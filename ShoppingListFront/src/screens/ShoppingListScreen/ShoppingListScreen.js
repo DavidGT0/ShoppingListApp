@@ -18,6 +18,8 @@ import {
 } from '../../services/api';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
+import DraggableFlatList from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const ShoppingListScreen = ({ navigation }) => {
   const [items, setItems] = useState([]);
@@ -62,6 +64,15 @@ const ShoppingListScreen = ({ navigation }) => {
       setItems(items.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
+    }
+  };
+
+  const handleUpdateAmount = async (item, newAmount) => {
+    try {
+      const updated = await updateItem(item.id, { amount: newAmount });
+      setItems(items.map(i => (i.id === item.id ? updated : i)));
+    } catch (error) {
+      Alert.alert('שגיאה', 'לא הצלחנו לעדכן את הכמות');
     }
   };
 
@@ -113,97 +124,113 @@ const ShoppingListScreen = ({ navigation }) => {
   const purchasedItems = items.filter(item => item.purchased);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>רשימת הקניות שלי</Text>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('Settings')}
-        >
-          <Text style={styles.settingsIcon}>⚙️</Text>
-        </TouchableOpacity>
-      </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>רשימת הקניות שלי</Text>
+            <TouchableOpacity
+              style={styles.settingsButton}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <Text style={styles.settingsIcon}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
 
-      <View style={styles.addContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="הוסף מוצר חדש..."
-          value={newItemName}
-          onChangeText={setNewItemName}
-          onSubmitEditing={handleAddItem}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.addContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="הוסף מוצר חדש..."
+              value={newItemName}
+              onChangeText={setNewItemName}
+              onSubmitEditing={handleAddItem}
+            />
+            <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
+              <Text style={styles.addButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
 
-      <FlatList
-        data={unpurchasedItems}
-        keyExtractor={item => item.id.toString()}
-        renderItem={({ item }) => (
-          <ShoppingListItem
-            item={item}
-            onTogglePurchased={() => handleTogglePurchased(item)}
-            onEdit={() => openEditModal(item)}
-            onDelete={() => handleDeleteItem(item.id)}
-          />
-        )}
-      />
-
-      {purchasedItems.length > 0 && (
-        <>
-          <View style={styles.divider} />
-          <Text style={styles.sectionTitle}>מוצרים שנקנו</Text>
-          <FlatList
-            data={purchasedItems}
+          <DraggableFlatList
+            data={unpurchasedItems}
             keyExtractor={item => item.id.toString()}
-            renderItem={({ item }) => (
-              <ShoppingListItem
-                item={item}
-                onTogglePurchased={() => handleTogglePurchased(item)}
-                onEdit={() => openEditModal(item)}
-                onDelete={() => handleDeleteItem(item.id)}
-              />
+            onDragEnd={({ data }) => {
+              setItems(data);
+              // כאן תבוא הפונקציה שמעדכנת את ה-position בשרת
+            }}
+            renderItem={({ item, drag }) => (
+              <TouchableOpacity onLongPress={drag}>
+                <ShoppingListItem
+                  item={item}
+                  onTogglePurchased={() => handleTogglePurchased(item)}
+                  onEdit={() => openEditModal(item)}
+                  onDelete={() => handleDeleteItem(item.id)}
+                  onUpdateAmount={newAmount =>
+                    handleUpdateAmount(item, newAmount)
+                  }
+                />
+              </TouchableOpacity>
             )}
           />
-        </>
-      )}
 
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>ערוך מוצר</Text>
-            <TextInput
-              style={styles.modalInput}
-              defaultValue={editingItem?.name}
-              onChangeText={text =>
-                setEditingItem({ ...editingItem, name: text })
-              }
-              autoFocus
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>ביטול</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={() => handleEditItem(editingItem?.name)}
-              >
-                <Text style={styles.saveButtonText}>שמור</Text>
-              </TouchableOpacity>
+          {purchasedItems.length > 0 && (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionTitle}>מוצרים שנקנו</Text>
+              <FlatList
+                data={purchasedItems}
+                keyExtractor={item => item.id.toString()}
+                renderItem={({ item }) => (
+                  <ShoppingListItem
+                    item={item}
+                    onTogglePurchased={() => handleTogglePurchased(item)}
+                    onEdit={() => openEditModal(item)}
+                    onDelete={() => handleDeleteItem(item.id)}
+                    onUpdateAmount={newAmount =>
+                      handleUpdateAmount(item, newAmount)
+                    }
+                  />
+                )}
+              />
+            </>
+          )}
+
+          <Modal
+            visible={modalVisible}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>ערוך מוצר</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  defaultValue={editingItem?.name}
+                  onChangeText={text =>
+                    setEditingItem({ ...editingItem, name: text })
+                  }
+                  autoFocus
+                />
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => setModalVisible(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>ביטול</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.saveButton]}
+                    onPress={() => handleEditItem(editingItem?.name)}
+                  >
+                    <Text style={styles.saveButtonText}>שמור</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </View>
+          </Modal>
         </View>
-      </Modal>
-    </View>
+      </View>
+    </GestureHandlerRootView>
   );
 };
 

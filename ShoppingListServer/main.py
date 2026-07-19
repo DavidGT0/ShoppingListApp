@@ -73,3 +73,12 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
     db.delete(item)
     db.commit()
     return {"message": "Item deleted successfully"}
+    
+@app.post("/items/reorder")
+async def reorder_items(reordered_items: list[dict]):
+    # reordered_items יקבל רשימה של {id: 1, position: 0}, {id: 2, position: 1} וכו'
+    for item_data in reordered_items:
+        # כאן תריץ עדכון ל-SQL:
+        # UPDATE items SET position = item_data['position'] WHERE id = item_data['id']
+        pass
+    return {"status": "success"}
