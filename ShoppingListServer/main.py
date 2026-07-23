@@ -335,3 +335,34 @@ async def reorder_items(reordered_items: List[dict], current_user: models.User =
     
     db.commit()
     return {"status": "success"}
+    
+@app.put("/lists/{list_id}", response_model=ShoppingListResponse)
+def update_list(list_id: int, list_data: ShoppingListCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """עדכון שם רשימה"""
+    shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
+    if not shopping_list:
+        raise HTTPException(status_code=404, detail="List not found")
+    
+    # בדיקת הרשאות (רק הבעלים יכול לערוך את שם הרשימה)
+    if shopping_list.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this list")
+    
+    shopping_list.name = list_data.name
+    db.commit()
+    db.refresh(shopping_list)
+    return shopping_list
+
+@app.delete("/lists/{list_id}")
+def delete_list(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """מחיקת רשימה (כולל כל הפריטים שבה בזכות cascade)"""
+    shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
+    if not shopping_list:
+        raise HTTPException(status_code=404, detail="List not found")
+    
+    # בדיקת הרשאות (רק הבעלים יכול למחוק את הרשימה)
+    if shopping_list.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this list")
+    
+    db.delete(shopping_list)
+    db.commit()
+    return {"message": "List deleted successfully"}    
