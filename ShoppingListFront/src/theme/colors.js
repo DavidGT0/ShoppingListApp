@@ -1,15 +1,42 @@
 ﻿export const colors = {
-  background: '#f5f5f5',
-  surface: '#ffffff',
-  primary: '#007AFF',
-  success: '#34C759',
-  danger: '#FF3B30',
-  warning: '#FF9500',
+  // צבעי רקע
+  background: '#F8F9FA',
+  surface: '#FFFFFF',
+  surfaceHover: '#F1F3F5',
+
+  // צבעים עיקריים
+  primary: '#5B8DEE',
+  primaryLight: '#7BA5F4',
+  primaryDark: '#4A7BCF',
+
+  // צבעי סטטוס
+  success: '#4CAF50',
+  successLight: '#81C784',
+  danger: '#F44336',
+  dangerLight: '#EF5350',
+  warning: '#FF9800',
+  warningLight: '#FFB74D',
+
+  // טקסט
   text: {
-    primary: '#333333',
-    secondary: '#666666',
-    disabled: '#999999',
+    primary: '#212529',
+    secondary: '#6C757D',
+    disabled: '#ADB5BD',
+    inverse: '#FFFFFF',
   },
-  border: '#e0e0e0',
-  purchased: '#e8f5e9',
+
+  // גבולות וקווים
+  border: '#DEE2E6',
+  borderLight: '#E9ECEF',
+
+  // מוצרים שנרכשו
+  purchased: '#E8F5E9',
+  purchasedText: '#9E9E9E',
+
+  // צללים
+  shadow: {
+    light: 'rgba(0, 0, 0, 0.05)',
+    medium: 'rgba(0, 0, 0, 0.1)',
+    dark: 'rgba(0, 0, 0, 0.2)',
+  },
 };
