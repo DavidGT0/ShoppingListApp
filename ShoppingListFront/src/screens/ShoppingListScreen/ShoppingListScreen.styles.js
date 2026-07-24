@@ -21,18 +21,27 @@ export const styles = StyleSheet.create({
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // דוחף את הכפתור שמאלה ואת הטקסט ימינה
+    alignItems: 'center', // ממורכז אותם לאותו קו גובה בדיוק
+    width: '100%',
+    marginBottom: 0, // רווח קל לפני שם הרשימה הגדול
+  },
   backButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginBottom: 10,
+    width: 44, // גודל קבוע כדי ליצור ריבוע/מלבן מדויק
+    height: 44,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)', // רקע חצי שקוף כמו בתמונה (אם כבר יש לך צבע משלך, השאר אותו)
+    borderRadius: 12,
+    justifyContent: 'center', // מרכוז אנכי של החץ בתוך הכפתור
+    alignItems: 'center', // מרכוז אופקי של החץ בתוך הכפתור
   },
   backButtonText: {
-    color: colors.text.inverse,
-    fontSize: 18,
+    color: '#FFFFFF',
+    fontSize: 28, // הגדלנו את החץ
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: -4, // תיקון אופטי קטן: לתווי טקסט של חצים יש לרוב רווח תחתון מובנה, זה ממקם אותו בול באמצע
   },
   headerEyebrow: {
     color: 'rgba(255,255,255,0.75)',
@@ -48,12 +57,14 @@ export const styles = StyleSheet.create({
     color: colors.text.inverse,
     textAlign: 'right',
     letterSpacing: -0.5,
+    marginTop: -4,
+    marginBottom: 2,
   },
   headerSubtitle: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.85)',
     textAlign: 'right',
-    marginTop: 4,
+    marginTop: 0,
     fontWeight: '500',
   },
 
@@ -86,7 +97,7 @@ export const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 380,
   },
 
   /* מודאל עריכה */
@@ -158,5 +169,32 @@ export const styles = StyleSheet.create({
     color: colors.text.inverse,
     fontSize: 17,
     fontWeight: '700',
+  },
+  tipContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 0.2,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 4,
+    textAlign: 'right',
+  },
+  tipText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    textAlign: 'right',
+  },
+  boldText: {
+    fontWeight: 'bold',
+    color: '#333',
   },
 });

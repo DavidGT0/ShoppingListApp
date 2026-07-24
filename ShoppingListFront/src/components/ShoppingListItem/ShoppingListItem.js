@@ -7,7 +7,6 @@ import {
   Animated,
 } from 'react-native';
 import { TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
-// החזרנו את הייבוא המקורי והנכון שעובד בגרסה שלך!
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
@@ -57,7 +56,6 @@ const ShoppingListItem = ({
     outputRange: [0, nameWidth],
   });
 
-  // הרקע שמוצג כשמחליקים ימינה (קניה)
   const renderLeftActions = () => {
     return (
       <TouchableOpacity
@@ -72,7 +70,6 @@ const ShoppingListItem = ({
     );
   };
 
-  // הרקע שמוצג כשמחליקים שמאלה (מחיקה)
   const renderRightActions = () => {
     return (
       <TouchableOpacity
@@ -87,15 +84,12 @@ const ShoppingListItem = ({
     );
   };
 
-  // הפונקציה שמופעלת ברגע שההחלקה מתבצעת
   const handleSwipeableOpen = direction => {
-    swipeableRef.current?.close(); // סוגר את השורה מיד כדי שהיא לא תיתקע פתוחה בצד
+    swipeableRef.current?.close();
 
     if (direction === 'left') {
-      // 'left' אומר שהפאנל השמאלי נחשף (כלומר האצבע החליקה ימינה) -> קניה
       onTogglePurchased();
     } else if (direction === 'right') {
-      // 'right' אומר שהפאנל הימני נחשף (כלומר האצבע החליקה שמאלה) -> מחיקה
       onDelete();
     }
   };
@@ -105,7 +99,7 @@ const ShoppingListItem = ({
       ref={swipeableRef}
       renderLeftActions={renderRightActions}
       renderRightActions={renderLeftActions}
-      onSwipeableWillOpen={handleSwipeableOpen} // משתמשים ב-WillOpen כדי שהפעולה תקרה מיד וחלקה
+      onSwipeableWillOpen={handleSwipeableOpen}
       overshootLeft={false}
       overshootRight={false}
       friction={2}
@@ -149,12 +143,12 @@ const ShoppingListItem = ({
               onLayout={e => setNameWidth(e.nativeEvent.layout.width)}
               style={styles.nameInner}
             >
+              {/* --- משימה 3: הוסר ה-numberOfLines כדי לאפשר לטקסט לגלוש ולייצג את השם המלא --- */}
               <Text
                 style={[
                   styles.itemName,
                   item.purchased && styles.purchasedTextColor,
                 ]}
-                numberOfLines={1}
               >
                 {item.name}
               </Text>

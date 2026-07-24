@@ -28,7 +28,7 @@ import { colors } from '../../theme/colors';
 
 const ShoppingListScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  const { listId, listName } = route.params || {}; // קבלת ה-ID ושם הרשימה מהמסך הקודם
+  const { listId, listName } = route.params || {};
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState(null);
@@ -45,7 +45,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
     try {
       setLoading(true);
       const data = await getShoppingList(id);
-      setItems(data || []);
+      // מיון המוצרים לפי שדה ה-position כדי לשמור על הסדר הנכון מהשרת
+      const sortedData = (data || []).sort(
+        (a, b) => (a.position ?? 0) - (b.position ?? 0),
+      );
+      setItems(sortedData);
     } catch (error) {
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את המוצרים לרשימה זו.');
     } finally {
@@ -58,9 +62,32 @@ const ShoppingListScreen = ({ route, navigation }) => {
       Alert.alert('שגיאה', 'לא נבחרה רשימה פעילה');
       return;
     }
+
+    const isDuplicate = items.some(
+      item => item.name.trim().toLowerCase() === name.trim().toLowerCase(),
+    );
+
+    if (isDuplicate) {
+      Alert.alert('שים לב', 'המוצר כבר קיים ברשימה');
+      return;
+    }
+
     try {
       const newItem = await addItem(name, currentListId, 1);
-      setItems(prevItems => [...prevItems, newItem]);
+
+      const unpurchasedItems = items.filter(item => !item.purchased);
+      const purchasedItems = items.filter(item => item.purchased);
+
+      // הכנסת המוצר החדש לראש רשימת הלא-נקונים
+      const updatedUnpurchased = [newItem, ...unpurchasedItems];
+      setItems([...updatedUnpurchased, ...purchasedItems]);
+
+      // עדכון המיקום (position) בשרת כך שהמוצר החדש יישאר תמיד למעלה גם אחרי רענון
+      const reorderedData = updatedUnpurchased.map((item, index) => ({
+        id: item.id,
+        position: index,
+      }));
+      await reorderItems(reorderedData);
     } catch (error) {
       Alert.alert('שגיאה', 'לא הצלחנו להוסיף את המוצר');
     }
@@ -115,6 +142,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleDragEnd = async ({ data }) => {
+    const purchasedItems = items.filter(item => item.purchased);
     setItems([...data, ...purchasedItems]);
     const reorderedData = data.map((item, index) => ({
       id: item.id,
@@ -145,16 +173,30 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* כותרת עליונה מעוצבת תואמת למסך הרשימות */}
-      <View style={[styles.headerBackground, { paddingTop: insets.top + 24 }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerEyebrow}>ניהול מוצרים ברשימה</Text>
+      {/* 
+        שינוי 1: הקטנת הריווח העליון
+        שינינו את insets.top + 24 ל- insets.top + 8
+        אפשר להקטין עוד אם צריך
+      */}
+      {/* הורדנו את הרווח העליון, והשארנו רווח תחתון קטן רק כדי לעבור את חלון ההוספה */}
+      <View
+        style={[
+          styles.headerBackground,
+          { paddingTop: insets.top + 5, paddingBottom: 40 },
+        ]}
+      >
+        {/* שורה עליונה חדשה המאגדת את הכפתור והכותרת הקטנה */}
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerEyebrow}>ניהול מוצרים ברשימה</Text>
+        </View>
+
         <Text style={styles.mainTitle} numberOfLines={1}>
           {listName || 'רשימת קניות'}
         </Text>
@@ -167,21 +209,32 @@ const ShoppingListScreen = ({ route, navigation }) => {
         </Text>
       </View>
 
-      {/* כרטיס הוספת מוצר - מרחף מעל הכותרת בדיוק כמו במסך הקודם */}
+      {/* תיבת ההוספה נשארת קבועה כדי שתמיד יהיה אפשר להוסיף מוצרים */}
       <View style={styles.addCard}>
         <AddItemInput onAdd={handleAddItem} />
       </View>
 
-      {/* רשימת המוצרים שלא נקנו + רשימת המוצרים שנקנו כ-Footer (נגללים יחד) */}
       <DraggableFlatList
         data={unpurchasedItems}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
         onDragEnd={handleDragEnd}
         ListHeaderComponent={
-          unpurchasedItems.length > 0 ? (
-            <Text style={styles.sectionLabel}>מוצרים לקנייה</Text>
-          ) : null
+          <View>
+            <View style={styles.tipContainer}>
+              <Text style={styles.tipTitle}>💡 טיפ שימושי:</Text>
+              <Text style={styles.tipText}>
+                • <Text style={styles.boldText}>סימון כנקנה:</Text> החלק שמאלה.
+                {'\n'}• <Text style={styles.boldText}>מחיקת מוצר:</Text> החלק
+                ימינה.
+              </Text>
+            </View>
+
+            {/* הכותרת המקורית של "מוצרים לקנייה" מופיעה מתחת לטיפ במידה ויש מוצרים */}
+            {unpurchasedItems.length > 0 && (
+              <Text style={styles.sectionLabel}>מוצרים לקנייה</Text>
+            )}
+          </View>
         }
         renderItem={({ item, drag, isActive }) => (
           <ShoppingListItem
@@ -205,7 +258,6 @@ const ShoppingListScreen = ({ route, navigation }) => {
         }
       />
 
-      {/* מודאל עריכה מופרד */}
       <EditItemModal
         visible={modalVisible}
         item={editingItem}

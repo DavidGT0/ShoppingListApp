@@ -6,16 +6,24 @@ import {
   Alert,
   ScrollView,
   Switch,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { styles } from './SettingsScreen.styles';
-import { logout, getCurrentUser } from '../../services/auth';
-// ניתן להשתמש ב-AsyncStorage או שירות שמירת הגדרות אחר
+import { logout, getCurrentUser, changePassword } from '../../services/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SettingsScreen = ({ navigation, onLogout }) => {
   const [user, setUser] = useState(null);
   const [autoResetEnabled, setAutoResetEnabled] = useState(false);
-  const [resetInterval, setResetInterval] = useState('daily'); // daily / weekly / off
+  const [resetInterval, setResetInterval] = useState('daily');
+
+  // States עבור שינוי סיסמה
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -62,6 +70,33 @@ const SettingsScreen = ({ navigation, onLogout }) => {
     }
   };
 
+  // פונקציית טיפול בשינוי סיסמה
+  const handleSubmitPasswordChange = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('שגיאה', 'נא למלא את כל השדות');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('שגיאה', 'הסיסמאות החדשות אינן תואמות');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      Alert.alert('הצלחה', 'הסיסמה שונתה בהצלחה');
+      // איפוס הטופס וסגירתו
+      setShowPasswordForm(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      Alert.alert('שגיאה', error.message || 'אירעה שגיאה בשינוי הסיסמה');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   const handleLogout = () => {
     Alert.alert('התנתקות', 'האם אתה בטוח שברצונך להתנתק?', [
       { text: 'ביטול', style: 'cancel' },
@@ -101,6 +136,74 @@ const SettingsScreen = ({ navigation, onLogout }) => {
           </View>
         </View>
       )}
+
+      {/* אזור אבטחה - שינוי סיסמה */}
+      <View style={styles.userSection}>
+        <Text style={styles.sectionTitle}>אבטחה</Text>
+
+        {!showPasswordForm ? (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => setShowPasswordForm(true)}
+          >
+            <Text style={styles.actionButtonText}>שנה סיסמה</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.passwordForm}>
+            <TextInput
+              style={styles.input}
+              placeholder="סיסמה נוכחית"
+              placeholderTextColor="#888"
+              secureTextEntry
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="סיסמה חדשה"
+              placeholderTextColor="#888"
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="אימות סיסמה חדשה"
+              placeholderTextColor="#888"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
+
+            <View style={styles.formButtonsRow}>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSubmitPasswordChange}
+                disabled={isChangingPassword}
+              >
+                {isChangingPassword ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>שמור סיסמה</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowPasswordForm(false);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+                disabled={isChangingPassword}
+              >
+                <Text style={styles.cancelButtonText}>ביטול</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
 
       {/* הגדרת איפוס אוטומטי של מוצרים שנקנו */}
       <View style={styles.userSection}>

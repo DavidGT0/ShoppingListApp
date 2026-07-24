@@ -125,4 +125,64 @@ export const styles = StyleSheet.create({
   intervalTextActive: {
     color: colors.primary,
   },
+  // --- סגנונות חדשים עבור שינוי סיסמה ---
+  actionButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  passwordForm: {
+    marginTop: 10,
+  },
+  input: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 16,
+    color: colors.text.primary,
+    textAlign: 'right',
+  },
+  formButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  cancelButtonText: {
+    color: colors.text.secondary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

@@ -129,3 +129,37 @@ export const getCurrentUser = async () => {
     throw error;
   }
 };
+
+/**
+ * שינוי סיסמת משתמש
+ */
+export const changePassword = async (currentPassword, newPassword) => {
+  try {
+    const token = await getToken();
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/users/password`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to change password');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Change password error:', error);
+    throw error;
+  }
+};

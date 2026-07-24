@@ -69,3 +69,4 @@ Database password/
 ShoppingListServer/.env
 venv/
 __pycache__/
+*.jks
