@@ -215,7 +215,7 @@ def change_password(
         )
     
     # 2. (אופציונלי אבל מומלץ) בדיקת אורך סיסמה חדשה
-    if len(password_data.new_password) <= 4:
+    if len(password_data.new_password) < 4:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="הסיסמה החדשה חייבת להכיל לפחות 4 תווים"
