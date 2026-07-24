@@ -41,6 +41,10 @@ class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
+    
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 class UserResponse(BaseModel):
     id: int
@@ -195,6 +199,33 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     """קבלת פרטי המשתמש המחובר"""
     return current_user
+    
+@app.put("/users/password")
+def change_password(
+    password_data: PasswordChangeRequest, 
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    """שינוי סיסמת משתמש"""
+    # 1. אימות שהסיסמה הנוכחית נכונה
+    if not verify_password(password_data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="הסיסמה הנוכחית שגויה"
+        )
+    
+    # 2. (אופציונלי אבל מומלץ) בדיקת אורך סיסמה חדשה
+    if len(password_data.new_password) <= 4:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="הסיסמה החדשה חייבת להכיל לפחות 4 תווים"
+        )
+
+    # 3. הצפנת הסיסמה החדשה ושמירה
+    current_user.hashed_password = get_password_hash(password_data.new_password)
+    db.commit()
+    
+    return {"message": "הסיסמה עודכנה בהצלחה"}    
 
 # === Shopping Lists Endpoints ===
 
