@@ -81,6 +81,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
               onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
+              testID="username_input" // <-- נוסף מזהה
+              accessibilityLabel="username_input"
             />
           </View>
 
@@ -95,6 +97,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoCorrect={false}
+                testID="email_input" // <-- נוסף מזהה
+                accessibilityLabel="email_input"
               />
             </View>
           )}
@@ -109,6 +113,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
+              testID="password_input" // <-- נוסף מזהה
+              accessibilityLabel="password_input"
             />
           </View>
 
@@ -116,6 +122,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
             style={styles.submitButton}
             onPress={handleSubmit}
             disabled={loading}
+            testID="login_button" // <-- נוסף מזהה
+            accessibilityLabel="login_button"
           >
             {loading ? (
               <ActivityIndicator color={colors.text.inverse} />
@@ -129,6 +137,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
           <TouchableOpacity
             style={styles.switchButton}
             onPress={() => setIsLogin(!isLogin)}
+            testID="switch_mode_button" // <-- נוסף מזהה
           >
             <Text style={styles.switchButtonText}>
               {isLogin

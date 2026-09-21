@@ -135,11 +135,15 @@ const MyListsScreen = ({ navigation }) => {
           value={newListName}
           onChangeText={setNewListName}
           placeholderTextColor={colors.text.secondary}
+          testID="new_list_input" // <-- מזהה לשדה יצירת רשימה
+          accessibilityLabel="new_list_input"
         />
         <TouchableOpacity
           style={styles.createButton}
           onPress={handleCreateList}
           activeOpacity={0.85}
+          testID="create_list_button" // <-- מזהה לכפתור יצירת רשימה
+          accessibilityLabel="create_list_button"
         >
           <Text style={styles.createButtonText}>+</Text>
         </TouchableOpacity>
@@ -164,6 +168,8 @@ const MyListsScreen = ({ navigation }) => {
                   listName: item.name,
                 })
               }
+              testID="list_card" // <-- מזהה לכרטיס רשימה כדי ללחוץ עליה
+              accessibilityLabel="list_card"
             >
               <Text style={styles.listNameText}>{item.name}</Text>
             </TouchableOpacity>

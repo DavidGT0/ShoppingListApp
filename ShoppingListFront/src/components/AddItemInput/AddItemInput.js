@@ -22,8 +22,15 @@ const AddItemInput = ({ onAdd }) => {
         value={name}
         onChangeText={setName}
         onSubmitEditing={handleAdd}
+        testID="add_item_input" // <-- מזהה עבור שדה ההקלדה
+        accessibilityLabel="add_item_input"
       />
-      <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={handleAdd}
+        testID="add_item_button" // <-- מזהה עבור כפתור ההוספה
+        accessibilityLabel="add_item_button"
+      >
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
     </View>
