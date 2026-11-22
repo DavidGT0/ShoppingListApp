@@ -173,3 +173,100 @@ def test_limiter_forgets_old_failures():
     assert limiter.is_blocked(1, now=1599.0)
     assert not limiter.is_blocked(1, now=1601.0)
     assert not limiter.is_blocked(2, now=1000.0)
+
+
+def _share(client, owner, list_id, username):
+    client.post("/lists/share", json={"list_id": list_id, "username": username}, headers=owner)
+
+
+def test_members_lists_owner_first_without_emails(client, register):
+    alice = register("alice")
+    bob = register("bob")
+    carol = register("carol")
+    dave = register("dave")
+    list_id = _make_list(client, alice)
+    _share(client, alice, list_id, "dave")
+    _share(client, alice, list_id, "bob")
+
+    for headers in (alice, bob):
+        r = client.get(f"/lists/{list_id}/members", headers=headers)
+        assert r.status_code == 200
+        members = r.json()
+        assert [m["username"] for m in members] == ["alice", "bob", "dave"]
+        assert [m["is_owner"] for m in members] == [True, False, False]
+        assert all(set(m) == {"id", "username", "is_owner"} for m in members)
+
+    assert client.get(f"/lists/{list_id}/members", headers=carol).status_code == 403
+    assert client.get("/lists/9999/members", headers=alice).status_code == 404
+
+
+def _member_id(client, headers, list_id, username):
+    members = client.get(f"/lists/{list_id}/members", headers=headers).json()
+    return next(m["id"] for m in members if m["username"] == username)
+
+
+def test_owner_removes_member(client, register):
+    alice = register("alice")
+    bob = register("bob")
+    list_id = _make_list(client, alice)
+    _share(client, alice, list_id, "bob")
+    bob_id = _member_id(client, alice, list_id, "bob")
+
+    r = client.delete(f"/lists/{list_id}/members/{bob_id}", headers=alice)
+
+    assert r.status_code == 200
+    assert client.get(f"/items?list_id={list_id}", headers=bob).status_code == 403
+    assert list_id not in [lst["id"] for lst in client.get("/lists", headers=bob).json()]
+
+
+def test_member_cannot_remove_others(client, register):
+    alice = register("alice")
+    bob = register("bob")
+    carol = register("carol")
+    list_id = _make_list(client, alice)
+    _share(client, alice, list_id, "bob")
+    _share(client, alice, list_id, "carol")
+    carol_id = _member_id(client, alice, list_id, "carol")
+
+    r = client.delete(f"/lists/{list_id}/members/{carol_id}", headers=bob)
+
+    assert r.status_code == 403
+    assert client.get(f"/items?list_id={list_id}", headers=carol).status_code == 200
+
+
+def test_member_leaves(client, register):
+    alice = register("alice")
+    bob = register("bob")
+    list_id = _make_list(client, alice)
+    _share(client, alice, list_id, "bob")
+
+    r = client.post(f"/lists/{list_id}/leave", headers=bob)
+
+    assert r.status_code == 200
+    assert client.get(f"/items?list_id={list_id}", headers=bob).status_code == 403
+
+
+def test_owner_cannot_leave(client, register):
+    alice = register("alice")
+    list_id = _make_list(client, alice)
+
+    r = client.post(f"/lists/{list_id}/leave", headers=alice)
+
+    assert r.status_code == 400
+    assert r.json()["detail"] == "הבעלים לא יכול לעזוב את הרשימה"
+
+
+def test_deleting_owner_account_removes_lists_invites_and_memberships(client, register, db):
+    alice = register("alice", "pw-a")
+    bob = register("bob", "pw-b")
+    list_id = _make_list(client, alice)
+    _invite_code(client, alice, list_id)
+    _share(client, alice, list_id, "bob")
+
+    r = client.request("DELETE", "/users/me", json={"password": "pw-a"}, headers=alice)
+
+    assert r.status_code == 200
+    db.expire_all()
+    assert db.query(models.ListInvite).count() == 0
+    assert db.execute(models.shared_lists.select().where(models.shared_lists.c.list_id == list_id)).fetchall() == []
+    assert db.query(models.ShoppingList).filter_by(id=list_id).count() == 0
