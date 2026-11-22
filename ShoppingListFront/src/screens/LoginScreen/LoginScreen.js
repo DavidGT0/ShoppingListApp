@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,17 @@ const LoginScreen = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // אם הבקשה לוקחת יותר מ-5 שניות - כנראה השרת "מתעורר", ומסבירים את זה למשתמש
+  const [isSlow, setIsSlow] = useState(false);
+  useEffect(() => {
+    if (!loading) {
+      setIsSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsSlow(true), 5000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   // שכחתי סיסמה
   const [showForgot, setShowForgot] = useState(false);
@@ -161,6 +172,12 @@ const LoginScreen = ({ onLoginSuccess }) => {
               </Text>
             )}
           </TouchableOpacity>
+
+          {isSlow && (
+            <Text style={styles.slowServerNote} testID="slow_server_note">
+              השרת מתעורר, זה יכול לקחת עד דקה…
+            </Text>
+          )}
 
           {isLogin && (
             <TouchableOpacity

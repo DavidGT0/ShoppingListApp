@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
@@ -56,6 +56,12 @@ class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
+
+    @field_validator("username", "email", mode="before")
+    @classmethod
+    def strip_spaces(cls, value):
+        """הסרת רווחים מסביב (המקלדת בטלפון מוסיפה רווח אחרי מילה)"""
+        return value.strip() if isinstance(value, str) else value
     
 class PasswordChangeRequest(BaseModel):
     current_password: str
@@ -131,6 +137,17 @@ def get_user_by_username(db: Session, username: str):
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 
+def find_user_for_login(db: Session, username: str):
+    """שם מדויק; ואם לא נמצא - לפי השם בלי רווחים מסביב
+    (כולל משתמשים ישנים שנרשמו בטעות עם רווח, לפני שההרשמה התחילה להסיר רווחים)"""
+    user = get_user_by_username(db, username)
+    if user:
+        return user
+    stripped = username.strip()
+    if not stripped:
+        return None
+    return db.query(models.User).filter(func.trim(models.User.username) == stripped).first()
+
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """קבלת המשתמש הנוכחי מהtoken"""
     credentials_exception = HTTPException(
@@ -167,12 +184,12 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     if get_user_by_username(db, user.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
+            detail="שם המשתמש כבר תפוס"
         )
     if get_user_by_email(db, user.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="כתובת האימייל כבר רשומה"
         )
     
     # יצירת משתמש חדש עם סיסמא מוצפנת
@@ -199,11 +216,11 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 @app.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """התחברות וקבלת token"""
-    user = get_user_by_username(db, form_data.username)
+    user = find_user_for_login(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="שם משתמש או סיסמה שגויים",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

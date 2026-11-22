@@ -1,30 +1,25 @@
 ﻿import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, apiFetch } from './http';
+import { apiFetch, publicFetch, readErrorMessage } from './http';
 
 /**
  * הרשמה של משתמש חדש
  */
 export const register = async (username, email, password) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/register`, {
+    // הסרת רווחים מסביב - המקלדת בטלפון מוסיפה רווח אחרי מילה
+    const response = await publicFetch('/register', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({
+        username: username.trim(),
+        email: email.trim(),
+        password,
+      }),
     });
 
     if (!response.ok) {
-      // בודקים אם התשובה היא JSON לפני שמפעילים parse
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Registration failed');
-      } else {
-        const textError = await response.text();
-        console.error('Server raw response:', textError);
-        throw new Error('Server error occurred. Please check backend logs.');
-      }
+      throw new Error(
+        await readErrorMessage(response, 'ההרשמה נכשלה. נסה שוב בעוד רגע.'),
+      );
     }
 
     return await response.json();
@@ -39,12 +34,14 @@ export const register = async (username, email, password) => {
  */
 export const login = async (username, password) => {
   try {
+    const cleanUsername = username.trim();
+
     // FastAPI OAuth2 מצפה לפורמט form-data
     const formData = new URLSearchParams();
-    formData.append('username', username);
+    formData.append('username', cleanUsername);
     formData.append('password', password);
 
-    const response = await fetch(`${API_BASE_URL}/token`, {
+    const response = await publicFetch('/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -53,15 +50,16 @@ export const login = async (username, password) => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Login failed');
+      throw new Error(
+        await readErrorMessage(response, 'ההתחברות נכשלה. נסה שוב בעוד רגע.'),
+      );
     }
 
     const data = await response.json();
 
     // שמירת ה-token ב-AsyncStorage
     await AsyncStorage.setItem('access_token', data.access_token);
-    await AsyncStorage.setItem('username', username);
+    await AsyncStorage.setItem('username', cleanUsername);
 
     return data;
   } catch (error) {
@@ -134,8 +132,9 @@ export const changePassword = async (currentPassword, newPassword) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to change password');
+      throw new Error(
+        await readErrorMessage(response, 'שינוי הסיסמה נכשל. נסה שוב בעוד רגע.'),
+      );
     }
 
     return await response.json();
@@ -149,9 +148,8 @@ export const changePassword = async (currentPassword, newPassword) => {
  * בקשת קישור לאיפוס סיסמה במייל. מחזיר את הודעת השרת (זהה תמיד, גם למייל שלא רשום).
  */
 export const requestPasswordReset = async email => {
-  const response = await fetch(`${API_BASE_URL}/password-reset/request`, {
+  const response = await publicFetch('/password-reset/request', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: email.trim() }),
   });
 
@@ -173,11 +171,8 @@ export const deleteAccount = async password => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        typeof errorData.detail === 'string'
-          ? errorData.detail
-          : 'מחיקת החשבון נכשלה',
+        await readErrorMessage(response, 'מחיקת החשבון נכשלה'),
       );
     }
 

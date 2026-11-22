@@ -78,3 +78,27 @@ describe('LoginScreen - forgot password', () => {
     expect(byTestId('forgot_password_link')).toBeUndefined();
   });
 });
+
+describe('LoginScreen - slow server', () => {
+  const { login } = require('../src/services/auth');
+
+  test('shows a "server is waking up" note only after 5 seconds of waiting', async () => {
+    jest.useFakeTimers();
+    login.mockReturnValue(new Promise(() => {})); // השרת לא עונה
+    const { byTestId } = await renderLogin();
+
+    await act(async () => byTestId('username_input').props.onChangeText('bob'));
+    await act(async () => byTestId('password_input').props.onChangeText('pw-1234'));
+    // לא מחכים ל-onPress: ההתחברות "תקועה" בכוונה
+    await act(async () => {
+      byTestId('login_button').props.onPress();
+    });
+
+    await act(async () => jest.advanceTimersByTime(4900));
+    expect(byTestId('slow_server_note')).toBeUndefined();
+
+    await act(async () => jest.advanceTimersByTime(200));
+    expect(byTestId('slow_server_note')).toBeDefined();
+    jest.useRealTimers();
+  });
+});

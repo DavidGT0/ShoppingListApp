@@ -20,7 +20,7 @@ import SettingsScreen from './src/screens/SettingsScreen/SettingsScreen';
 import LoginScreen from './src/screens/LoginScreen/LoginScreen';
 
 import { isAuthenticated } from './src/services/auth';
-import { setSessionExpiredHandler } from './src/services/http';
+import { setSessionExpiredHandler, wakeUpServer } from './src/services/http';
 import { colors } from './src/theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -96,6 +96,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // מעירים את השרת ברקע כבר עכשיו, כדי שיהיה מוכן עד שהמשתמש יתחבר
+    wakeUpServer();
     checkAuth();
 
     // כשהשרת דוחה את הטוקן (פג תוקף / לא תקין) - חוזרים למסך הכניסה

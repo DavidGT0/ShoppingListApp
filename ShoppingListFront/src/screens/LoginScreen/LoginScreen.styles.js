@@ -104,6 +104,12 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  slowServerNote: {
+    marginTop: 12,
+    textAlign: 'center',
+    color: colors.text.secondary,
+    fontSize: 14,
+  },
   // שכחתי סיסמה
   forgotButton: {
     alignSelf: 'center',
