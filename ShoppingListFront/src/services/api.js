@@ -316,3 +316,16 @@ export const clearPurchased = async listId => {
   }
   return (await response.json()).deleted;
 };
+
+/**
+ * שכפול רשימה - נוצרת רשימה חדשה בבעלותי עם אותם מוצרים
+ */
+export const duplicateList = async listId => {
+  const response = await apiFetch(`/lists/${listId}/duplicate`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו לשכפל את הרשימה');
+  }
+  return await response.json();
+};

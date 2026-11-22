@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Share,
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +17,11 @@ import {
   createShoppingList,
   updateShoppingList,
   deleteShoppingList,
+  duplicateList,
+  getShoppingList,
 } from '../../services/api';
+import ListActionsMenu from '../../components/ListActionsMenu/ListActionsMenu';
+import { buildListShareText } from '../../services/shareText';
 import JoinListModal from '../../components/JoinListModal/JoinListModal';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './MyListsScreen.styles';
@@ -32,6 +37,9 @@ const MyListsScreen = ({ navigation }) => {
   const [editingList, setEditingList] = useState(null);
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [newNameValue, setNewNameValue] = useState('');
+
+  // הרשימה שתפריט הפעולות (⋮) פתוח עבורה
+  const [menuList, setMenuList] = useState(null);
 
   // מצבים לניהול חלון ההצטרפות עם קוד הזמנה
   const [joinModalVisible, setJoinModalVisible] = useState(false);
@@ -142,6 +150,40 @@ const MyListsScreen = ({ navigation }) => {
         },
       },
     ]);
+  };
+
+  const handleDuplicateList = async list => {
+    setMenuList(null);
+    startMutation();
+    try {
+      const copy = await duplicateList(list.id);
+      setLists(prev => (prev.some(l => l.id === copy.id) ? prev : [...prev, copy]));
+    } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      Alert.alert('שגיאה', error.message || 'לא הצלחנו לשכפל את הרשימה');
+    } finally {
+      endMutation();
+    }
+  };
+
+  const handleShareText = async list => {
+    setMenuList(null);
+    try {
+      const items = await getShoppingList(list.id);
+      const message = buildListShareText(list.name, items);
+      if (!message) {
+        Alert.alert('', 'אין מוצרים לשליחה');
+        return;
+      }
+      await Share.share({ message });
+    } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      // שגיאות רשת כבר בעברית; שגיאות שרת (למשל 403) מגיעות באנגלית
+      Alert.alert(
+        'שגיאה',
+        error.network ? error.message : 'לא הצלחנו לשלוח את הרשימה',
+      );
+    }
   };
 
   const openRenameModal = list => {
@@ -260,31 +302,20 @@ const MyListsScreen = ({ navigation }) => {
               <Text style={styles.listNameText}>{item.name}</Text>
             </TouchableOpacity>
 
-            {/* רק הבעלים יכול לשנות שם או למחוק; ברשימה ששותפה איתך מוצג תג במקום */}
-            {item.is_owner === false ? (
+            {/* ברשימה ששותפה איתך מוצג תג, ולכל רשימה יש תפריט פעולות */}
+            {item.is_owner === false && (
               <View style={styles.sharedBadge} testID={`shared_badge_${item.id}`}>
                 <Text style={styles.sharedBadgeText}>משותפת</Text>
               </View>
-            ) : (
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  onPress={() => openRenameModal(item)}
-                  style={styles.actionIconBtn}
-                  testID={`edit_list_${item.id}`}
-                  accessibilityLabel="edit_list_button"
-                >
-                  <Text style={{ fontSize: 18 }}>✏️</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleDeleteList(item.id)}
-                  style={styles.actionIconBtn}
-                  testID={`delete_list_${item.id}`}
-                  accessibilityLabel="delete_list_button"
-                >
-                  <Text style={{ fontSize: 18 }}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
             )}
+            <TouchableOpacity
+              onPress={() => setMenuList(item)}
+              style={styles.actionIconBtn}
+              testID={`list_menu_${item.id}`}
+              accessibilityLabel="list_menu_button"
+            >
+              <Text style={styles.menuIcon}>⋮</Text>
+            </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={
@@ -292,6 +323,22 @@ const MyListsScreen = ({ navigation }) => {
             אין עדיין רשימות. צור רשימה חדשה למעלה!
           </Text>
         }
+      />
+
+      <ListActionsMenu
+        visible={!!menuList}
+        list={menuList}
+        onClose={() => setMenuList(null)}
+        onRename={list => {
+          setMenuList(null);
+          openRenameModal(list);
+        }}
+        onDuplicate={handleDuplicateList}
+        onShareText={handleShareText}
+        onDelete={list => {
+          setMenuList(null);
+          handleDeleteList(list.id);
+        }}
       />
 
       <JoinListModal
@@ -326,6 +373,7 @@ const MyListsScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={handleRenameList}
+                testID="rename_save_button"
               >
                 <Text style={styles.saveButtonText}>שמור</Text>
               </TouchableOpacity>
