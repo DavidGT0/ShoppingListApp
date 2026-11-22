@@ -277,3 +277,42 @@ export const leaveList = async listId => {
     await throwResponseError(response, 'לא הצלחנו לעזוב את הרשימה');
   }
 };
+
+/**
+ * הצעות להשלמה לשם מוצר (עד 8, בלי מוצרים שכבר פתוחים ברשימה)
+ */
+export const getSuggestions = async (q, listId) => {
+  const response = await apiFetch(
+    `/items/suggestions?q=${encodeURIComponent(q)}&list_id=${listId}`,
+  );
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו להביא הצעות');
+  }
+  return await response.json();
+};
+
+/**
+ * החזרת כל המוצרים שנקנו אל הרשימה. מחזיר את מספר המוצרים שהוחזרו
+ */
+export const restorePurchased = async listId => {
+  const response = await apiFetch(`/lists/${listId}/purchased/restore`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו להחזיר את המוצרים לרשימה');
+  }
+  return (await response.json()).restored;
+};
+
+/**
+ * מחיקת כל המוצרים שנקנו. מחזיר את מספר המוצרים שנמחקו
+ */
+export const clearPurchased = async listId => {
+  const response = await apiFetch(`/lists/${listId}/purchased/clear`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו למחוק את המוצרים שנקנו');
+  }
+  return (await response.json()).deleted;
+};

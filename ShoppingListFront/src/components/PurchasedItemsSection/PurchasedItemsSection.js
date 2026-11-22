@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import ShoppingListItem from '../ShoppingListItem/ShoppingListItem';
 import { styles } from './PurchasedItemsSection.styles';
 
@@ -9,14 +9,52 @@ const PurchasedItemsSection = ({
   onEdit,
   onDelete,
   onUpdateAmount,
+  onRestoreAll,
+  onClearAll,
 }) => {
   // אם אין מוצרים שנקנו, לא מרנדרים כלום
   if (!items || items.length === 0) return null;
+
+  const confirmRestore = () =>
+    Alert.alert('החזר הכל לרשימה', 'להחזיר את כל המוצרים שנקנו לרשימה?', [
+      { text: 'ביטול', style: 'cancel' },
+      { text: 'החזר', onPress: () => onRestoreAll && onRestoreAll() },
+    ]);
+
+  const confirmClear = () =>
+    Alert.alert('מחק את מה שנקנה', 'למחוק את כל המוצרים שנקנו?', [
+      { text: 'ביטול', style: 'cancel' },
+      {
+        text: 'מחק',
+        style: 'destructive',
+        onPress: () => onClearAll && onClearAll(),
+      },
+    ]);
 
   return (
     <View>
       <View style={styles.divider} />
       <Text style={styles.sectionTitle}>מוצרים שנקנו</Text>
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={confirmRestore}
+          testID="restore_all_button"
+          accessibilityLabel="restore_all_button"
+        >
+          <Text style={styles.actionText}>החזר הכל לרשימה</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={confirmClear}
+          testID="clear_purchased_button"
+          accessibilityLabel="clear_purchased_button"
+        >
+          <Text style={[styles.actionText, styles.actionTextDanger]}>
+            מחק את מה שנקנה
+          </Text>
+        </TouchableOpacity>
+      </View>
       {items.map(item => (
         <ShoppingListItem
           key={item.id.toString()}

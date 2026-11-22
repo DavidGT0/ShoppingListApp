@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime
+﻿from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -27,6 +27,9 @@ class User(Base):
 
     # בקשות איפוס סיסמה (נמחקות יחד עם המשתמש)
     reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+
+    # היסטוריית מוצרים להצעות השלמה (נמחקת יחד עם המשתמש)
+    item_history = relationship("ItemHistory", back_populates="user", cascade="all, delete-orphan")
 
 
 class ShoppingList(Base):
@@ -60,6 +63,21 @@ class ShoppingItem(Base):
     list_id = Column(Integer, ForeignKey('shopping_lists.id'))
     
     shopping_list = relationship("ShoppingList", back_populates="items")
+
+
+class ItemHistory(Base):
+    """שמות מוצרים שהמשתמש הוסיף בעבר, להצעות השלמה. פרטי לכל משתמש."""
+    __tablename__ = "item_history"
+    __table_args__ = (UniqueConstraint("user_id", "name_key", name="uq_item_history_user_name"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    name = Column(String(100), nullable=False)      # כפי שהוקלד לאחרונה
+    name_key = Column(String(100), nullable=False)  # name.strip().lower()
+    use_count = Column(Integer, default=1, nullable=False)
+    last_used = Column(DateTime, nullable=False)  # UTC
+
+    user = relationship("User", back_populates="item_history")
 
 
 class PasswordResetToken(Base):

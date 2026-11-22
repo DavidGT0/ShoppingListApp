@@ -1,9 +1,42 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { View, TextInput, TouchableOpacity, Text, Alert } from 'react-native';
+import { getSuggestions } from '../../services/api';
 import { styles } from './AddItemInput.styles';
 
-const AddItemInput = ({ onAdd }) => {
+const DEBOUNCE_MS = 250;
+const MAX_CHIPS = 5;
+
+const AddItemInput = ({ onAdd, listId }) => {
   const [name, setName] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  // מספר השאילתה האחרונה - תשובה של שאילתה ישנה יותר נזרקת
+  const queryId = useRef(0);
+
+  useEffect(() => {
+    const query = name.trim();
+    const id = ++queryId.current;
+    if (!query || !listId) {
+      setSuggestions([]);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const result = await getSuggestions(query, listId);
+        if (id === queryId.current && Array.isArray(result)) {
+          setSuggestions(result.slice(0, MAX_CHIPS));
+        }
+      } catch (error) {
+        // שקט - פשוט אין הצעות
+        if (id === queryId.current) setSuggestions([]);
+      }
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [name, listId]);
+
+  const handleChip = chipName => {
+    onAdd(chipName);
+    setName('');
+  };
 
   const handleAdd = () => {
     if (!name.trim()) {
@@ -15,7 +48,8 @@ const AddItemInput = ({ onAdd }) => {
   };
 
   return (
-    <View style={styles.addContainer}>
+    <View>
+      <View style={styles.addContainer}>
       <TextInput
         style={styles.input}
         placeholder="הוסף מוצר חדש..."
@@ -33,6 +67,22 @@ const AddItemInput = ({ onAdd }) => {
       >
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
+      </View>
+      {suggestions.length > 0 && (
+        <View style={styles.chipsRow}>
+          {suggestions.map((chip, index) => (
+            <TouchableOpacity
+              key={chip}
+              style={styles.chip}
+              onPress={() => handleChip(chip)}
+              testID={`suggestion_chip_${index}`}
+              accessibilityLabel={chip}
+            >
+              <Text style={styles.chipText}>{chip}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 };

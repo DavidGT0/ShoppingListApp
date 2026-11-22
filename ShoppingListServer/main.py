@@ -468,6 +468,34 @@ def share_list(share_request: ShareListRequest, current_user: models.User = Depe
 
 # === Items Endpoints ===
 
+@app.get("/items/suggestions")
+def get_item_suggestions(
+    q: str = "",
+    list_id: Optional[int] = None,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """הצעות השלמה להוספת מוצר, מההיסטוריה של המשתמש בלבד (עד 8)"""
+    excluded = set()
+    if list_id is not None:
+        shopping_list = get_accessible_list_or_error(db, list_id, current_user)
+        open_items = db.query(models.ShoppingItem).filter(
+            models.ShoppingItem.list_id == shopping_list.id,
+            models.ShoppingItem.purchased == False  # noqa: E712
+        ).all()
+        excluded = {i.name.strip().lower() for i in open_items}
+
+    key = q.strip().lower()
+    rows = db.query(models.ItemHistory).filter(models.ItemHistory.user_id == current_user.id).order_by(
+        models.ItemHistory.use_count.desc(), models.ItemHistory.last_used.desc()
+    ).all()
+    rows = [r for r in rows if r.name_key not in excluded]
+    if key:
+        prefix = [r for r in rows if r.name_key.startswith(key)]
+        contains = [r for r in rows if key in r.name_key and not r.name_key.startswith(key)]
+        rows = prefix + contains
+    return [r.name for r in rows[:8]]
+
 @app.get("/items")
 def get_items(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """קבלת כל הפריטים ברשימה"""
@@ -504,6 +532,25 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
         position=0 if min_position is None else min_position - 1
     )
     db.add(new_item)
+
+    # היסטוריית מוצרים של המשתמש המוסיף (באותה טרנזקציה)
+    name_key = item.name.strip().lower()[:100]
+    history = db.query(models.ItemHistory).filter(
+        models.ItemHistory.user_id == current_user.id,
+        models.ItemHistory.name_key == name_key
+    ).first()
+    if history:
+        history.use_count = (history.use_count or 0) + 1
+        history.last_used = datetime.utcnow()
+        history.name = item.name.strip()[:100]
+    else:
+        db.add(models.ItemHistory(
+            user_id=current_user.id,
+            name=item.name.strip()[:100],
+            name_key=name_key,
+            use_count=1,
+            last_used=datetime.utcnow()
+        ))
     db.commit()
     db.refresh(new_item)
     return new_item
@@ -679,6 +726,28 @@ def get_accessible_list_or_error(db: Session, list_id: int, user: models.User):
     if shopping_list.owner_id != user.id and user not in shopping_list.shared_users:
         raise HTTPException(status_code=403, detail="אין לך גישה לרשימה הזו")
     return shopping_list
+
+@app.post("/lists/{list_id}/purchased/restore")
+def restore_purchased_items(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """החזרת כל המוצרים שנקנו למצב 'לא נקנה'"""
+    get_accessible_list_or_error(db, list_id, current_user)
+    restored = db.query(models.ShoppingItem).filter(
+        models.ShoppingItem.list_id == list_id,
+        models.ShoppingItem.purchased == True  # noqa: E712
+    ).update({models.ShoppingItem.purchased: False}, synchronize_session=False)
+    db.commit()
+    return {"restored": restored}
+
+@app.post("/lists/{list_id}/purchased/clear")
+def clear_purchased_items(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """מחיקת כל המוצרים שנקנו"""
+    get_accessible_list_or_error(db, list_id, current_user)
+    deleted = db.query(models.ShoppingItem).filter(
+        models.ShoppingItem.list_id == list_id,
+        models.ShoppingItem.purchased == True  # noqa: E712
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}
 
 @app.get("/lists/{list_id}/members")
 def get_list_members(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
