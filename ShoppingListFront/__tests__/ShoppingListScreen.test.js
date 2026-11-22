@@ -9,6 +9,7 @@ import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListIte
 import { Alert, AppState, Text } from 'react-native';
 import MembersModal from '../src/components/MembersModal/MembersModal';
 import AddItemInput from '../src/components/AddItemInput/AddItemInput';
+import PurchasedItemsSection from '../src/components/PurchasedItemsSection/PurchasedItemsSection';
 import {
   getShoppingList,
   updateItem,
@@ -18,6 +19,8 @@ import {
   getListMembers,
   removeListMember,
   leaveList,
+  restorePurchased,
+  clearPurchased,
 } from '../src/services/api';
 
 // הבדיקה כאן היא על ניהול המצב במסך, לא על גרירה/החלקה -
@@ -74,6 +77,8 @@ jest.mock('../src/services/api', () => ({
   resetInviteCode: jest.fn(),
   removeListMember: jest.fn(),
   leaveList: jest.fn(),
+  restorePurchased: jest.fn(),
+  clearPurchased: jest.fn(),
 }));
 
 const { act } = ReactTestRenderer;
@@ -670,5 +675,67 @@ describe('undo', () => {
     expect(undoBar(tree)).toBeDefined();
     await act(async () => jest.advanceTimersByTime(UNDO_MS));
     expect(undoBar(tree)).toBeUndefined();
+  });
+});
+
+describe('purchased bulk actions', () => {
+  const bought = { ...milk, id: 5, name: 'גבינה', purchased: true, position: 3 };
+  let alertSpy;
+  beforeEach(() => {
+    getShoppingList.mockReset();
+    getShoppingList.mockResolvedValue([milk, bought]);
+    restorePurchased.mockReset();
+    clearPurchased.mockReset();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+  afterEach(() => alertSpy.mockRestore());
+
+  test('restore all makes purchased items unpurchased and passes listId to the input', async () => {
+    restorePurchased.mockResolvedValue(1);
+    const tree = await renderScreen();
+    expect(tree.root.findByType(AddItemInput).props.listId).toBe(7);
+    await act(async () =>
+      tree.root.findByType(PurchasedItemsSection).props.onRestoreAll(),
+    );
+    expect(restorePurchased).toHaveBeenCalledWith(7);
+    expect(rowFor(tree, 5).props.item.purchased).toBe(false);
+  });
+
+  test('clear all removes purchased items locally', async () => {
+    clearPurchased.mockResolvedValue(1);
+    const tree = await renderScreen();
+    await act(async () =>
+      tree.root.findByType(PurchasedItemsSection).props.onClearAll(),
+    );
+    expect(clearPurchased).toHaveBeenCalledWith(7);
+    expect(names(tree)).toEqual(['חלב']);
+  });
+
+  test('a failure shows an error alert and keeps the items', async () => {
+    clearPurchased.mockRejectedValue(new Error('x'));
+    const tree = await renderScreen();
+    await act(async () =>
+      tree.root.findByType(PurchasedItemsSection).props.onClearAll(),
+    );
+    expect(alertSpy).toHaveBeenCalledWith('שגיאה', expect.any(String));
+    expect(names(tree)).toEqual(['חלב', 'גבינה']);
+  });
+
+  test('a live refresh that returns during the action is discarded', async () => {
+    const d = deferred();
+    restorePurchased.mockReturnValue(d.promise);
+    const tree = await renderScreen();
+    await act(async () => {
+      tree.root.findByType(PurchasedItemsSection).props.onRestoreAll();
+    });
+    getShoppingList.mockResolvedValueOnce([
+      milk,
+      bought,
+      { ...milk, id: 9, name: 'עגבניות' },
+    ]);
+    await act(async () => global.__live.refresh());
+    expect(names(tree)).not.toContain('עגבניות');
+    await act(async () => d.resolve(1));
+    expect(rowFor(tree, 5).props.item.purchased).toBe(false);
   });
 });

@@ -25,6 +25,25 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 2,
   },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: -10,
+    marginBottom: 12,
+  },
+  chip: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipText: {
+    color: colors.text.primary,
+    fontSize: 14,
+  },
   addButtonText: {
     color: 'white',
     fontSize: 30,

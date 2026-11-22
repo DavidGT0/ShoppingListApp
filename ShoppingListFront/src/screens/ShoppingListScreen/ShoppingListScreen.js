@@ -26,6 +26,8 @@ import {
   deleteItem,
   reorderItems,
   getListMembers,
+  restorePurchased,
+  clearPurchased,
 } from '../../services/api';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
@@ -316,6 +318,30 @@ const ShoppingListScreen = ({ route, navigation }) => {
     }
   };
 
+  // פעולה על כל המוצרים שנקנו: מאשרת מחיקה ממתינה, ועוברת במשמר השינויים
+  const runPurchasedBulk = async (request, applyLocally) => {
+    commitPendingDelete();
+    hideBar();
+    startMutation();
+    try {
+      await request(currentListId);
+      setItems(applyLocally);
+    } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      Alert.alert('שגיאה', error.message || 'לא הצלחנו לעדכן את הרשימה');
+    } finally {
+      endMutation();
+    }
+  };
+
+  const handleRestoreAll = () =>
+    runPurchasedBulk(restorePurchased, prev =>
+      prev.map(i => (i.purchased ? { ...i, purchased: false } : i)),
+    );
+
+  const handleClearAll = () =>
+    runPurchasedBulk(clearPurchased, prev => prev.filter(i => !i.purchased));
+
   const handleDeleteItem = itemId => {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
@@ -438,7 +464,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       {/* תיבת ההוספה נשארת קבועה כדי שתמיד יהיה אפשר להוסיף מוצרים */}
       <View style={styles.addCard}>
-        <AddItemInput onAdd={handleAddItem} />
+        <AddItemInput onAdd={handleAddItem} listId={currentListId} />
       </View>
 
       <DraggableFlatList
@@ -484,6 +510,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
             onEdit={openEditModal}
             onDelete={handleDeleteItem}
             onUpdateAmount={handleUpdateAmount}
+            onRestoreAll={handleRestoreAll}
+            onClearAll={handleClearAll}
           />
         }
       />
