@@ -18,13 +18,12 @@ import {
 jest.mock('react-native-draggable-flatlist', () => {
   const ReactLib = require('react');
   const { View } = require('react-native');
-  const MockDraggableFlatList = ({
-    data,
-    renderItem,
-    ListHeaderComponent,
-    ListFooterComponent,
-  }) =>
-    ReactLib.createElement(
+  const MockDraggableFlatList = props => {
+    const { data, renderItem, ListHeaderComponent, ListFooterComponent } =
+      props;
+    // חושף את ה-props האחרונים כדי שהבדיקות יוכלו להפעיל onDragBegin / onRefresh וכו'
+    global.__listProps = props;
+    return ReactLib.createElement(
       View,
       null,
       ListHeaderComponent,
@@ -37,8 +36,17 @@ jest.mock('react-native-draggable-flatlist', () => {
       ),
       ListFooterComponent,
     );
+  };
   return { __esModule: true, default: MockDraggableFlatList };
 });
+
+// ה-hook נבדק בנפרד - כאן רק רושמים עם אילו ארגומנטים המסך קרא לו
+jest.mock('../src/hooks/useLiveRefresh', () => ({
+  __esModule: true,
+  useLiveRefresh: jest.fn((refresh, intervalMs, options) => {
+    global.__live = { refresh, intervalMs, options };
+  }),
+}));
 
 jest.mock('../src/components/ShoppingListItem/ShoppingListItem', () => {
   const ReactLib = require('react');
@@ -141,4 +149,112 @@ test('adding an item sends a single request and shows it first, with no error', 
     .map(n => n.props.item.name);
   expect(names).toEqual(['לחם', 'חלב']);
   alertSpy.mockRestore();
+});
+
+const milk = { id: 1, name: 'חלב', amount: 1, purchased: false, position: 0 };
+const eggs = { id: 3, name: 'ביצים', amount: 1, purchased: false, position: 2 };
+
+const renderScreen = async (goBack = jest.fn()) => {
+  let tree;
+  await act(async () => {
+    tree = ReactTestRenderer.create(
+      <GestureHandlerRootView>
+        <ShoppingListScreen
+          route={{ params: { listId: 7, listName: 'רשימה' } }}
+          navigation={{ goBack }}
+        />
+      </GestureHandlerRootView>,
+    );
+  });
+  return tree;
+};
+const names = tree =>
+  tree.root.findAllByType(ShoppingListItem).map(n => n.props.item.name);
+
+test('a refresh shows an item another family member added', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValueOnce([milk]);
+  const tree = await renderScreen();
+  expect(global.__live.intervalMs).toBe(3000);
+
+  getShoppingList.mockResolvedValueOnce([milk, eggs]);
+  await act(async () => global.__live.refresh());
+
+  expect(names(tree)).toEqual(['חלב', 'ביצים']);
+});
+
+test('a refresh that started before my own change is discarded', async () => {
+  getShoppingList.mockReset();
+  updateItem.mockReset();
+  getShoppingList.mockResolvedValueOnce([milk]);
+  const tree = await renderScreen();
+
+  const stale = deferred();
+  getShoppingList.mockReturnValueOnce(stale.promise);
+  let refreshing;
+  await act(async () => {
+    refreshing = global.__live.refresh();
+  });
+  updateItem.mockResolvedValueOnce({ ...milk, purchased: true });
+  await act(async () =>
+    tree.root.findByType(ShoppingListItem).props.onTogglePurchased(),
+  );
+  await act(async () => {
+    stale.resolve([milk]);
+    await refreshing;
+  });
+
+  const row = tree.root.findByType(ShoppingListItem);
+  expect(row.props.item.purchased).toBe(true);
+});
+
+test.each([403, 404])(
+  'losing access (%i) shows one message and goes back',
+  async status => {
+    getShoppingList.mockReset();
+    getShoppingList.mockResolvedValueOnce([milk]);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const goBack = jest.fn();
+    await renderScreen(goBack);
+
+    const err = Object.assign(new Error('x'), { status });
+    getShoppingList.mockRejectedValue(err);
+    await act(async () => global.__live.refresh());
+    await act(async () => global.__live.refresh());
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][1]).toBe('אין לך יותר גישה לרשימה הזו');
+    expect(goBack).toHaveBeenCalledTimes(1);
+    alertSpy.mockRestore();
+  },
+);
+
+test('a network error during refresh is silent and keeps the items', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValueOnce([milk]);
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const tree = await renderScreen();
+
+  getShoppingList.mockRejectedValueOnce(
+    Object.assign(new Error('net'), { network: true }),
+  );
+  await act(async () => global.__live.refresh());
+
+  expect(alertSpy).not.toHaveBeenCalled();
+  expect(names(tree)).toEqual(['חלב']);
+  alertSpy.mockRestore();
+});
+
+test('refresh is paused while dragging', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValueOnce([milk]);
+  reorderItems.mockResolvedValue();
+  await renderScreen();
+  expect(global.__live.options.paused).toBe(false);
+
+  await act(async () => global.__listProps.onDragBegin());
+  expect(global.__live.options.paused).toBe(true);
+
+  await act(async () => global.__listProps.onDragEnd({ data: [milk] }));
+  expect(global.__live.options.paused).toBe(false);
 });

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   ActivityIndicator,
@@ -23,8 +23,15 @@ import {
   deleteItem,
   reorderItems,
 } from '../../services/api';
+import { useLiveRefresh } from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
+
+const LIVE_REFRESH_MS = 3000;
+
+// מיון המוצרים לפי שדה ה-position כדי לשמור על הסדר הנכון מהשרת
+const sortByPosition = data =>
+  (data || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
 const ShoppingListScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
@@ -33,7 +40,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const currentListId = listId;
+  // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
+  const mutationVersion = useRef(0);
+  const lostAccessHandled = useRef(false);
 
   useEffect(() => {
     if (listId) {
@@ -45,16 +57,43 @@ const ShoppingListScreen = ({ route, navigation }) => {
     try {
       setLoading(true);
       const data = await getShoppingList(id);
-      // מיון המוצרים לפי שדה ה-position כדי לשמור על הסדר הנכון מהשרת
-      const sortedData = (data || []).sort(
-        (a, b) => (a.position ?? 0) - (b.position ?? 0),
-      );
-      setItems(sortedData);
+      setItems(sortByPosition(data));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את המוצרים לרשימה זו.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // רענון חי: מביא את המצב העדכני מהשרת (שינויים של בני משפחה אחרים)
+  const refreshItems = async () => {
+    if (!listId) return;
+    const version = mutationVersion.current;
+    try {
+      const data = await getShoppingList(listId);
+      if (version !== mutationVersion.current) return; // בוצע שינוי שלי בינתיים
+      setItems(sortByPosition(data));
+    } catch (error) {
+      if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה
+      if (error.status === 403 || error.status === 404) {
+        if (lostAccessHandled.current) return;
+        lostAccessHandled.current = true;
+        Alert.alert('שים לב', 'אין לך יותר גישה לרשימה הזו');
+        navigation.goBack();
+      }
+      // שגיאות אחרות (רשת וכו') - שקט, המוצרים הנוכחיים נשארים
+    }
+  };
+
+  useLiveRefresh(refreshItems, LIVE_REFRESH_MS, { paused: isDragging });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshItems();
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -73,6 +112,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       return;
     }
 
+    mutationVersion.current++;
     try {
       const newItem = await addItem(name, currentListId, 1);
 
@@ -87,31 +127,40 @@ const ShoppingListScreen = ({ route, navigation }) => {
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו להוסיף את המוצר');
+    } finally {
+      mutationVersion.current++;
     }
   };
 
   const handleTogglePurchased = async item => {
+    mutationVersion.current++;
     try {
       const updated = await updateItem(item.id, { purchased: !item.purchased });
       setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
+    } finally {
+      mutationVersion.current++;
     }
   };
 
   const handleUpdateAmount = async (item, newAmount) => {
+    mutationVersion.current++;
     try {
       const updated = await updateItem(item.id, { amount: newAmount });
       setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את הכמות');
+    } finally {
+      mutationVersion.current++;
     }
   };
 
   const handleEditItem = async newName => {
     if (!editingItem || !newName?.trim()) return;
+    mutationVersion.current++;
     try {
       const updated = await updateItem(editingItem.id, { name: newName });
       setItems(prev => prev.map(i => (i.id === editingItem.id ? updated : i)));
@@ -120,6 +169,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לערוך את המוצר');
+    } finally {
+      mutationVersion.current++;
     }
   };
 
@@ -130,19 +181,28 @@ const ShoppingListScreen = ({ route, navigation }) => {
         text: 'מחק',
         style: 'destructive',
         onPress: async () => {
+          mutationVersion.current++;
           try {
             await deleteItem(itemId);
             setItems(prev => prev.filter(i => i.id !== itemId));
           } catch (error) {
             if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
+          } finally {
+            mutationVersion.current++;
           }
         },
       },
     ]);
   };
 
+  const handleDragBegin = () => {
+    mutationVersion.current++; // גרירה נחשבת תחילת שינוי - רענון שבדרך נזרק
+    setIsDragging(true);
+  };
+
   const handleDragEnd = async ({ data }) => {
+    setIsDragging(false);
     setItems(prev => [...data, ...prev.filter(item => item.purchased)]);
     const reorderedData = data.map((item, index) => ({
       id: item.id,
@@ -152,6 +212,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
       await reorderItems(reorderedData);
     } catch (error) {
       console.log('Failed to save order to server');
+    } finally {
+      mutationVersion.current++;
     }
   };
 
@@ -218,7 +280,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
         data={unpurchasedItems}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
+        onDragBegin={handleDragBegin}
         onDragEnd={handleDragEnd}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         ListHeaderComponent={
           <View>
             <View style={styles.tipContainer}>
