@@ -127,6 +127,10 @@ test('remove asks for confirmation and refreshes the members', async () => {
     byTestId(tree, 'remove_member_2').props.onPress();
   });
   expect(removeListMember).not.toHaveBeenCalled();
+  // ההתראה מזכירה שהקוד עדיין תקף ושאפשר ליצור קוד חדש
+  expect(alertSpy.mock.calls[alertSpy.mock.calls.length - 1][1]).toContain(
+    'צרו קוד חדש',
+  );
   getListMembers.mockResolvedValue([MEMBERS[0]]);
   await confirmLast();
   expect(removeListMember).toHaveBeenCalledWith(7, 2);
@@ -162,4 +166,29 @@ test('server errors are shown and session expiry is ignored', async () => {
     await byTestId(tree, 'invite_button').props.onPress();
   });
   expect(alertSpy).not.toHaveBeenCalled();
+});
+
+test('a second invite press while one is pending is ignored', async () => {
+  let resolveCode;
+  getInviteCode.mockReturnValue(
+    new Promise(resolve => {
+      resolveCode = resolve;
+    }),
+  );
+  const shareSpy = jest
+    .spyOn(Share, 'share')
+    .mockResolvedValue({ action: Share.sharedAction });
+  const tree = await render();
+  await act(async () => {
+    const press = byTestId(tree, 'invite_button').props.onPress;
+    press();
+    press();
+  });
+  expect(byTestId(tree, 'invite_button').props.disabled).toBe(true);
+  await act(async () => {
+    resolveCode('K7M2Q9');
+  });
+  expect(getInviteCode).toHaveBeenCalledTimes(1);
+  expect(shareSpy).toHaveBeenCalledTimes(1);
+  expect(byTestId(tree, 'invite_button').props.disabled).toBe(false);
 });

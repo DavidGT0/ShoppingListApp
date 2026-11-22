@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Alert,
   Share,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {
   getListMembers,
@@ -26,6 +27,22 @@ const MembersModal = ({
   onLeft,
 }) => {
   const [members, setMembers] = useState([]);
+  const [busy, setBusy] = useState(false);
+  // ה-ref חוסם גם לחיצה כפולה מהירה לפני שה-state הספיק להתעדכן
+  const busyRef = useRef(false);
+
+  // מריץ פעולה מול השרת; בזמן שהיא רצה לחיצות נוספות מתעלמות
+  const runGuarded = async action => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await action();
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
 
   const showError = error => {
     if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
@@ -49,18 +66,19 @@ const MembersModal = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, listId]);
 
-  const handleInvite = async () => {
-    try {
-      const code = await getInviteCode(listId);
-      const message =
-        `הצטרפו לרשימת הקניות "${listName}" שלי ב-ShopLi 🛒\n` +
-        `באפליקציה: הרשימות שלי ← "הצטרפות עם קוד" ← הקוד: ${code}`;
-      // סגירת חלון השיתוף על ידי המשתמש אינה שגיאה - לא מציגים התראה
-      await Share.share({ message });
-    } catch (error) {
-      showError(error);
-    }
-  };
+  const handleInvite = () =>
+    runGuarded(async () => {
+      try {
+        const code = await getInviteCode(listId);
+        const message =
+          `הצטרפו לרשימת הקניות "${listName}" שלי ב-ShopLi 🛒\n` +
+          `באפליקציה: הרשימות שלי ← "הצטרפות עם קוד" ← הקוד: ${code}`;
+        // סגירת חלון השיתוף על ידי המשתמש אינה שגיאה - לא מציגים התראה
+        await Share.share({ message });
+      } catch (error) {
+        showError(error);
+      }
+    });
 
   const handleResetCode = () => {
     Alert.alert('קוד הזמנה חדש', 'הקוד הקודם יפסיק לעבוד. להמשיך?', [
@@ -68,37 +86,44 @@ const MembersModal = ({
       {
         text: 'צור קוד חדש',
         style: 'destructive',
-        onPress: async () => {
-          try {
-            await resetInviteCode(listId);
-            Alert.alert(
-              'בוצע',
-              'נוצר קוד הזמנה חדש. לחצו "הזמן בני משפחה" כדי לשתף אותו.',
-            );
-          } catch (error) {
-            showError(error);
-          }
-        },
+        onPress: () =>
+          runGuarded(async () => {
+            try {
+              await resetInviteCode(listId);
+              Alert.alert(
+                'בוצע',
+                'נוצר קוד הזמנה חדש. לחצו "הזמן בני משפחה" כדי לשתף אותו.',
+              );
+            } catch (error) {
+              showError(error);
+            }
+          }),
       },
     ]);
   };
 
   const handleRemove = member => {
-    Alert.alert('הסרת משתתף', `להסיר את ${member.username} מהרשימה?`, [
-      { text: 'ביטול', style: 'cancel' },
-      {
-        text: 'הסר',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeListMember(listId, member.id);
-            await loadMembers();
-          } catch (error) {
-            showError(error);
-          }
+    Alert.alert(
+      'הסרת משתתף',
+      `להסיר את ${member.username} מהרשימה?\n` +
+        'כדי שלא יוכל להצטרף שוב עם אותו קוד, צרו קוד חדש',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'הסר',
+          style: 'destructive',
+          onPress: () =>
+            runGuarded(async () => {
+              try {
+                await removeListMember(listId, member.id);
+                await loadMembers();
+              } catch (error) {
+                showError(error);
+              }
+            }),
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const handleLeave = () => {
@@ -110,14 +135,15 @@ const MembersModal = ({
         {
           text: 'עזוב',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await leaveList(listId);
-              onLeft();
-            } catch (error) {
-              showError(error);
-            }
-          },
+          onPress: () =>
+            runGuarded(async () => {
+              try {
+                await leaveList(listId);
+                onLeft();
+              } catch (error) {
+                showError(error);
+              }
+            }),
         },
       ],
     );
@@ -146,6 +172,7 @@ const MembersModal = ({
                   <TouchableOpacity
                     style={styles.removeButton}
                     onPress={() => handleRemove(member)}
+                    disabled={busy}
                     testID={`remove_member_${member.id}`}
                     accessibilityLabel={`remove_member_${member.id}`}
                   >
@@ -162,14 +189,20 @@ const MembersModal = ({
                 <TouchableOpacity
                   style={[styles.modalButton, styles.primaryButton]}
                   onPress={handleInvite}
+                  disabled={busy}
                   testID="invite_button"
                   accessibilityLabel="invite_button"
                 >
-                  <Text style={styles.primaryButtonText}>הזמן בני משפחה</Text>
+                  {busy ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>הזמן בני משפחה</Text>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.secondaryButton]}
                   onPress={handleResetCode}
+                  disabled={busy}
                   testID="reset_code_button"
                   accessibilityLabel="reset_code_button"
                 >
@@ -180,6 +213,7 @@ const MembersModal = ({
               <TouchableOpacity
                 style={[styles.modalButton, styles.dangerButton]}
                 onPress={handleLeave}
+                disabled={busy}
                 testID="leave_list_button"
                 accessibilityLabel="leave_list_button"
               >
