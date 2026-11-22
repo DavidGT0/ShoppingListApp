@@ -444,6 +444,35 @@ def create_list(list_data: ShoppingListCreate, current_user: models.User = Depen
     db.refresh(new_list)
     return new_list
 
+DUPLICATE_SUFFIX = " (עותק)"
+LIST_NAME_MAX_LENGTH = 100
+
+@app.post("/lists/{list_id}/duplicate", response_model=ShoppingListResponse, status_code=status.HTTP_201_CREATED)
+def duplicate_list(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """שכפול רשימה (בעלים או משתתף). הרשימה החדשה שייכת למשתמש הנוכחי, בלי שיתופים ובלי קוד הזמנה"""
+    source = get_accessible_list_or_error(db, list_id, current_user)
+    base = source.name[:LIST_NAME_MAX_LENGTH - len(DUPLICATE_SUFFIX)]
+    new_list = models.ShoppingList(name=f"{base}{DUPLICATE_SUFFIX}", owner_id=current_user.id)
+    db.add(new_list)
+    db.flush()
+    source_items = (
+        db.query(models.ShoppingItem)
+        .filter(models.ShoppingItem.list_id == source.id)
+        .order_by(models.ShoppingItem.position)
+        .all()
+    )
+    for item in source_items:
+        db.add(models.ShoppingItem(
+            name=item.name,
+            amount=item.amount,
+            position=item.position,
+            purchased=False,
+            list_id=new_list.id,
+        ))
+    db.commit()
+    db.refresh(new_list)
+    return ShoppingListResponse(id=new_list.id, name=new_list.name, owner_id=new_list.owner_id, is_owner=True)
+
 @app.post("/lists/share")
 def share_list(share_request: ShareListRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """שיתוף רשימה עם משתמש אחר"""
