@@ -34,6 +34,7 @@ def client():
     """לקוח HTTP לשרת, עם מסד נתונים ריק בכל בדיקה"""
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    main.join_limiter.reset()
     return TestClient(main.app)
 
 

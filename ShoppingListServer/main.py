@@ -17,6 +17,7 @@ from database import engine, get_db
 import os
 import hashlib
 import secrets
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -596,6 +597,8 @@ def delete_list(list_id: int, current_user: models.User = Depends(get_current_us
 
 # === Invite Endpoints ===
 
+join_limiter = sharing.JoinAttemptLimiter()
+
 def get_owned_list_or_error(db: Session, list_id: int, user: models.User):
     """מחזיר רשימה שהמשתמש הוא הבעלים שלה, או 404/403"""
     shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
@@ -634,3 +637,25 @@ def reset_invite_code(list_id: int, current_user: models.User = Depends(get_curr
     """מחליף את קוד ההזמנה בקוד חדש, והקוד הישן מפסיק לעבוד. רק הבעלים"""
     shopping_list = get_owned_list_or_error(db, list_id, current_user)
     return {"code": set_new_invite_code(db, shopping_list)}
+
+class JoinListRequest(BaseModel):
+    code: str = Field(max_length=100)
+
+@app.post("/lists/join", response_model=ShoppingListResponse)
+def join_list(join_request: JoinListRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """הצטרפות לרשימה עם קוד הזמנה. מוגבל בניסיונות כושלים"""
+    now = time.monotonic()
+    if join_limiter.is_blocked(current_user.id, now):
+        raise HTTPException(status_code=429, detail="יותר מדי ניסיונות, נסה שוב בעוד כמה דקות")
+    code = sharing.normalize_invite_code(join_request.code)
+    invite = db.query(models.ListInvite).filter(models.ListInvite.code == code).first()
+    if not invite:
+        join_limiter.record_failure(current_user.id, now)
+        raise HTTPException(status_code=404, detail="קוד ההזמנה לא נמצא")
+    shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == invite.list_id).first()
+    if shopping_list.owner_id == current_user.id:
+        raise HTTPException(status_code=400, detail="זו הרשימה שלך")
+    if current_user not in shopping_list.shared_users:
+        shopping_list.shared_users.append(current_user)
+        db.commit()
+    return ShoppingListResponse(id=shopping_list.id, name=shopping_list.name, owner_id=shopping_list.owner_id, is_owner=False)
