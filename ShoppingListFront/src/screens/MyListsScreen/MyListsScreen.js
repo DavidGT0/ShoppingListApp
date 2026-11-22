@@ -40,6 +40,7 @@ const MyListsScreen = ({ navigation }) => {
       const data = await getShoppingLists();
       setLists(data || []);
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את הרשימות שלך.');
     } finally {
       setLoading(false);
@@ -57,6 +58,7 @@ const MyListsScreen = ({ navigation }) => {
       setLists(prev => [...prev, newList]);
       setNewListName(''); // מנקה את האינבוקס אחרי ההוספה
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו ליצור רשימה חדשה');
     }
   };
@@ -72,6 +74,7 @@ const MyListsScreen = ({ navigation }) => {
             await deleteShoppingList(listId);
             setLists(lists.filter(l => l.id !== listId));
           } catch (error) {
+            if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את הרשימה');
           }
         },
@@ -102,6 +105,7 @@ const MyListsScreen = ({ navigation }) => {
       setRenameModalVisible(false);
       setEditingList(null);
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את שם הרשימה');
     }
   };

@@ -51,6 +51,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       );
       setItems(sortedData);
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את המוצרים לרשימה זו.');
     } finally {
       setLoading(false);
@@ -89,6 +90,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       }));
       await reorderItems(reorderedData);
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו להוסיף את המוצר');
     }
   };
@@ -98,6 +100,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       const updated = await updateItem(item.id, { purchased: !item.purchased });
       setItems(items.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
     }
   };
@@ -107,6 +110,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       const updated = await updateItem(item.id, { amount: newAmount });
       setItems(items.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את הכמות');
     }
   };
@@ -119,6 +123,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setEditingItem(null);
       setModalVisible(false);
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לערוך את המוצר');
     }
   };
@@ -134,6 +139,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
             await deleteItem(itemId);
             setItems(items.filter(i => i.id !== itemId));
           } catch (error) {
+            if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
           }
         },

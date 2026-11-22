@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   View,
   Text,
+  Alert,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import SettingsScreen from './src/screens/SettingsScreen/SettingsScreen';
 import LoginScreen from './src/screens/LoginScreen/LoginScreen';
 
 import { isAuthenticated } from './src/services/auth';
+import { setSessionExpiredHandler } from './src/services/http';
 import { colors } from './src/theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -95,6 +97,13 @@ function App() {
 
   useEffect(() => {
     checkAuth();
+
+    // כשהשרת דוחה את הטוקן (פג תוקף / לא תקין) - חוזרים למסך הכניסה
+    setSessionExpiredHandler(() => {
+      setIsLoggedIn(false);
+      Alert.alert('פג תוקף ההתחברות', 'נא להתחבר מחדש');
+    });
+    return () => setSessionExpiredHandler(null);
   }, []);
 
   const checkAuth = async () => {

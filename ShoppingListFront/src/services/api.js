@@ -1,25 +1,11 @@
-﻿import { getToken } from './auth';
-
-const API_BASE_URL = 'https://shoppinglistapp-7dj5.onrender.com';
-
-/**
- * פונקצית עזר לקבלת headers עם authorization
- */
-const getHeaders = async () => {
-  const token = await getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
-};
+﻿import { apiFetch } from './http';
 
 /**
  * קבלת כל הרשימות של המשתמש
  */
 export const getShoppingLists = async () => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/lists`, { headers });
+    const response = await apiFetch(`/lists`);
 
     if (!response.ok) {
       throw new Error('Network response was not ok');
@@ -36,10 +22,8 @@ export const getShoppingLists = async () => {
  */
 export const createShoppingList = async name => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/lists`, {
+    const response = await apiFetch(`/lists`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ name }),
     });
 
@@ -58,10 +42,8 @@ export const createShoppingList = async name => {
  */
 export const updateShoppingList = async (listId, updates) => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/lists/${listId}`, {
+    const response = await apiFetch(`/lists/${listId}`, {
       method: 'PUT',
-      headers,
       body: JSON.stringify(updates),
     });
 
@@ -80,10 +62,8 @@ export const updateShoppingList = async (listId, updates) => {
  */
 export const deleteShoppingList = async listId => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/lists/${listId}`, {
+    const response = await apiFetch(`/lists/${listId}`, {
       method: 'DELETE',
-      headers,
     });
 
     if (!response.ok) {
@@ -101,10 +81,8 @@ export const deleteShoppingList = async listId => {
  */
 export const shareList = async (listId, username) => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/lists/share`, {
+    const response = await apiFetch(`/lists/share`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ list_id: listId, username }),
     });
 
@@ -123,10 +101,7 @@ export const shareList = async (listId, username) => {
  */
 export const getShoppingList = async listId => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/items?list_id=${listId}`, {
-      headers,
-    });
+    const response = await apiFetch(`/items?list_id=${listId}`);
 
     if (!response.ok) {
       throw new Error('Network response was not ok');
@@ -143,10 +118,8 @@ export const getShoppingList = async listId => {
  */
 export const addItem = async (name, listId, amount = 1) => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/items`, {
+    const response = await apiFetch(`/items`, {
       method: 'POST',
-      headers,
       body: JSON.stringify({ name, list_id: listId, amount }),
     });
 
@@ -165,10 +138,8 @@ export const addItem = async (name, listId, amount = 1) => {
  */
 export const updateItem = async (id, updates) => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/items/${id}`, {
+    const response = await apiFetch(`/items/${id}`, {
       method: 'PUT',
-      headers,
       body: JSON.stringify(updates),
     });
 
@@ -187,10 +158,8 @@ export const updateItem = async (id, updates) => {
  */
 export const deleteItem = async id => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/items/${id}`, {
+    const response = await apiFetch(`/items/${id}`, {
       method: 'DELETE',
-      headers,
     });
 
     if (!response.ok) {
@@ -208,10 +177,8 @@ export const deleteItem = async id => {
  */
 export const reorderItems = async reorderedItems => {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${API_BASE_URL}/items/reorder`, {
+    const response = await apiFetch(`/items/reorder`, {
       method: 'POST',
-      headers,
       body: JSON.stringify(reorderedItems),
     });
 

@@ -1,6 +1,5 @@
 ﻿import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = 'https://shoppinglistapp-7dj5.onrender.com';
+import { API_BASE_URL, apiFetch } from './http';
 
 /**
  * הרשמה של משתמש חדש
@@ -108,16 +107,7 @@ export const isAuthenticated = async () => {
  */
 export const getCurrentUser = async () => {
   try {
-    const token = await getToken();
-    if (!token) {
-      throw new Error('No token found');
-    }
-
-    const response = await fetch(`${API_BASE_URL}/users/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await apiFetch('/users/me');
 
     if (!response.ok) {
       throw new Error('Failed to get user info');
@@ -135,17 +125,8 @@ export const getCurrentUser = async () => {
  */
 export const changePassword = async (currentPassword, newPassword) => {
   try {
-    const token = await getToken();
-    if (!token) {
-      throw new Error('No token found');
-    }
-
-    const response = await fetch(`${API_BASE_URL}/users/password`, {
+    const response = await apiFetch('/users/password', {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
       body: JSON.stringify({
         current_password: currentPassword,
         new_password: newPassword

@@ -91,6 +91,7 @@ const SettingsScreen = ({ navigation, onLogout }) => {
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', error.message || 'אירעה שגיאה בשינוי הסיסמה');
     } finally {
       setIsChangingPassword(false);
