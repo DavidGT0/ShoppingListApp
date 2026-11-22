@@ -6,6 +6,7 @@ import MyListsScreen from '../src/screens/MyListsScreen/MyListsScreen';
 import {
   getShoppingLists,
   deleteShoppingList,
+  createShoppingList,
   joinListByCode,
 } from '../src/services/api';
 import useLiveRefresh from '../src/hooks/useLiveRefresh';
@@ -169,5 +170,42 @@ describe('MyListsScreen', () => {
       listName: 'משפחתית',
       isOwner: false,
     });
+  });
+
+  test('a stale refresh does not hide a just-created list', async () => {
+    const { byTestId, listNames } = await renderScreen();
+    const tick = useLiveRefresh.mock.calls[useLiveRefresh.mock.calls.length - 1][0];
+
+    // רענון שנשאר תקוע ומחזיר בסוף נתונים ישנים
+    const stale = deferred();
+    getShoppingLists.mockReturnValueOnce(stale.promise);
+    let refreshDone;
+    await act(async () => {
+      refreshDone = tick();
+    });
+
+    createShoppingList.mockResolvedValue({
+      id: 7,
+      name: 'חדשה שלי',
+      owner_id: 1,
+      is_owner: true,
+    });
+    await act(async () => {
+      byTestId('new_list_input').props.onChangeText('חדשה שלי');
+    });
+    await act(async () => {
+      await byTestId('create_list_button').props.onPress();
+    });
+    expect(listNames()).toContain('חדשה שלי');
+
+    await act(async () => {
+      stale.resolve([
+        { id: 1, name: 'שלי', owner_id: 1, is_owner: true },
+        { id: 2, name: 'של אמא', owner_id: 2, is_owner: false },
+      ]);
+      await refreshDone;
+    });
+
+    expect(listNames()).toContain('חדשה שלי');
   });
 });

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,13 +37,31 @@ const MyListsScreen = ({ navigation }) => {
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
+  const mutationVersion = useRef(0);
+  // מספר פעולות שלי שעדיין בדרך - רענון שחוזר בזמן הזה נזרק
+  const pendingMutations = useRef(0);
+  const startMutation = () => {
+    mutationVersion.current++;
+    pendingMutations.current++;
+  };
+  const endMutation = () => {
+    mutationVersion.current++;
+    pendingMutations.current--;
+  };
+
   useEffect(() => {
     loadLists();
   }, []);
 
   // רענון שקט: מחליף את הרשימות בלי מסך טעינה. שגיאות מושתקות - ננסה שוב בפעם הבאה
   const refreshLists = useCallback(async () => {
+    const version = mutationVersion.current;
     const data = await getShoppingLists();
+    // פעולה שלי בדרך, או שבוצע שינוי שלי בינתיים - התשובה ישנה
+    if (pendingMutations.current > 0 || version !== mutationVersion.current) {
+      return;
+    }
     setLists(data || []);
   }, []);
 
@@ -90,6 +108,7 @@ const MyListsScreen = ({ navigation }) => {
       return;
     }
 
+    startMutation();
     try {
       const newList = await createShoppingList(newListName.trim());
       setLists(prev => [...prev, newList]);
@@ -97,6 +116,8 @@ const MyListsScreen = ({ navigation }) => {
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו ליצור רשימה חדשה');
+    } finally {
+      endMutation();
     }
   };
 
@@ -107,6 +128,7 @@ const MyListsScreen = ({ navigation }) => {
         text: 'מחק',
         style: 'destructive',
         onPress: async () => {
+          startMutation();
           try {
             await deleteShoppingList(listId);
             // עדכון לפי המצב העדכני (ולא עותק ישן) - כדי שכמה פעולות מהירות לא ידרסו זו את זו
@@ -114,6 +136,8 @@ const MyListsScreen = ({ navigation }) => {
           } catch (error) {
             if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את הרשימה');
+          } finally {
+            endMutation();
           }
         },
       },
@@ -129,6 +153,7 @@ const MyListsScreen = ({ navigation }) => {
   const handleRenameList = async () => {
     if (!editingList || !newNameValue.trim()) return;
 
+    startMutation();
     try {
       const updated = await updateShoppingList(editingList.id, {
         name: newNameValue.trim(),
@@ -145,6 +170,8 @@ const MyListsScreen = ({ navigation }) => {
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את שם הרשימה');
+    } finally {
+      endMutation();
     }
   };
 
