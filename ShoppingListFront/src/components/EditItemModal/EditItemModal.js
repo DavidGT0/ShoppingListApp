@@ -5,12 +5,13 @@ import { styles } from './EditItemModal.styles';
 const EditItemModal = ({ visible, item, onSave, onClose }) => {
   const [editName, setEditName] = useState('');
 
-  // מעדכן את הטקסט בחלון ברגע שמעבירים אליו מוצר לעריכה
+  // בכל פתיחה של החלון - טוענים מחדש את השם השמור של המוצר
+  // (גם כשפותחים שוב את אותו מוצר אחרי ביטול, כדי שלא יוצג טקסט שלא נשמר)
   useEffect(() => {
-    if (item) {
+    if (visible && item) {
       setEditName(item.name);
     }
-  }, [item]);
+  }, [visible, item]);
 
   return (
     <Modal
