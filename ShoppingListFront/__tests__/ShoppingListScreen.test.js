@@ -357,3 +357,30 @@ test('leaving from the dialog goes back', async () => {
   expect(goBack).toHaveBeenCalled();
   alertSpy.mockRestore();
 });
+
+test('a lost-access refresh after leaving does not alert or go back twice', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValue([milk]);
+  getListMembers.mockResolvedValue(TWO_MEMBERS);
+  leaveList.mockResolvedValue();
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const goBack = jest.fn();
+  const tree = await renderScreen(goBack, { isOwner: false });
+  await act(async () => byTestId(tree, 'members_button').props.onPress());
+  await act(async () => byTestId(tree, 'leave_list_button').props.onPress());
+  const buttons = alertSpy.mock.calls[alertSpy.mock.calls.length - 1][2];
+  await act(async () => {
+    await buttons.find(b => b.style === 'destructive').onPress();
+  });
+  expect(goBack).toHaveBeenCalledTimes(1);
+
+  alertSpy.mockClear();
+  getShoppingList.mockRejectedValue(
+    Object.assign(new Error('אין גישה'), { status: 403 }),
+  );
+  await act(async () => global.__live.refresh());
+
+  expect(goBack).toHaveBeenCalledTimes(1);
+  expect(alertSpy).not.toHaveBeenCalled();
+  alertSpy.mockRestore();
+});

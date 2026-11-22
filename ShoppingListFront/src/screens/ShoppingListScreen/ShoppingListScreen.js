@@ -89,6 +89,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleLeft = () => {
+    // יצאתי מרצון - רענון שיחזיר 403 מעכשיו לא יציג התראה ולא יחזיר שוב
+    lostAccessHandled.current = true;
     setMembersVisible(false);
     navigation.goBack();
   };
