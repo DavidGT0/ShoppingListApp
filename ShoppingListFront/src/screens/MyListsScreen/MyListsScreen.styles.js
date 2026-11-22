@@ -160,7 +160,13 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   actionIconBtn: {
-    padding: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  menuIcon: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.text.secondary,
   },
   emptyText: {
     textAlign: 'center',
