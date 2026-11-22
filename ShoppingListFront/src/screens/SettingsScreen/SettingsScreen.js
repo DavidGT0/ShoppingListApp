@@ -10,7 +10,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { styles } from './SettingsScreen.styles';
-import { logout, getCurrentUser, changePassword } from '../../services/auth';
+import {
+  logout,
+  getCurrentUser,
+  changePassword,
+  deleteAccount,
+} from '../../services/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SettingsScreen = ({ navigation, onLogout }) => {
@@ -24,6 +29,11 @@ const SettingsScreen = ({ navigation, onLogout }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // States עבור מחיקת חשבון
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -110,6 +120,43 @@ const SettingsScreen = ({ navigation, onLogout }) => {
         },
       },
     ]);
+  };
+
+  const closeDeleteForm = () => {
+    setShowDeleteForm(false);
+    setDeletePassword('');
+  };
+
+  // מחיקת חשבון: סיסמה + אישור אחרון, ואז חזרה למסך הכניסה
+  const handleDeleteAccount = () => {
+    if (!deletePassword) {
+      Alert.alert('שגיאה', 'נא להזין את הסיסמה שלך לאישור');
+      return;
+    }
+
+    Alert.alert(
+      'מחיקת חשבון',
+      'החשבון, כל הרשימות שלך וכל המוצרים שבהן יימחקו לצמיתות. לא ניתן לבטל פעולה זו.',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'מחק לצמיתות',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await deleteAccount(deletePassword);
+              Alert.alert('החשבון נמחק', 'כל המידע שלך נמחק בהצלחה.');
+              onLogout();
+            } catch (error) {
+              if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+              Alert.alert('שגיאה', error.message || 'מחיקת החשבון נכשלה');
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -265,6 +312,59 @@ const SettingsScreen = ({ navigation, onLogout }) => {
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutButtonText}>התנתק</Text>
       </TouchableOpacity>
+
+      {/* מחיקת חשבון (דרישה של Google Play) */}
+      <View style={[styles.userSection, styles.dangerSection]}>
+        <Text style={styles.sectionTitle}>מחיקת חשבון</Text>
+        <Text style={styles.dangerText}>
+          מחיקת החשבון תמחק לצמיתות את המשתמש שלך, את כל הרשימות שיצרת ואת כל
+          המוצרים שבהן.
+        </Text>
+
+        {!showDeleteForm ? (
+          <TouchableOpacity
+            style={styles.deleteAccountButton}
+            onPress={() => setShowDeleteForm(true)}
+            testID="delete_account_button"
+            accessibilityLabel="delete_account_button"
+          >
+            <Text style={styles.deleteAccountButtonText}>מחק את החשבון שלי</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.passwordForm}>
+            <TextInput
+              style={styles.input}
+              placeholder="הזן את הסיסמה שלך לאישור"
+              placeholderTextColor="#888"
+              secureTextEntry
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              testID="delete_account_password"
+              accessibilityLabel="delete_account_password"
+            />
+            <View style={styles.formButtonsRow}>
+              <TouchableOpacity
+                style={styles.deleteConfirmButton}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>מחק לצמיתות</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={closeDeleteForm}
+                disabled={isDeleting}
+              >
+                <Text style={styles.cancelButtonText}>ביטול</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 };

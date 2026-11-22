@@ -1,5 +1,6 @@
-﻿from fastapi import FastAPI, Depends, HTTPException, status
+﻿from fastapi import FastAPI, Depends, HTTPException, status, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 import models
+import web_pages
 from database import engine, get_db
 import os
 from dotenv import load_dotenv
@@ -47,6 +49,9 @@ class UserCreate(BaseModel):
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
+
+class AccountDeleteRequest(BaseModel):
+    password: str
 
 class UserResponse(BaseModel):
     id: int
@@ -227,7 +232,48 @@ def change_password(
     current_user.hashed_password = get_password_hash(password_data.new_password)
     db.commit()
     
-    return {"message": "הסיסמה עודכנה בהצלחה"}    
+    return {"message": "הסיסמה עודכנה בהצלחה"}
+
+# === מחיקת חשבון (דרישה של Google Play) ===
+
+def delete_user_account(db: Session, user: models.User):
+    """מחיקת משתמש וכל המידע שלו: הרשימות שבבעלותו (כולל המוצרים שבהן) והשיתופים שלו"""
+    for shopping_list in list(user.owned_lists):
+        db.delete(shopping_list)  # המוצרים נמחקים בזכות cascade, והשיתופים של הרשימה נמחקים אוטומטית
+    user.shared_lists.clear()  # הסרת הגישה לרשימות של אחרים
+    db.delete(user)
+    db.commit()
+
+@app.delete("/users/me")
+def delete_my_account(
+    request: AccountDeleteRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """מחיקת החשבון מתוך האפליקציה (דורש אישור סיסמה)"""
+    # 400 ולא 401 - כדי שסיסמה שגויה לא תיחשב באפליקציה כהתחברות שפגה
+    if not verify_password(request.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="הסיסמה שגויה")
+    delete_user_account(db, current_user)
+    return {"message": "החשבון נמחק"}
+
+@app.get("/delete-account", response_class=HTMLResponse)
+def delete_account_page():
+    """דף אינטרנט למחיקת חשבון בלי האפליקציה"""
+    return web_pages.delete_account_form()
+
+@app.post("/delete-account", response_class=HTMLResponse)
+def delete_account_web(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    user = get_user_by_username(db, username)
+    if not user or not verify_password(password, user.hashed_password):
+        return HTMLResponse(web_pages.delete_account_form(error="שם המשתמש או הסיסמה שגויים"), status_code=400)
+    delete_user_account(db, user)
+    return web_pages.delete_account_done()
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_policy():
+    """מדיניות פרטיות (הקישור שמוזן ב-Play Console)"""
+    return web_pages.privacy_policy()
 
 # === Shopping Lists Endpoints ===
 

@@ -185,4 +185,37 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  // מחיקת חשבון
+  dangerSection: {
+    borderWidth: 1,
+    borderColor: colors.dangerLight,
+    marginBottom: 40,
+  },
+  dangerText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    lineHeight: 22,
+    textAlign: 'right',
+  },
+  deleteAccountButton: {
+    borderWidth: 1.5,
+    borderColor: colors.danger,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  deleteAccountButtonText: {
+    color: colors.danger,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    backgroundColor: colors.danger,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginRight: 8,
+  },
 });

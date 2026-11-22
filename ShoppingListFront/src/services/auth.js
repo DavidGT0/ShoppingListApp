@@ -144,3 +144,30 @@ export const changePassword = async (currentPassword, newPassword) => {
     throw error;
   }
 };
+
+/**
+ * מחיקת החשבון לצמיתות (דורש אישור סיסמה). לאחר הצלחה - מנקה את ההתחברות מהמכשיר.
+ */
+export const deleteAccount = async password => {
+  try {
+    const response = await apiFetch('/users/me', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof errorData.detail === 'string'
+          ? errorData.detail
+          : 'מחיקת החשבון נכשלה',
+      );
+    }
+
+    await logout();
+    return true;
+  } catch (error) {
+    console.error('Delete account error:', error);
+    throw error;
+  }
+};
