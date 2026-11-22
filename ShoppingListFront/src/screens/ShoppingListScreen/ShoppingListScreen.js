@@ -84,9 +84,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
     const version = mutationVersion.current;
     try {
       const data = await getShoppingList(listId);
+      // פעולה שלי בדרך, או שבוצע שינוי שלי בינתיים - התשובה ישנה
       if (pendingMutations.current > 0 || version !== mutationVersion.current) {
         return;
-      } // בוצע שינוי שלי בינתיים
+      }
       setItems(sortByPosition(data));
     } catch (error) {
       if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה

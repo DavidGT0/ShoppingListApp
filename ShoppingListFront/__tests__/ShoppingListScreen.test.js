@@ -276,11 +276,10 @@ test('a refresh that starts and resolves inside an in-flight mutation is discard
     tree.root.findByType(ShoppingListItem).props.onTogglePurchased();
   });
   // הרענון מתחיל ומסתיים כשהפעולה שלי עדיין בדרך
-  getShoppingList.mockResolvedValueOnce([milk]);
+  const cheese = { id: 9, name: 'גבינה', amount: 1, purchased: false, position: 5 };
+  getShoppingList.mockResolvedValueOnce([milk, cheese]);
   await act(async () => global.__live.refresh());
-  expect(tree.root.findByType(ShoppingListItem).props.item.purchased).toBe(
-    false,
-  );
+  expect(names(tree)).toEqual(['חלב']);
   await act(async () => pendingUpdate.resolve({ ...milk, purchased: true }));
 
   expect(tree.root.findByType(ShoppingListItem).props.item.purchased).toBe(
