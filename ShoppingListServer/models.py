@@ -45,6 +45,9 @@ class ShoppingList(Base):
     # קשר לפריטים
     items = relationship("ShoppingItem", back_populates="shopping_list", cascade="all, delete-orphan")
 
+    # קוד הזמנה (אחד לכל רשימה, נמחק יחד איתה)
+    invite = relationship("ListInvite", uselist=False, cascade="all, delete-orphan")
+
 
 class ShoppingItem(Base):
     __tablename__ = "items"
@@ -71,3 +74,12 @@ class PasswordResetToken(Base):
     used = Column(Boolean, default=False, nullable=False)
 
     user = relationship("User", back_populates="reset_tokens")
+
+
+class ListInvite(Base):
+    """קוד הזמנה לרשימה: מי שמחזיק בקוד יכול להצטרף לרשימה"""
+    __tablename__ = "list_invites"
+
+    list_id = Column(Integer, ForeignKey('shopping_lists.id'), primary_key=True)
+    code = Column(String(16), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False)  # UTC

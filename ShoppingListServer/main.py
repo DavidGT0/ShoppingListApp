@@ -12,6 +12,7 @@ from passlib.context import CryptContext
 import models
 import web_pages
 import email_sender
+import sharing
 from database import engine, get_db
 import os
 import hashlib
@@ -592,3 +593,44 @@ def delete_list(list_id: int, current_user: models.User = Depends(get_current_us
     db.delete(shopping_list)
     db.commit()
     return {"message": "List deleted successfully"}    
+
+# === Invite Endpoints ===
+
+def get_owned_list_or_error(db: Session, list_id: int, user: models.User):
+    """מחזיר רשימה שהמשתמש הוא הבעלים שלה, או 404/403"""
+    shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
+    if not shopping_list:
+        raise HTTPException(status_code=404, detail="List not found")
+    if shopping_list.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="רק הבעלים יכול לנהל את קוד ההזמנה")
+    return shopping_list
+
+def set_new_invite_code(db: Session, shopping_list: models.ShoppingList) -> str:
+    """יוצר קוד חדש לרשימה. אם הקוד כבר תפוס מנסים שוב, עד 5 פעמים"""
+    for _ in range(5):
+        code = sharing.generate_invite_code()
+        if not db.query(models.ListInvite).filter(models.ListInvite.code == code).first():
+            break
+    else:
+        raise HTTPException(status_code=500, detail="לא הצלחנו ליצור קוד הזמנה, נסו שוב")
+    if shopping_list.invite:
+        shopping_list.invite.code = code
+        shopping_list.invite.created_at = datetime.utcnow()
+    else:
+        shopping_list.invite = models.ListInvite(code=code, created_at=datetime.utcnow())
+    db.commit()
+    return code
+
+@app.post("/lists/{list_id}/invite")
+def get_invite_code(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """קוד ההזמנה של הרשימה (נוצר בפעם הראשונה). רק הבעלים"""
+    shopping_list = get_owned_list_or_error(db, list_id, current_user)
+    if shopping_list.invite:
+        return {"code": shopping_list.invite.code}
+    return {"code": set_new_invite_code(db, shopping_list)}
+
+@app.post("/lists/{list_id}/invite/reset")
+def reset_invite_code(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """מחליף את קוד ההזמנה בקוד חדש, והקוד הישן מפסיק לעבוד. רק הבעלים"""
+    shopping_list = get_owned_list_or_error(db, list_id, current_user)
+    return {"code": set_new_invite_code(db, shopping_list)}
