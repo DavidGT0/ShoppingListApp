@@ -1,4 +1,4 @@
-﻿import { apiFetch } from './http';
+﻿import { apiFetch, readErrorMessage } from './http';
 
 /**
  * קבלת כל הרשימות של המשתמש
@@ -104,7 +104,9 @@ export const getShoppingList = async listId => {
     const response = await apiFetch(`/items?list_id=${listId}`);
 
     if (!response.ok) {
-      throw new Error('Network response was not ok');
+      const error = new Error('Network response was not ok');
+      error.status = response.status;
+      throw error;
     }
     return await response.json();
   } catch (error) {
@@ -189,5 +191,89 @@ export const reorderItems = async reorderedItems => {
   } catch (error) {
     console.error('Error reordering items:', error);
     throw error;
+  }
+};
+
+/**
+ * זורק שגיאה עם הודעת השרת (בעברית) וקוד התשובה
+ */
+const throwResponseError = async (response, fallback) => {
+  const error = new Error(await readErrorMessage(response, fallback));
+  error.status = response.status;
+  throw error;
+};
+
+/**
+ * קבלת קוד ההזמנה של הרשימה (נוצר אם עדיין אין)
+ */
+export const getInviteCode = async listId => {
+  const response = await apiFetch(`/lists/${listId}/invite`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו להביא את קוד ההזמנה');
+  }
+  return (await response.json()).code;
+};
+
+/**
+ * יצירת קוד הזמנה חדש (הקוד הקודם מפסיק לעבוד)
+ */
+export const resetInviteCode = async listId => {
+  const response = await apiFetch(`/lists/${listId}/invite/reset`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו ליצור קוד הזמנה חדש');
+  }
+  return (await response.json()).code;
+};
+
+/**
+ * הצטרפות לרשימה באמצעות קוד הזמנה
+ */
+export const joinListByCode = async code => {
+  const response = await apiFetch(`/lists/join`, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו להצטרף לרשימה');
+  }
+  return await response.json();
+};
+
+/**
+ * רשימת חברי הרשימה
+ */
+export const getListMembers = async listId => {
+  const response = await apiFetch(`/lists/${listId}/members`);
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו להביא את חברי הרשימה');
+  }
+  return await response.json();
+};
+
+/**
+ * הסרת חבר מהרשימה (לבעל הרשימה בלבד)
+ */
+export const removeListMember = async (listId, userId) => {
+  const response = await apiFetch(`/lists/${listId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו להסיר את החבר');
+  }
+};
+
+/**
+ * עזיבת רשימה משותפת
+ */
+export const leaveList = async listId => {
+  const response = await apiFetch(`/lists/${listId}/leave`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו לעזוב את הרשימה');
   }
 };
