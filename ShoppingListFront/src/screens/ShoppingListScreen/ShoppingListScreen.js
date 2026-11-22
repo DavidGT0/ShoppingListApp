@@ -14,6 +14,7 @@ import ShoppingListItem from '../../components/ShoppingListItem/ShoppingListItem
 import PurchasedItemsSection from '../../components/PurchasedItemsSection/PurchasedItemsSection';
 import AddItemInput from '../../components/AddItemInput/AddItemInput';
 import EditItemModal from '../../components/EditItemModal/EditItemModal';
+import MembersModal from '../../components/MembersModal/MembersModal';
 
 // שירותים ועיצובים
 import {
@@ -22,6 +23,7 @@ import {
   updateItem,
   deleteItem,
   reorderItems,
+  getListMembers,
 } from '../../services/api';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
@@ -35,8 +37,6 @@ const sortByPosition = data =>
 
 const ShoppingListScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  // isOwner ישמש את חלון המשתתפים (משימה 8)
-  // eslint-disable-next-line no-unused-vars
   const { listId, listName, isOwner = true } = route.params || {};
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [membersVisible, setMembersVisible] = useState(false);
+  const [memberCount, setMemberCount] = useState(null);
   const currentListId = listId;
   // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
   const mutationVersion = useRef(0);
@@ -64,6 +66,32 @@ const ShoppingListScreen = ({ route, navigation }) => {
       loadListItems(listId);
     }
   }, [listId]);
+
+  // מספר המשתתפים מוצג על כפתור הכותרת
+  const loadMemberCount = async () => {
+    if (!listId) return;
+    try {
+      const members = await getListMembers(listId);
+      if (Array.isArray(members)) setMemberCount(members.length);
+    } catch (error) {
+      // שקט - הכפתור פשוט לא יציג מספר
+    }
+  };
+
+  useEffect(() => {
+    loadMemberCount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listId]);
+
+  const closeMembers = () => {
+    setMembersVisible(false);
+    loadMemberCount();
+  };
+
+  const handleLeft = () => {
+    setMembersVisible(false);
+    navigation.goBack();
+  };
 
   const loadListItems = async id => {
     try {
@@ -272,6 +300,18 @@ const ShoppingListScreen = ({ route, navigation }) => {
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerEyebrow}>ניהול מוצרים ברשימה</Text>
+          <TouchableOpacity
+            onPress={() => setMembersVisible(true)}
+            style={styles.membersButton}
+            activeOpacity={0.8}
+            testID="members_button"
+            accessibilityLabel="members_button"
+          >
+            <Text style={styles.membersButtonText}>👥</Text>
+            {memberCount !== null && (
+              <Text style={styles.membersButtonText}>{memberCount}</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.mainTitle} numberOfLines={1}>
@@ -343,6 +383,15 @@ const ShoppingListScreen = ({ route, navigation }) => {
         item={editingItem}
         onSave={handleEditItem}
         onClose={() => setModalVisible(false)}
+      />
+
+      <MembersModal
+        visible={membersVisible}
+        listId={listId}
+        listName={listName}
+        isOwner={isOwner}
+        onClose={closeMembers}
+        onLeft={handleLeft}
       />
     </View>
   );

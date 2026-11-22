@@ -4,13 +4,17 @@ import ReactTestRenderer from 'react-test-renderer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListItem';
-import { Alert } from 'react-native';
+import { Alert, Text } from 'react-native';
+import MembersModal from '../src/components/MembersModal/MembersModal';
 import AddItemInput from '../src/components/AddItemInput/AddItemInput';
 import {
   getShoppingList,
   updateItem,
   addItem,
   reorderItems,
+  getListMembers,
+  removeListMember,
+  leaveList,
 } from '../src/services/api';
 
 // הבדיקה כאן היא על ניהול המצב במסך, לא על גרירה/החלקה -
@@ -50,9 +54,9 @@ jest.mock('../src/hooks/useLiveRefresh', () => ({
 
 jest.mock('../src/components/ShoppingListItem/ShoppingListItem', () => {
   const ReactLib = require('react');
-  const { Text } = require('react-native');
+  const { Text: RNText } = require('react-native');
   const MockShoppingListItem = ({ item }) =>
-    ReactLib.createElement(Text, null, item.name);
+    ReactLib.createElement(RNText, null, item.name);
   return { __esModule: true, default: MockShoppingListItem };
 });
 
@@ -62,6 +66,11 @@ jest.mock('../src/services/api', () => ({
   updateItem: jest.fn(),
   deleteItem: jest.fn(),
   reorderItems: jest.fn(),
+  getListMembers: jest.fn(() => Promise.resolve([])),
+  getInviteCode: jest.fn(),
+  resetInviteCode: jest.fn(),
+  removeListMember: jest.fn(),
+  leaveList: jest.fn(),
 }));
 
 const { act } = ReactTestRenderer;
@@ -154,13 +163,13 @@ test('adding an item sends a single request and shows it first, with no error', 
 const milk = { id: 1, name: 'חלב', amount: 1, purchased: false, position: 0 };
 const eggs = { id: 3, name: 'ביצים', amount: 1, purchased: false, position: 2 };
 
-const renderScreen = async (goBack = jest.fn()) => {
+const renderScreen = async (goBack = jest.fn(), extraParams = {}) => {
   let tree;
   await act(async () => {
     tree = ReactTestRenderer.create(
       <GestureHandlerRootView>
         <ShoppingListScreen
-          route={{ params: { listId: 7, listName: 'רשימה' } }}
+          route={{ params: { listId: 7, listName: 'רשימה', ...extraParams } }}
           navigation={{ goBack }}
         />
       </GestureHandlerRootView>,
@@ -285,4 +294,66 @@ test('a refresh that starts and resolves inside an in-flight mutation is discard
   expect(tree.root.findByType(ShoppingListItem).props.item.purchased).toBe(
     true,
   );
+});
+
+const TWO_MEMBERS = [
+  { id: 1, username: 'owner_user', is_owner: true },
+  { id: 2, username: 'member_user', is_owner: false },
+];
+const byTestId = (tree, id) =>
+  tree.root.findAll(n => n.props.testID === id && n.props.onPress)[0];
+const countText = tree =>
+  byTestId(tree, 'members_button')
+    .findAllByType(Text)
+    .map(t => [].concat(t.props.children).join(''))
+    .join(' ');
+
+test('header shows the member count', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValue([milk]);
+  getListMembers.mockResolvedValue(TWO_MEMBERS);
+  const tree = await renderScreen();
+  expect(countText(tree)).toContain('2');
+});
+
+test('closing the dialog reloads the count', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValue([milk]);
+  getListMembers.mockResolvedValue(TWO_MEMBERS);
+  removeListMember.mockResolvedValue();
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const tree = await renderScreen();
+  await act(async () => byTestId(tree, 'members_button').props.onPress());
+
+  getListMembers.mockResolvedValue([TWO_MEMBERS[0]]);
+  await act(async () => byTestId(tree, 'remove_member_2').props.onPress());
+  const buttons = alertSpy.mock.calls[alertSpy.mock.calls.length - 1][2];
+  await act(async () => {
+    await buttons.find(b => b.style === 'destructive').onPress();
+  });
+  const modal = tree.root.findByType(MembersModal);
+  await act(async () => modal.props.onClose());
+
+  expect(countText(tree)).toContain('1');
+  expect(countText(tree)).not.toContain('2');
+  alertSpy.mockRestore();
+});
+
+test('leaving from the dialog goes back', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValue([milk]);
+  getListMembers.mockResolvedValue(TWO_MEMBERS);
+  leaveList.mockResolvedValue();
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const goBack = jest.fn();
+  const tree = await renderScreen(goBack, { isOwner: false });
+  await act(async () => byTestId(tree, 'members_button').props.onPress());
+  await act(async () => byTestId(tree, 'leave_list_button').props.onPress());
+  const buttons = alertSpy.mock.calls[alertSpy.mock.calls.length - 1][2];
+  await act(async () => {
+    await buttons.find(b => b.style === 'destructive').onPress();
+  });
+  expect(leaveList).toHaveBeenCalledWith(7);
+  expect(goBack).toHaveBeenCalled();
+  alertSpy.mockRestore();
 });
