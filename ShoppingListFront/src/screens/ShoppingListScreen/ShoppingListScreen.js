@@ -223,13 +223,32 @@ const ShoppingListScreen = ({ route, navigation }) => {
     // פעולה חדשה מאשרת מחיקה ממתינה
     commitPendingDelete();
     // מוצר שמחיקתו ממתינה מוסתר, ולכן אפשר להוסיף שוב את אותו שם
-    const isDuplicate = items
+    const wanted = name.trim().toLowerCase();
+    const matches = items
       .filter(item => !hiddenIds.current.has(item.id))
-      .some(
-        item => item.name.trim().toLowerCase() === name.trim().toLowerCase(),
-      );
+      .filter(item => item.name.trim().toLowerCase() === wanted);
 
-    if (isDuplicate) {
+    // מוצר שכבר נקנה - קנייה חוזרת: מחזירים אותו לרשימה במקום להוסיף כפילות
+    const boughtMatch = matches.find(item => item.purchased);
+    if (boughtMatch && matches.every(item => item.purchased)) {
+      startMutation();
+      try {
+        const updated = await updateItem(boughtMatch.id, { purchased: false });
+        setItems(prev => [
+          updated,
+          ...prev.filter(i => i.id !== updated.id && !i.purchased),
+          ...prev.filter(i => i.id !== updated.id && i.purchased),
+        ]);
+      } catch (error) {
+        if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+        Alert.alert('שגיאה', 'לא הצלחנו להחזיר את המוצר לרשימה');
+      } finally {
+        endMutation();
+      }
+      return;
+    }
+
+    if (matches.length > 0) {
       Alert.alert('שים לב', 'המוצר כבר קיים ברשימה');
       return;
     }
@@ -320,7 +339,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   // פעולה על כל המוצרים שנקנו: מאשרת מחיקה ממתינה, ועוברת במשמר השינויים
   const runPurchasedBulk = async (request, applyLocally) => {
-    commitPendingDelete();
+    // המחיקה הממתינה מסתיימת לפני הבקשה הקבוצתית, כדי שלא יהיה מרוץ ביניהן
+    await commitPendingDelete();
     hideBar();
     startMutation();
     try {

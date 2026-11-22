@@ -738,4 +738,46 @@ describe('purchased bulk actions', () => {
     await act(async () => d.resolve(1));
     expect(rowFor(tree, 5).props.item.purchased).toBe(false);
   });
+
+  test('adding the name of a bought item un-purchases it instead of adding', async () => {
+    updateItem.mockReset();
+    addItem.mockReset();
+    updateItem.mockResolvedValue({ ...bought, purchased: false });
+    const tree = await renderScreen();
+    await act(async () => tree.root.findByType(AddItemInput).props.onAdd(' גבינה '));
+    expect(updateItem).toHaveBeenCalledWith(5, { purchased: false });
+    expect(addItem).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(rowFor(tree, 5).props.item.purchased).toBe(false);
+  });
+
+  test('adding the name of an open item still alerts', async () => {
+    addItem.mockReset();
+    const tree = await renderScreen();
+    await act(async () => tree.root.findByType(AddItemInput).props.onAdd('חלב'));
+    expect(alertSpy).toHaveBeenCalledWith('שים לב', 'המוצר כבר קיים ברשימה');
+    expect(addItem).not.toHaveBeenCalled();
+  });
+
+  test('a pending delete is committed before the bulk request', async () => {
+    jest.useFakeTimers();
+    try {
+      deleteItem.mockReset();
+      deleteItem.mockResolvedValue();
+      clearPurchased.mockResolvedValue(1);
+      const tree = await renderScreen();
+      await act(async () => rowFor(tree, 1).props.onDelete());
+      expect(undoBar(tree)).toBeDefined();
+      await act(async () =>
+        tree.root.findByType(PurchasedItemsSection).props.onClearAll(),
+      );
+      expect(deleteItem).toHaveBeenCalledWith(1);
+      expect(deleteItem.mock.invocationCallOrder[0]).toBeLessThan(
+        clearPurchased.mock.invocationCallOrder[0],
+      );
+      expect(undoBar(tree)).toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
