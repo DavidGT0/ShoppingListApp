@@ -3,10 +3,19 @@ from appium.options.android import UiAutomator2Options
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import os
 import time
+
+import pytest
+
+TEST_USERNAME = os.environ.get("SHOPLI_TEST_USERNAME")
+TEST_PASSWORD = os.environ.get("SHOPLI_TEST_PASSWORD")
 
 
 def test_e2e_full_flow():
+    if not TEST_USERNAME or not TEST_PASSWORD:
+        pytest.skip("Set SHOPLI_TEST_USERNAME and SHOPLI_TEST_PASSWORD to run this test")
+
     options = UiAutomator2Options()
     options.platform_name = 'Android'
     options.automation_name = 'UIAutomator2'
@@ -24,11 +33,11 @@ def test_e2e_full_flow():
         # ----------------- שלב 1: מסך התחברות -----------------
         print("מקליד שם משתמש...")
         username_field = wait.until(EC.presence_of_element_located((AppiumBy.ACCESSIBILITY_ID, 'username_input')))
-        username_field.send_keys("גזית")
+        username_field.send_keys(TEST_USERNAME)
 
         print("מקליד סיסמה...")
         password_field = wait.until(EC.presence_of_element_located((AppiumBy.ACCESSIBILITY_ID, 'password_input')))
-        password_field.send_keys("1234")
+        password_field.send_keys(TEST_PASSWORD)
 
         print("לוחץ על 'התחבר' וממתין לתשובת שרת...")
         login_btn = wait.until(EC.presence_of_element_located((AppiumBy.ACCESSIBILITY_ID, 'login_button')))
