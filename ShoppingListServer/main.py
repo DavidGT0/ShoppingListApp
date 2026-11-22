@@ -605,7 +605,7 @@ def get_owned_list_or_error(db: Session, list_id: int, user: models.User):
     if not shopping_list:
         raise HTTPException(status_code=404, detail="List not found")
     if shopping_list.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="רק הבעלים יכול לנהל את קוד ההזמנה")
+        raise HTTPException(status_code=403, detail="רק הבעלים של הרשימה יכול לבצע פעולה זו")
     return shopping_list
 
 def set_new_invite_code(db: Session, shopping_list: models.ShoppingList) -> str:
