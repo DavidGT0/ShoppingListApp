@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
 from typing import Annotated, Optional, List
@@ -603,7 +604,7 @@ def get_owned_list_or_error(db: Session, list_id: int, user: models.User):
     """מחזיר רשימה שהמשתמש הוא הבעלים שלה, או 404/403"""
     shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
     if not shopping_list:
-        raise HTTPException(status_code=404, detail="List not found")
+        raise HTTPException(status_code=404, detail="הרשימה לא נמצאה")
     if shopping_list.owner_id != user.id:
         raise HTTPException(status_code=403, detail="רק הבעלים של הרשימה יכול לבצע פעולה זו")
     return shopping_list
@@ -630,7 +631,15 @@ def get_invite_code(list_id: int, current_user: models.User = Depends(get_curren
     shopping_list = get_owned_list_or_error(db, list_id, current_user)
     if shopping_list.invite:
         return {"code": shopping_list.invite.code}
-    return {"code": set_new_invite_code(db, shopping_list)}
+    try:
+        return {"code": set_new_invite_code(db, shopping_list)}
+    except IntegrityError:
+        # שתי בקשות ראשונות במקביל: השנייה נכשלה על המפתח הראשי - מחזירים את הקוד שנוצר
+        db.rollback()
+        invite = db.query(models.ListInvite).filter(models.ListInvite.list_id == list_id).first()
+        if not invite:
+            raise
+        return {"code": invite.code}
 
 @app.post("/lists/{list_id}/invite/reset")
 def reset_invite_code(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -666,9 +675,9 @@ def get_accessible_list_or_error(db: Session, list_id: int, user: models.User):
     """מחזיר רשימה שהמשתמש הוא הבעלים שלה או משתתף בה, או 404/403"""
     shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
     if not shopping_list:
-        raise HTTPException(status_code=404, detail="List not found")
+        raise HTTPException(status_code=404, detail="הרשימה לא נמצאה")
     if shopping_list.owner_id != user.id and user not in shopping_list.shared_users:
-        raise HTTPException(status_code=403, detail="Not authorized to access this list")
+        raise HTTPException(status_code=403, detail="אין לך גישה לרשימה הזו")
     return shopping_list
 
 @app.get("/lists/{list_id}/members")

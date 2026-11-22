@@ -1,4 +1,6 @@
 """קודי הזמנה לרשימה: יצירה, קבלה ואיפוס"""
+from datetime import datetime
+
 import models
 import sharing
 
@@ -270,3 +272,40 @@ def test_deleting_owner_account_removes_lists_invites_and_memberships(client, re
     assert db.query(models.ListInvite).count() == 0
     assert db.execute(models.shared_lists.select().where(models.shared_lists.c.list_id == list_id)).fetchall() == []
     assert db.query(models.ShoppingList).filter_by(id=list_id).count() == 0
+
+
+def test_members_errors_are_in_hebrew(client, register):
+    alice = register("alice")
+    carol = register("carol")
+    list_id = _make_list(client, alice)
+
+    stranger = client.get(f"/lists/{list_id}/members", headers=carol)
+    missing = client.get("/lists/9999/members", headers=alice)
+
+    assert stranger.status_code == 403
+    assert stranger.json()["detail"] == "אין לך גישה לרשימה הזו"
+    assert missing.status_code == 404
+    assert missing.json()["detail"] == "הרשימה לא נמצאה"
+
+
+def test_first_invite_race_returns_the_existing_code(client, register, db, monkeypatch):
+    import main
+
+    alice = register("alice")
+    list_id = _make_list(client, alice)
+    original = main.get_owned_list_or_error
+
+    def racing(session, lid, user):
+        shopping_list = original(session, lid, user)
+        assert shopping_list.invite is None  # הבקשה הזו רואה "אין קוד עדיין"
+        # בקשה מקבילה יוצרת את הקוד לפני שהבקשה הזו הספיקה לשמור
+        db.add(models.ListInvite(list_id=lid, code="RACE22", created_at=datetime.utcnow()))
+        db.commit()
+        return shopping_list
+
+    monkeypatch.setattr(main, "get_owned_list_or_error", racing)
+
+    r = client.post(f"/lists/{list_id}/invite", headers=alice)
+
+    assert r.status_code == 200
+    assert r.json()["code"] == "RACE22"
