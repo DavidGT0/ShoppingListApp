@@ -136,6 +136,17 @@ export const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'center',
   },
+  sharedBadge: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  sharedBadgeText: {
+    color: colors.text.inverse,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   actionIconBtn: {
     padding: 4,
   },

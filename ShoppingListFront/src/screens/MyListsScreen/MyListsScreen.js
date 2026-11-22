@@ -72,7 +72,8 @@ const MyListsScreen = ({ navigation }) => {
         onPress: async () => {
           try {
             await deleteShoppingList(listId);
-            setLists(lists.filter(l => l.id !== listId));
+            // עדכון לפי המצב העדכני (ולא עותק ישן) - כדי שכמה פעולות מהירות לא ידרסו זו את זו
+            setLists(prev => prev.filter(l => l.id !== listId));
           } catch (error) {
             if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את הרשימה');
@@ -95,8 +96,8 @@ const MyListsScreen = ({ navigation }) => {
       const updated = await updateShoppingList(editingList.id, {
         name: newNameValue.trim(),
       });
-      setLists(
-        lists.map(l =>
+      setLists(prev =>
+        prev.map(l =>
           l.id === editingList.id
             ? updated || { ...l, name: newNameValue.trim() }
             : l,
@@ -178,20 +179,31 @@ const MyListsScreen = ({ navigation }) => {
               <Text style={styles.listNameText}>{item.name}</Text>
             </TouchableOpacity>
 
-            <View style={styles.cardActions}>
-              <TouchableOpacity
-                onPress={() => openRenameModal(item)}
-                style={styles.actionIconBtn}
-              >
-                <Text style={{ fontSize: 18 }}>✏️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleDeleteList(item.id)}
-                style={styles.actionIconBtn}
-              >
-                <Text style={{ fontSize: 18 }}>🗑️</Text>
-              </TouchableOpacity>
-            </View>
+            {/* רק הבעלים יכול לשנות שם או למחוק; ברשימה ששותפה איתך מוצג תג במקום */}
+            {item.is_owner === false ? (
+              <View style={styles.sharedBadge} testID={`shared_badge_${item.id}`}>
+                <Text style={styles.sharedBadgeText}>משותפת</Text>
+              </View>
+            ) : (
+              <View style={styles.cardActions}>
+                <TouchableOpacity
+                  onPress={() => openRenameModal(item)}
+                  style={styles.actionIconBtn}
+                  testID={`edit_list_${item.id}`}
+                  accessibilityLabel="edit_list_button"
+                >
+                  <Text style={{ fontSize: 18 }}>✏️</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleDeleteList(item.id)}
+                  style={styles.actionIconBtn}
+                  testID={`delete_list_${item.id}`}
+                  accessibilityLabel="delete_list_button"
+                >
+                  <Text style={{ fontSize: 18 }}>🗑️</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         )}
         ListEmptyComponent={

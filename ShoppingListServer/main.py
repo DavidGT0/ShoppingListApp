@@ -92,7 +92,10 @@ class ShoppingListResponse(BaseModel):
     id: int
     name: str
     owner_id: int
-    
+    # האם המשתמש המחובר הוא הבעלים (ולא רשימה ששותפה איתו).
+    # ברירת המחדל True מתאימה ליצירה ולשינוי שם - רק הבעלים יכול לבצע אותם
+    is_owner: bool = True
+
     class Config:
         from_attributes = True
 
@@ -401,7 +404,15 @@ def get_lists(current_user: models.User = Depends(get_current_user), db: Session
     owned_lists = current_user.owned_lists
     shared_lists = current_user.shared_lists
     all_lists = owned_lists + shared_lists
-    return all_lists
+    return [
+        ShoppingListResponse(
+            id=lst.id,
+            name=lst.name,
+            owner_id=lst.owner_id,
+            is_owner=lst.owner_id == current_user.id,
+        )
+        for lst in all_lists
+    ]
 
 @app.post("/lists", response_model=ShoppingListResponse, status_code=status.HTTP_201_CREATED)
 def create_list(list_data: ShoppingListCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
