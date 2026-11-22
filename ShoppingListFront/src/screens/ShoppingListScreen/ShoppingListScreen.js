@@ -62,6 +62,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const pendingDelete = useRef(null);
   const hiddenIds = useRef(new Set());
   const barTimer = useRef(null);
+  // עולה בתחילת כל פעולה של המשתמש - תשובה מאוחרת לא דורסת פס ביטול של פעולה חדשה יותר
+  const actionSeq = useRef(0);
   const [undoState, setUndoState] = useState(null);
   const startMutation = () => {
     mutationVersion.current++;
@@ -95,7 +97,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
       await deleteItem(pending.item.id);
       setItems(prev => prev.filter(i => i.id !== pending.item.id));
     } catch (error) {
-      if (!error.sessionExpired) {
+      if (error.status === 404) {
+        // המוצר כבר נמחק (למשל על ידי בן משפחה) - נחשב הצלחה
+        setItems(prev => prev.filter(i => i.id !== pending.item.id));
+      } else if (error.status === 403) {
+        // אבדה הגישה לרשימה - הרענון החי מטפל בהודעה ובחזרה
+      } else if (!error.sessionExpired) {
         Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
       }
     } finally {
@@ -220,35 +227,18 @@ const ShoppingListScreen = ({ route, navigation }) => {
       return;
     }
 
-    // פעולה חדשה מאשרת מחיקה ממתינה
+    // פעולה חדשה מאשרת מחיקה ממתינה ומסתירה פס ביטול קודם
     commitPendingDelete();
+    hideBar();
+    actionSeq.current++;
     // מוצר שמחיקתו ממתינה מוסתר, ולכן אפשר להוסיף שוב את אותו שם
     const wanted = name.trim().toLowerCase();
     const matches = items
       .filter(item => !hiddenIds.current.has(item.id))
       .filter(item => item.name.trim().toLowerCase() === wanted);
 
-    // מוצר שכבר נקנה - קנייה חוזרת: מחזירים אותו לרשימה במקום להוסיף כפילות
-    const boughtMatch = matches.find(item => item.purchased);
-    if (boughtMatch && matches.every(item => item.purchased)) {
-      startMutation();
-      try {
-        const updated = await updateItem(boughtMatch.id, { purchased: false });
-        setItems(prev => [
-          updated,
-          ...prev.filter(i => i.id !== updated.id && !i.purchased),
-          ...prev.filter(i => i.id !== updated.id && i.purchased),
-        ]);
-      } catch (error) {
-        if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
-        Alert.alert('שגיאה', 'לא הצלחנו להחזיר את המוצר לרשימה');
-      } finally {
-        endMutation();
-      }
-      return;
-    }
-
-    if (matches.length > 0) {
+    // מוצר פתוח באותו שם - כפילות. מוצר שנקנה אינו חוסם: השרת מחזיר אותו לרשימה (קנייה חוזרת)
+    if (matches.some(item => !item.purchased)) {
       Alert.alert('שים לב', 'המוצר כבר קיים ברשימה');
       return;
     }
@@ -260,11 +250,15 @@ const ShoppingListScreen = ({ route, navigation }) => {
       // הכנסת המוצר החדש לראש רשימת הלא-נקונים.
       // (השרת עצמו שומר מוצר חדש בראש הרשימה - אין צורך בבקשת סידור נוספת)
       // העדכון נבנה מהמצב העדכני (prev) ולא מעותק ישן - כדי שפעולות מהירות לא ידרסו זו את זו
-      setItems(prev => [
-        newItem,
-        ...prev.filter(item => !item.purchased),
-        ...prev.filter(item => item.purchased),
-      ]);
+      // קנייה חוזרת: השרת החזיר מוצר קיים - מחליפים אותו במקום ומעבירים לראש, בלי כפילות
+      setItems(prev => {
+        const rest = prev.filter(item => item.id !== newItem.id);
+        return [
+          newItem,
+          ...rest.filter(item => !item.purchased),
+          ...rest.filter(item => item.purchased),
+        ];
+      });
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו להוסיף את המוצר');
@@ -275,6 +269,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   // ביטול סימון: שולח את הערך ההפוך, בתוך משמר השינויים
   const undoToggle = async (itemId, previousPurchased) => {
+    actionSeq.current++;
     hideBar();
     startMutation();
     try {
@@ -291,13 +286,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const handleTogglePurchased = async item => {
     commitPendingDelete();
     hideBar();
+    const seq = ++actionSeq.current;
     startMutation();
     try {
       const updated = await updateItem(item.id, { purchased: !item.purchased });
       setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
-      showBar(updated.purchased ? 'סומן כנקנה' : 'הוחזר לרשימה', () =>
-        undoToggle(item.id, item.purchased),
-      );
+      // פעולה חדשה יותר כבר התחילה - לא דורסים את הפס שלה
+      if (seq === actionSeq.current) {
+        showBar(updated.purchased ? 'סומן כנקנה' : 'הוחזר לרשימה', () =>
+          undoToggle(item.id, item.purchased),
+        );
+      }
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
@@ -308,6 +307,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   const handleUpdateAmount = async (item, newAmount) => {
     commitPendingDelete();
+    actionSeq.current++;
     startMutation();
     try {
       const updated = await updateItem(item.id, { amount: newAmount });
@@ -323,6 +323,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const handleEditItem = async newName => {
     if (!editingItem || !newName?.trim()) return;
     commitPendingDelete();
+    actionSeq.current++;
     startMutation();
     try {
       const updated = await updateItem(editingItem.id, { name: newName });
@@ -341,6 +342,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const runPurchasedBulk = async (request, applyLocally) => {
     // המחיקה הממתינה מסתיימת לפני הבקשה הקבוצתית, כדי שלא יהיה מרוץ ביניהן
     await commitPendingDelete();
+    actionSeq.current++;
     hideBar();
     startMutation();
     try {
@@ -365,6 +367,9 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const handleDeleteItem = itemId => {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
+    // כבר ממתין למחיקה (למשל החלקה וגם כפתור) - לא רושמים שוב
+    if (hiddenIds.current.has(itemId)) return;
+    actionSeq.current++;
     // פעולה אחת בכל רגע: מחיקה קודמת נשלחת עכשיו
     commitPendingDelete();
     hideBar();
@@ -387,6 +392,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   const handleDragBegin = () => {
     commitPendingDelete();
+    actionSeq.current++;
     startMutation(); // גרירה נחשבת תחילת שינוי - רענון שבדרך נזרק
     setIsDragging(true);
   };

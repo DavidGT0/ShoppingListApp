@@ -589,6 +589,63 @@ describe('undo', () => {
     expect(names(tree)).toEqual(['חלב', 'ביצים']);
   });
 
+  test('a delete that gets 404 counts as done: item removed, no alert', async () => {
+    deleteItem.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 404 }));
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(names(tree)).toEqual(['ביצים']);
+  });
+
+  test('a delete that gets 403 shows no alert of its own', async () => {
+    deleteItem.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 403 }));
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  test('a late toggle does not replace the newer delete bar', async () => {
+    const toggle = deferred();
+    updateItem.mockReturnValueOnce(toggle.promise);
+    const tree = await renderScreen();
+    await act(async () => {
+      rowFor(tree, 1).props.onTogglePurchased();
+    });
+    await act(async () => rowFor(tree, 3).props.onDelete());
+    expect(barText(tree)).toContain('המוצר נמחק');
+
+    await act(async () => toggle.resolve({ ...milk, purchased: true }));
+    expect(barText(tree)).toContain('המוצר נמחק');
+  });
+
+  test('deleting the same item twice sends one delete', async () => {
+    const tree = await renderScreen();
+    const row = rowFor(tree, 1);
+    await act(async () => {
+      row.props.onDelete();
+      row.props.onDelete();
+    });
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith(1);
+  });
+
+  test('adding an item hides a leftover toggle bar', async () => {
+    updateItem.mockResolvedValueOnce({ ...milk, purchased: true });
+    addItem.mockReset();
+    addItem.mockResolvedValue({ id: 30, name: 'לחם', amount: 1, purchased: false, position: -1 });
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onTogglePurchased());
+    expect(undoBar(tree)).toBeDefined();
+    await act(async () => tree.root.findByType(AddItemInput).props.onAdd('לחם'));
+    expect(undoBar(tree)).toBeUndefined();
+  });
+
   test('a failure that settles after the bar is hidden shows the item again', async () => {
     const pendingDelete = deferred();
     deleteItem.mockReturnValueOnce(pendingDelete.promise);
@@ -739,16 +796,17 @@ describe('purchased bulk actions', () => {
     expect(rowFor(tree, 5).props.item.purchased).toBe(false);
   });
 
-  test('adding the name of a bought item un-purchases it instead of adding', async () => {
+  test('adding the name of a bought item goes through addItem and moves it to the top without a duplicate', async () => {
     updateItem.mockReset();
     addItem.mockReset();
-    updateItem.mockResolvedValue({ ...bought, purchased: false });
+    addItem.mockResolvedValue({ ...bought, purchased: false, position: -1 });
     const tree = await renderScreen();
     await act(async () => tree.root.findByType(AddItemInput).props.onAdd(' גבינה '));
-    expect(updateItem).toHaveBeenCalledWith(5, { purchased: false });
-    expect(addItem).not.toHaveBeenCalled();
+    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(updateItem).not.toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
     expect(rowFor(tree, 5).props.item.purchased).toBe(false);
+    expect(names(tree)).toEqual(['גבינה', 'חלב']);
   });
 
   test('adding the name of an open item still alerts', async () => {

@@ -146,7 +146,9 @@ export const updateItem = async (id, updates) => {
     });
 
     if (!response.ok) {
-      throw new Error('Network response was not ok');
+      const error = new Error('Network response was not ok');
+      error.status = response.status;
+      throw error;
     }
     return await response.json();
   } catch (error) {
@@ -165,7 +167,9 @@ export const deleteItem = async id => {
     });
 
     if (!response.ok) {
-      throw new Error('Network response was not ok');
+      const error = new Error('Network response was not ok');
+      error.status = response.status;
+      throw error;
     }
     return true;
   } catch (error) {
