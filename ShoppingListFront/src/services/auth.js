@@ -146,6 +146,23 @@ export const changePassword = async (currentPassword, newPassword) => {
 };
 
 /**
+ * בקשת קישור לאיפוס סיסמה במייל. מחזיר את הודעת השרת (זהה תמיד, גם למייל שלא רשום).
+ */
+export const requestPasswordReset = async email => {
+  const response = await fetch(`${API_BASE_URL}/password-reset/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim() }),
+  });
+
+  if (!response.ok) {
+    throw new Error('לא הצלחנו לשלוח את הבקשה. נסה שוב בעוד רגע.');
+  }
+  const data = await response.json();
+  return data.message;
+};
+
+/**
  * מחיקת החשבון לצמיתות (דורש אישור סיסמה). לאחר הצלחה - מנקה את ההתחברות מהמכשיר.
  */
 export const deleteAccount = async password => {

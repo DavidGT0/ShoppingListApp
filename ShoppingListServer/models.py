@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table
+﻿from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -24,6 +24,9 @@ class User(Base):
     
     # קשר לרשימות משותפות
     shared_lists = relationship("ShoppingList", secondary=shared_lists, back_populates="shared_users")
+
+    # בקשות איפוס סיסמה (נמחקות יחד עם המשתמש)
+    reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
 
 
 class ShoppingList(Base):
@@ -54,3 +57,17 @@ class ShoppingItem(Base):
     list_id = Column(Integer, ForeignKey('shopping_lists.id'))
     
     shopping_list = relationship("ShoppingList", back_populates="items")
+
+
+class PasswordResetToken(Base):
+    """קישור איפוס סיסמה חד-פעמי. נשמר רק ה-hash של הטוקן, לא הטוקן עצמו."""
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False)  # UTC
+    expires_at = Column(DateTime, nullable=False)  # UTC
+    used = Column(Boolean, default=False, nullable=False)
+
+    user = relationship("User", back_populates="reset_tokens")

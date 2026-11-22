@@ -1,4 +1,5 @@
-"""דפי HTML שהשרת מגיש ישירות: מחיקת חשבון ומדיניות פרטיות (נדרשים ע"י Google Play)."""
+"""דפי HTML שהשרת מגיש ישירות: מחיקת חשבון, איפוס סיסמה ומדיניות פרטיות."""
+from html import escape
 
 APP_NAME = "ShopLi"
 CONTACT_EMAIL = "david.app.programing@gmail.com"
@@ -62,6 +63,7 @@ def delete_account_form(error: str = "") -> str:
   <input id="password" name="password" type="password" autocomplete="current-password" required>
   <button type="submit">מחק את החשבון שלי לצמיתות</button>
 </form>
+<p><small><a href="/forgot-password">שכחת את הסיסמה?</a></small></p>
 """
     return _page("מחיקת חשבון", APP_NAME, body)
 
@@ -72,6 +74,77 @@ def delete_account_done() -> str:
 <p>אם האפליקציה עדיין מותקנת אצלך, אפשר להסיר אותה מהמכשיר.</p>
 """
     return _page("מחיקת חשבון", APP_NAME, body)
+
+
+_BLUE_BUTTON = 'style="background:#5B8DEE"'
+
+
+def forgot_password_form() -> str:
+    body = f"""
+<p>הזן את כתובת האימייל שרשומה בחשבון שלך, ונשלח אליה קישור לאיפוס הסיסמה.</p>
+<form method="post" action="/forgot-password">
+  <label for="email">אימייל</label>
+  <input id="email" name="email" type="email" autocomplete="email" required>
+  <button type="submit" {_BLUE_BUTTON}>שלח לי קישור לאיפוס</button>
+</form>
+"""
+    return _page("שכחתי סיסמה", APP_NAME, body)
+
+
+def forgot_password_sent() -> str:
+    body = """
+<div class="success">אם כתובת האימייל רשומה אצלנו, נשלח אליה קישור לאיפוס הסיסמה.</div>
+<p>הקישור תקף ל-30 דקות. לא קיבלת? כדאי לבדוק גם בתיקיית הספאם.</p>
+"""
+    return _page("שכחתי סיסמה", APP_NAME, body)
+
+
+def reset_password_form(token: str, error: str = "") -> str:
+    error_html = f'<div class="error">{error}</div>' if error else ""
+    body = f"""
+{error_html}
+<form method="post" action="/reset-password">
+  <input type="hidden" name="token" value="{escape(token, quote=True)}">
+  <label for="password">סיסמה חדשה</label>
+  <input id="password" name="password" type="password" autocomplete="new-password" required>
+  <label for="confirm">אימות סיסמה חדשה</label>
+  <input id="confirm" name="confirm" type="password" autocomplete="new-password" required>
+  <button type="submit" {_BLUE_BUTTON}>שמור סיסמה חדשה</button>
+</form>
+"""
+    return _page("איפוס סיסמה", APP_NAME, body)
+
+
+def reset_password_invalid() -> str:
+    body = """
+<div class="error">הקישור אינו תקף: ייתכן שפג תוקפו (30 דקות), שכבר השתמשו בו, או שנשלח קישור חדש יותר.</div>
+<p><a href="/forgot-password">לבקשת קישור חדש</a></p>
+"""
+    return _page("איפוס סיסמה", APP_NAME, body)
+
+
+def reset_password_done() -> str:
+    body = f"""
+<div class="success"><b>הסיסמה עודכנה.</b> אפשר לחזור לאפליקציה {APP_NAME} ולהתחבר עם הסיסמה החדשה.</div>
+"""
+    return _page("איפוס סיסמה", APP_NAME, body)
+
+
+def reset_password_email(username: str, link: str) -> str:
+    """תוכן המייל עם קישור האיפוס"""
+    return f"""<!DOCTYPE html>
+<html lang="he" dir="rtl"><body style="font-family:Arial,sans-serif;background:#F8F9FA;padding:24px;direction:rtl;text-align:right">
+<div style="max-width:480px;margin:auto;background:#fff;border-radius:16px;padding:24px">
+  <h2 style="color:#5B8DEE;margin-top:0">איפוס סיסמה ל-{APP_NAME}</h2>
+  <p>שלום {escape(username)},</p>
+  <p>קיבלנו בקשה לאיפוס הסיסמה שלך. לחיצה על הכפתור תאפשר לבחור סיסמה חדשה:</p>
+  <p style="text-align:center;margin:28px 0">
+    <a href="{link}" style="background:#5B8DEE;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold">בחירת סיסמה חדשה</a>
+  </p>
+  <p style="color:#6C757D;font-size:14px">הקישור תקף ל-30 דקות ולשימוש חד-פעמי.
+  אם לא ביקשת לאפס את הסיסמה, אפשר להתעלם מהמייל הזה - הסיסמה שלך לא תשתנה.</p>
+</div>
+</body></html>"""
 
 
 def privacy_policy() -> str:

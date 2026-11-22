@@ -1,7 +1,8 @@
-﻿from fastapi import FastAPI, Depends, HTTPException, status, Form
+﻿from fastapi import FastAPI, Depends, HTTPException, status, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
@@ -10,8 +11,11 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import models
 import web_pages
+import email_sender
 from database import engine, get_db
 import os
+import hashlib
+import secrets
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,6 +31,13 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY is not set. Add it in Render → Environment, or to .env for local runs.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # שבוע
+MIN_PASSWORD_LENGTH = 4
+
+# איפוס סיסמה
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://shoppinglistapp-7dj5.onrender.com").rstrip("/")
+RESET_LINK_MINUTES = 30
+RESET_RESEND_COOLDOWN_SECONDS = 60
+RESET_REQUEST_MESSAGE = "אם כתובת האימייל רשומה אצלנו, נשלח אליה קישור לאיפוס הסיסמה."
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -222,10 +233,10 @@ def change_password(
         )
     
     # 2. (אופציונלי אבל מומלץ) בדיקת אורך סיסמה חדשה
-    if len(password_data.new_password) < 4:
+    if len(password_data.new_password) < MIN_PASSWORD_LENGTH:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="הסיסמה החדשה חייבת להכיל לפחות 4 תווים"
+            detail=f"הסיסמה החדשה חייבת להכיל לפחות {MIN_PASSWORD_LENGTH} תווים"
         )
 
     # 3. הצפנת הסיסמה החדשה ושמירה
@@ -274,6 +285,96 @@ def delete_account_web(username: str = Form(...), password: str = Form(...), db:
 def privacy_policy():
     """מדיניות פרטיות (הקישור שמוזן ב-Play Console)"""
     return web_pages.privacy_policy()
+
+# === איפוס סיסמה דרך המייל ===
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def start_password_reset(db: Session, email: str, background_tasks: BackgroundTasks):
+    """יוצר קישור איפוס ושולח אותו במייל (ברקע). למייל לא רשום - לא עושה כלום, בלי לחשוף את זה."""
+    email = (email or "").strip().lower()
+    user = db.query(models.User).filter(func.lower(models.User.email) == email).first() if email else None
+    if not user:
+        return
+
+    now = datetime.utcnow()
+    tokens = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.user_id == user.id)
+    latest = tokens.order_by(models.PasswordResetToken.created_at.desc()).first()
+    if latest and now - latest.created_at < timedelta(seconds=RESET_RESEND_COOLDOWN_SECONDS):
+        return  # הגנה מספאם: לכל היותר מייל אחד בדקה
+
+    tokens.filter(models.PasswordResetToken.used == False).update({"used": True})  # קישור חדש מבטל את הקודמים
+    token = secrets.token_urlsafe(32)
+    db.add(models.PasswordResetToken(
+        user_id=user.id,
+        token_hash=_hash_reset_token(token),
+        created_at=now,
+        expires_at=now + timedelta(minutes=RESET_LINK_MINUTES),
+    ))
+    db.commit()
+
+    link = f"{PUBLIC_BASE_URL}/reset-password?token={token}"
+    background_tasks.add_task(
+        email_sender.send_email, user.email, "איפוס סיסמה ל-ShopLi", web_pages.reset_password_email(user.username, link)
+    )
+
+def find_valid_reset_token(db: Session, token: str):
+    if not token:
+        return None
+    reset = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token_hash == _hash_reset_token(token)
+    ).first()
+    if not reset or reset.used or reset.expires_at < datetime.utcnow():
+        return None
+    return reset
+
+@app.post("/password-reset/request")
+def password_reset_request(data: PasswordResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """בקשת איפוס מהאפליקציה. תמיד אותה תשובה, כדי שאי אפשר יהיה לגלות אילו מיילים רשומים"""
+    start_password_reset(db, data.email, background_tasks)
+    return {"message": RESET_REQUEST_MESSAGE}
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page():
+    return web_pages.forgot_password_form()
+
+@app.post("/forgot-password", response_class=HTMLResponse)
+def forgot_password_web(background_tasks: BackgroundTasks, email: str = Form(...), db: Session = Depends(get_db)):
+    start_password_reset(db, email, background_tasks)
+    return web_pages.forgot_password_sent()
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(token: str = "", db: Session = Depends(get_db)):
+    if not find_valid_reset_token(db, token):
+        return HTMLResponse(web_pages.reset_password_invalid(), status_code=400)
+    return web_pages.reset_password_form(token)
+
+@app.post("/reset-password", response_class=HTMLResponse)
+def reset_password_web(
+    token: str = Form(...),
+    password: str = Form(...),
+    confirm: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    reset = find_valid_reset_token(db, token)
+    if not reset:
+        return HTMLResponse(web_pages.reset_password_invalid(), status_code=400)
+    if password != confirm:
+        return HTMLResponse(web_pages.reset_password_form(token, error="הסיסמאות אינן תואמות"), status_code=400)
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return HTMLResponse(
+            web_pages.reset_password_form(token, error=f"הסיסמה חייבת להכיל לפחות {MIN_PASSWORD_LENGTH} תווים"),
+            status_code=400,
+        )
+
+    reset.user.hashed_password = get_password_hash(password)
+    reset.used = True
+    db.commit()
+    return web_pages.reset_password_done()
 
 # === Shopping Lists Endpoints ===
 

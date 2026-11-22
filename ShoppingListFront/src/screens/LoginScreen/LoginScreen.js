@@ -9,10 +9,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { styles } from './LoginScreen.styles';
 import { colors } from '../../theme/colors';
-import { login, register } from '../../services/auth';
+import { login, register, requestPasswordReset } from '../../services/auth';
 
 const LoginScreen = ({ onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -20,6 +21,33 @@ const LoginScreen = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // שכחתי סיסמה
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [sendingReset, setSendingReset] = useState(false);
+
+  const closeForgot = () => {
+    setShowForgot(false);
+    setForgotEmail('');
+  };
+
+  const handleSendReset = async () => {
+    if (!forgotEmail.trim()) {
+      Alert.alert('שגיאה', 'אנא הזן את כתובת האימייל של החשבון');
+      return;
+    }
+    setSendingReset(true);
+    try {
+      const message = await requestPasswordReset(forgotEmail);
+      closeForgot();
+      Alert.alert('בדוק את תיבת המייל', message);
+    } catch (error) {
+      Alert.alert('שגיאה', error.message);
+    } finally {
+      setSendingReset(false);
+    }
+  };
 
   const handleSubmit = async () => {
     // ולידציה בסיסית
@@ -134,6 +162,17 @@ const LoginScreen = ({ onLoginSuccess }) => {
             )}
           </TouchableOpacity>
 
+          {isLogin && (
+            <TouchableOpacity
+              style={styles.forgotButton}
+              onPress={() => setShowForgot(true)}
+              testID="forgot_password_link"
+              accessibilityLabel="forgot_password_link"
+            >
+              <Text style={styles.forgotButtonText}>שכחתי סיסמה</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={styles.switchButton}
             onPress={() => setIsLogin(!isLogin)}
@@ -151,6 +190,57 @@ const LoginScreen = ({ onLoginSuccess }) => {
           <Text style={styles.securityText}>🔒 הסיסמא שלך מוצפנת ומאובטחת</Text>
         </View>
       </ScrollView>
+
+      {/* שכחתי סיסמה - שליחת קישור איפוס למייל */}
+      <Modal
+        visible={showForgot}
+        transparent
+        animationType="slide"
+        onRequestClose={closeForgot}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>איפוס סיסמה</Text>
+            <Text style={styles.modalText}>
+              הזן את האימייל של החשבון, ונשלח אליו קישור לבחירת סיסמה חדשה.
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="כתובת אימייל"
+              value={forgotEmail}
+              onChangeText={setForgotEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+              autoFocus
+              testID="forgot_email_input"
+              accessibilityLabel="forgot_email_input"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={closeForgot}
+                disabled={sendingReset}
+              >
+                <Text style={styles.modalCancelText}>ביטול</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSendButton]}
+                onPress={handleSendReset}
+                disabled={sendingReset}
+                testID="forgot_send_button"
+                accessibilityLabel="forgot_send_button"
+              >
+                {sendingReset ? (
+                  <ActivityIndicator color={colors.text.inverse} />
+                ) : (
+                  <Text style={styles.modalSendText}>שלח קישור</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
