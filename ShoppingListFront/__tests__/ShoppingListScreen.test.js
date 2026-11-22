@@ -384,3 +384,38 @@ test('a lost-access refresh after leaving does not alert or go back twice', asyn
   expect(alertSpy).not.toHaveBeenCalled();
   alertSpy.mockRestore();
 });
+
+test('a refresh that started before a drag began is discarded', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValueOnce([milk]);
+  const tree = await renderScreen();
+
+  const stale = deferred();
+  getShoppingList.mockReturnValueOnce(stale.promise);
+  let refreshing;
+  await act(async () => {
+    refreshing = global.__live.refresh();
+  });
+  await act(async () => global.__listProps.onDragBegin());
+  await act(async () => {
+    stale.resolve([milk, eggs]);
+    await refreshing;
+  });
+
+  expect(names(tree)).toEqual(['חלב']);
+});
+
+test('losing access on the initial load and on a refresh gives one message and one goBack', async () => {
+  getShoppingList.mockReset();
+  const err = Object.assign(new Error('x'), { status: 403 });
+  getShoppingList.mockRejectedValue(err);
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const goBack = jest.fn();
+  await renderScreen(goBack);
+  await act(async () => global.__live.refresh());
+
+  expect(alertSpy).toHaveBeenCalledTimes(1);
+  expect(alertSpy.mock.calls[0][1]).toBe('אין לך יותר גישה לרשימה הזו');
+  expect(goBack).toHaveBeenCalledTimes(1);
+  alertSpy.mockRestore();
+});

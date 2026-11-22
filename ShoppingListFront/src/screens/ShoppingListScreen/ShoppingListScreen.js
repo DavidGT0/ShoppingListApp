@@ -65,6 +65,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     if (listId) {
       loadListItems(listId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listId]);
 
   // מספר המשתתפים מוצג על כפתור הכותרת
@@ -95,6 +96,14 @@ const ShoppingListScreen = ({ route, navigation }) => {
     navigation.goBack();
   };
 
+  // אין יותר גישה לרשימה (403/404): התראה אחת וחזרה אחת, גם אם כמה בקשות נכשלו
+  const handleLostAccess = () => {
+    if (lostAccessHandled.current) return;
+    lostAccessHandled.current = true;
+    Alert.alert('שים לב', 'אין לך יותר גישה לרשימה הזו');
+    navigation.goBack();
+  };
+
   const loadListItems = async id => {
     try {
       setLoading(true);
@@ -102,6 +111,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setItems(sortByPosition(data));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (error.status === 403 || error.status === 404) {
+        handleLostAccess();
+        return;
+      }
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את המוצרים לרשימה זו.');
     } finally {
       setLoading(false);
@@ -122,10 +135,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     } catch (error) {
       if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה
       if (error.status === 403 || error.status === 404) {
-        if (lostAccessHandled.current) return;
-        lostAccessHandled.current = true;
-        Alert.alert('שים לב', 'אין לך יותר גישה לרשימה הזו');
-        navigation.goBack();
+        handleLostAccess();
       }
       // שגיאות אחרות (רשת וכו') - שקט, המוצרים הנוכחיים נשארים
     }
