@@ -538,6 +538,39 @@ def get_items(list_id: int, current_user: models.User = Depends(get_current_user
     items = db.query(models.ShoppingItem).filter(models.ShoppingItem.list_id == list_id).order_by(models.ShoppingItem.position).all()
     return items
 
+def _find_history(db: Session, user_id: int, name_key: str):
+    return db.query(models.ItemHistory).filter(
+        models.ItemHistory.user_id == user_id,
+        models.ItemHistory.name_key == name_key
+    ).first()
+
+
+def _record_history(db: Session, user_id: int, name: str):
+    """מעדכן את היסטוריית המוצרים. בתוך SAVEPOINT, כדי שהוספה מקבילה לא תכשיל את הוספת המוצר"""
+    name_key = name.strip().lower()[:100]
+    clean_name = name.strip()[:100]
+    now = datetime.utcnow()
+
+    def bump(row):
+        row.use_count = (row.use_count or 0) + 1
+        row.last_used = now
+        row.name = clean_name
+
+    history = _find_history(db, user_id, name_key)
+    if history:
+        bump(history)
+        return
+    try:
+        with db.begin_nested():
+            db.add(models.ItemHistory(
+                user_id=user_id, name=clean_name, name_key=name_key,
+                use_count=1, last_used=now
+            ))
+    except IntegrityError:
+        # הוספה מקבילה יצרה את השורה קודם - מגדילים אותה
+        bump(_find_history(db, user_id, name_key))
+
+
 @app.post("/items")
 def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """הוספת פריט חדש"""
@@ -553,33 +586,31 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
     min_position = db.query(func.min(models.ShoppingItem.position)).filter(
         models.ShoppingItem.list_id == item.list_id
     ).scalar()
+    top_position = 0 if min_position is None else min_position - 1
 
-    new_item = models.ShoppingItem(
-        name=item.name,
-        amount=item.amount,
-        list_id=item.list_id,
-        position=0 if min_position is None else min_position - 1
-    )
-    db.add(new_item)
+    # קנייה חוזרת: אם יש ברשימה מוצר שנקנה באותו שם - מחזירים אותו לרשימה במקום להוסיף כפילות
+    wanted = item.name.strip().lower()
+    bought = db.query(models.ShoppingItem).filter(
+        models.ShoppingItem.list_id == item.list_id,
+        models.ShoppingItem.purchased == True  # noqa: E712
+    ).order_by(models.ShoppingItem.position).all()
+    revived = next((i for i in bought if i.name.strip().lower() == wanted), None)
+
+    if revived is not None:
+        revived.purchased = False
+        revived.position = top_position
+        new_item = revived
+    else:
+        new_item = models.ShoppingItem(
+            name=item.name,
+            amount=item.amount,
+            list_id=item.list_id,
+            position=top_position
+        )
+        db.add(new_item)
 
     # היסטוריית מוצרים של המשתמש המוסיף (באותה טרנזקציה)
-    name_key = item.name.strip().lower()[:100]
-    history = db.query(models.ItemHistory).filter(
-        models.ItemHistory.user_id == current_user.id,
-        models.ItemHistory.name_key == name_key
-    ).first()
-    if history:
-        history.use_count = (history.use_count or 0) + 1
-        history.last_used = datetime.utcnow()
-        history.name = item.name.strip()[:100]
-    else:
-        db.add(models.ItemHistory(
-            user_id=current_user.id,
-            name=item.name.strip()[:100],
-            name_key=name_key,
-            use_count=1,
-            last_used=datetime.utcnow()
-        ))
+    _record_history(db, current_user.id, item.name)
     db.commit()
     db.refresh(new_item)
     return new_item
