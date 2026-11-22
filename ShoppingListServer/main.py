@@ -15,6 +15,7 @@ import web_pages
 import email_sender
 import sharing
 from database import engine, get_db
+from schema_upgrade import ensure_columns
 import os
 import hashlib
 import secrets
@@ -25,6 +26,8 @@ load_dotenv()
 
 # יצירת הטבלאות ב-DB
 models.Base.metadata.create_all(bind=engine)
+# הוספת עמודות חדשות לטבלאות קיימות (בטוח להרצה חוזרת)
+ensure_columns(engine)
 
 app = FastAPI()
 

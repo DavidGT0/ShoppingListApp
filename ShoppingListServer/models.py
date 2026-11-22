@@ -61,8 +61,14 @@ class ShoppingItem(Base):
     purchased = Column(Boolean, default=False)
     position = Column(Integer, default=0)  # לסדר הפריטים
     list_id = Column(Integer, ForeignKey('shopping_lists.id'))
-    
+    # עמודות שנוספו בסבב 2 (נוספות ל-DB קיים דרך schema_upgrade.ensure_columns)
+    unit = Column(String(10), nullable=True)
+    note = Column(String(100), nullable=True)
+    category = Column(String(40), nullable=True)
+    added_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+
     shopping_list = relationship("ShoppingList", back_populates="items")
+    added_by = relationship("User", foreign_keys=[added_by_id])
 
 
 class ItemHistory(Base):
@@ -76,6 +82,7 @@ class ItemHistory(Base):
     name_key = Column(String(100), nullable=False)  # name.strip().lower()
     use_count = Column(Integer, default=1, nullable=False)
     last_used = Column(DateTime, nullable=False)  # UTC
+    category = Column(String(40), nullable=True)
 
     user = relationship("User", back_populates="item_history")
 
