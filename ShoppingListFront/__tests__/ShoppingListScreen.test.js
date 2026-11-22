@@ -103,10 +103,12 @@ afterEach(async () => {
 
 const deferred = () => {
   let resolve;
-  const promise = new Promise(r => {
-    resolve = r;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 test('checking off two items quickly keeps both checked (no stale state)', async () => {
@@ -580,6 +582,55 @@ describe('undo', () => {
 
     expect(alertSpy).toHaveBeenCalledWith('שגיאה', 'לא הצלחנו למחוק את המוצר');
     expect(names(tree)).toEqual(['חלב', 'ביצים']);
+  });
+
+  test('a failure that settles after the bar is hidden shows the item again', async () => {
+    const pendingDelete = deferred();
+    deleteItem.mockReturnValueOnce(pendingDelete.promise);
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+    expect(undoBar(tree)).toBeUndefined();
+    expect(names(tree)).toEqual(['ביצים']);
+
+    await act(async () => {
+      pendingDelete.reject(new Error('x'));
+    });
+    expect(names(tree)).toEqual(['חלב', 'ביצים']);
+  });
+
+  test('dragging commits the pending delete and keeps the other items', async () => {
+    reorderItems.mockResolvedValue();
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => global.__listProps.onDragBegin());
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith(1);
+
+    await act(async () => global.__listProps.onDragEnd({ data: [eggs] }));
+    expect(names(tree)).toEqual(['ביצים']);
+    expect(reorderItems).toHaveBeenCalledWith([{ id: 3, position: 0 }]);
+  });
+
+  test('adding commits the pending delete and allows re-adding the same name', async () => {
+    addItem.mockReset();
+    addItem.mockResolvedValue({ ...milk, id: 20 });
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => tree.root.findByType(AddItemInput).props.onAdd('חלב'));
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(deleteItem).toHaveBeenCalledWith(1);
+    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(names(tree)).toEqual(['חלב', 'ביצים']);
+  });
+
+  test('changing an amount commits the pending delete', async () => {
+    updateItem.mockResolvedValue({ ...eggs, amount: 2 });
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => rowFor(tree, 3).props.onUpdateAmount(2));
+    expect(deleteItem).toHaveBeenCalledWith(1);
   });
 
   test('toggling purchased shows the undo bar, and undo sends the reverse update', async () => {

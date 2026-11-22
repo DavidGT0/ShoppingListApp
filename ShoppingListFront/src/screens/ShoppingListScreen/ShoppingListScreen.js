@@ -99,7 +99,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
     } finally {
       // בכישלון המוצר מופיע שוב, כי הוא עדיין ברשימת המוצרים
       hiddenIds.current.delete(pending.item.id);
-      setUndoState(prev => prev);
+      // שינוי מצב אמיתי כדי שהמסך יצויר מחדש והמוצר יופיע שוב אחרי כישלון
+      setItems(prev => [...prev]);
       endMutation();
     }
   };
@@ -217,9 +218,14 @@ const ShoppingListScreen = ({ route, navigation }) => {
       return;
     }
 
-    const isDuplicate = items.some(
-      item => item.name.trim().toLowerCase() === name.trim().toLowerCase(),
-    );
+    // פעולה חדשה מאשרת מחיקה ממתינה
+    commitPendingDelete();
+    // מוצר שמחיקתו ממתינה מוסתר, ולכן אפשר להוסיף שוב את אותו שם
+    const isDuplicate = items
+      .filter(item => !hiddenIds.current.has(item.id))
+      .some(
+        item => item.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      );
 
     if (isDuplicate) {
       Alert.alert('שים לב', 'המוצר כבר קיים ברשימה');
@@ -280,6 +286,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleUpdateAmount = async (item, newAmount) => {
+    commitPendingDelete();
     startMutation();
     try {
       const updated = await updateItem(item.id, { amount: newAmount });
@@ -294,6 +301,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   const handleEditItem = async newName => {
     if (!editingItem || !newName?.trim()) return;
+    commitPendingDelete();
     startMutation();
     try {
       const updated = await updateItem(editingItem.id, { name: newName });
@@ -332,13 +340,20 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleDragBegin = () => {
+    commitPendingDelete();
     startMutation(); // גרירה נחשבת תחילת שינוי - רענון שבדרך נזרק
     setIsDragging(true);
   };
 
   const handleDragEnd = async ({ data }) => {
     setIsDragging(false);
-    setItems(prev => [...data, ...prev.filter(item => item.purchased)]);
+    // מוצר מוסתר (מחיקה בדרך) נשאר במצב, כדי שיוצג שוב אם המחיקה תיכשל
+    setItems(prev => [
+      ...data,
+      ...prev.filter(
+        item => item.purchased || hiddenIds.current.has(item.id),
+      ),
+    ]);
     const reorderedData = data.map((item, index) => ({
       id: item.id,
       position: index,
@@ -353,6 +368,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const openEditModal = item => {
+    commitPendingDelete();
     setEditingItem(item);
     setModalVisible(true);
   };
@@ -414,7 +430,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
         <Text style={styles.headerSubtitle}>
           {unpurchasedItems.length > 0
             ? `${unpurchasedItems.length} מוצרים לקנייה`
-            : items.length > 0
+            : visibleItems.length > 0
             ? 'כל המוצרים נקנו 🎉'
             : 'הרשימה עדיין ריקה'}
         </Text>
