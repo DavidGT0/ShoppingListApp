@@ -2,14 +2,17 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
+import ShoppingListScreen, {
+  UNDO_MS,
+} from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListItem';
-import { Alert, Text } from 'react-native';
+import { Alert, AppState, Text } from 'react-native';
 import MembersModal from '../src/components/MembersModal/MembersModal';
 import AddItemInput from '../src/components/AddItemInput/AddItemInput';
 import {
   getShoppingList,
   updateItem,
+  deleteItem,
   addItem,
   reorderItems,
   getListMembers,
@@ -74,6 +77,29 @@ jest.mock('../src/services/api', () => ({
 }));
 
 const { act } = ReactTestRenderer;
+
+// מנתק את כל המסכים שנוצרו בבדיקה, כדי שטיימרים של פס הביטול לא ישארו פתוחים
+const createdTrees = [];
+const realCreate = ReactTestRenderer.create;
+beforeEach(() => {
+  jest.spyOn(ReactTestRenderer, 'create').mockImplementation((...args) => {
+    const created = realCreate(...args);
+    createdTrees.push(created);
+    return created;
+  });
+});
+afterEach(async () => {
+  await act(async () => {
+    createdTrees.splice(0).forEach(t => {
+      try {
+        t.unmount();
+      } catch (e) {
+        // כבר נותק בבדיקה עצמה
+      }
+    });
+  });
+  ReactTestRenderer.create.mockRestore();
+});
 
 const deferred = () => {
   let resolve;
@@ -418,4 +444,180 @@ test('losing access on the initial load and on a refresh gives one message and o
   expect(alertSpy.mock.calls[0][1]).toBe('אין לך יותר גישה לרשימה הזו');
   expect(goBack).toHaveBeenCalledTimes(1);
   alertSpy.mockRestore();
+});
+
+// ---- ביטול פעולה (מחיקה וסימון כנקנה) ----
+const rowFor = (tree, id) =>
+  tree.root.findAllByType(ShoppingListItem).find(n => n.props.item.id === id);
+const undoBar = tree =>
+  tree.root.findAll(n => n.props.testID === 'undo_bar')[0];
+const barText = tree =>
+  undoBar(tree)
+    .findAllByType(Text)
+    .map(t => t.props.children)
+    .join('|');
+const pressUndo = async tree =>
+  act(async () => byTestId(tree, 'undo_button').props.onPress());
+
+describe('undo', () => {
+  let alertSpy;
+  beforeEach(() => {
+    jest.useFakeTimers();
+    getShoppingList.mockReset();
+    getShoppingList.mockResolvedValue([milk, eggs]);
+    deleteItem.mockReset();
+    deleteItem.mockResolvedValue();
+    updateItem.mockReset();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    alertSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  test('deleting an item removes it at once without a confirmation dialog and shows the undo bar', async () => {
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(names(tree)).toEqual(['ביצים']);
+    expect(barText(tree)).toContain('המוצר נמחק');
+    expect(deleteItem).not.toHaveBeenCalled();
+  });
+
+  test('the delete is sent after 5 seconds', async () => {
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => jest.advanceTimersByTime(UNDO_MS - 1));
+    expect(deleteItem).not.toHaveBeenCalled();
+    await act(async () => jest.advanceTimersByTime(1));
+
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith(1);
+    expect(names(tree)).toEqual(['ביצים']);
+    expect(undoBar(tree)).toBeUndefined();
+  });
+
+  test('undo restores the item and never calls deleteItem', async () => {
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await pressUndo(tree);
+    await act(async () => jest.advanceTimersByTime(UNDO_MS * 2));
+
+    expect(names(tree)).toEqual(['חלב', 'ביצים']);
+    expect(deleteItem).not.toHaveBeenCalled();
+    expect(undoBar(tree)).toBeUndefined();
+    // המשמר שוחרר - רענון חי מתקבל שוב
+    const cheese = { ...milk, id: 9, name: 'גבינה' };
+    getShoppingList.mockResolvedValueOnce([milk, eggs, cheese]);
+    await act(async () => global.__live.refresh());
+    expect(names(tree)).toContain('גבינה');
+  });
+
+  test('a live refresh during a pending delete does not bring the item back', async () => {
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    getShoppingList.mockResolvedValue([milk, eggs]);
+    await act(async () => global.__live.refresh());
+    expect(names(tree)).toEqual(['ביצים']);
+
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+    expect(names(tree)).toEqual(['ביצים']);
+  });
+
+  test('a pending delete is committed immediately when the screen unmounts', async () => {
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => tree.unmount());
+
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith(1);
+    await act(async () => jest.advanceTimersByTime(UNDO_MS * 2));
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+  });
+
+  test('a pending delete is committed immediately when the app goes to background', async () => {
+    const remove = jest.fn();
+    const addSpy = jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation(() => ({ remove }));
+    const tree = await renderScreen();
+    // ההאזנה האחרונה שנרשמה היא של המסך שנוצר עכשיו
+    const handler = addSpy.mock.calls
+      .filter(c => c[0] === 'change')
+      .map(c => c[1])
+      .pop();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    expect(deleteItem).not.toHaveBeenCalled();
+
+    await act(async () => handler('background'));
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith(1);
+
+    await act(async () => tree.unmount());
+    expect(remove).toHaveBeenCalled();
+    addSpy.mockRestore();
+  });
+
+  test('a second action commits the previous pending delete', async () => {
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => rowFor(tree, 3).props.onDelete());
+
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith(1);
+    expect(names(tree)).toEqual([]);
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+    expect(deleteItem).toHaveBeenCalledTimes(2);
+    expect(deleteItem).toHaveBeenLastCalledWith(3);
+  });
+
+  test('a failed delete shows the item again with an error', async () => {
+    deleteItem.mockRejectedValueOnce(new Error('x'));
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+
+    expect(alertSpy).toHaveBeenCalledWith('שגיאה', 'לא הצלחנו למחוק את המוצר');
+    expect(names(tree)).toEqual(['חלב', 'ביצים']);
+  });
+
+  test('toggling purchased shows the undo bar, and undo sends the reverse update', async () => {
+    updateItem
+      .mockResolvedValueOnce({ ...milk, purchased: true })
+      .mockResolvedValueOnce({ ...milk, purchased: false });
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onTogglePurchased());
+
+    expect(updateItem).toHaveBeenNthCalledWith(1, 1, { purchased: true });
+    expect(barText(tree)).toContain('סומן כנקנה');
+
+    await pressUndo(tree);
+    expect(updateItem).toHaveBeenNthCalledWith(2, 1, { purchased: false });
+    expect(updateItem).toHaveBeenCalledTimes(2);
+    expect(rowFor(tree, 1).props.item.purchased).toBe(false);
+    expect(undoBar(tree)).toBeUndefined();
+  });
+
+  test('un-checking shows the return message and undo marks it purchased again', async () => {
+    const bought = { ...milk, purchased: true };
+    getShoppingList.mockResolvedValue([bought]);
+    updateItem
+      .mockResolvedValueOnce({ ...milk, purchased: false })
+      .mockResolvedValueOnce(bought);
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onTogglePurchased());
+    expect(barText(tree)).toContain('הוחזר לרשימה');
+    await pressUndo(tree);
+    expect(updateItem).toHaveBeenNthCalledWith(2, 1, { purchased: true });
+  });
+
+  test('the purchase undo bar disappears after 5 seconds', async () => {
+    updateItem.mockResolvedValueOnce({ ...milk, purchased: true });
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onTogglePurchased());
+    expect(undoBar(tree)).toBeDefined();
+    await act(async () => jest.advanceTimersByTime(UNDO_MS));
+    expect(undoBar(tree)).toBeUndefined();
+  });
 });

@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   Alert,
+  AppState,
 } from 'react-native';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import PurchasedItemsSection from '../../components/PurchasedItemsSection/Purcha
 import AddItemInput from '../../components/AddItemInput/AddItemInput';
 import EditItemModal from '../../components/EditItemModal/EditItemModal';
 import MembersModal from '../../components/MembersModal/MembersModal';
+import UndoBar from '../../components/UndoBar/UndoBar';
 
 // שירותים ועיצובים
 import {
@@ -30,6 +32,8 @@ import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
 
 const LIVE_REFRESH_MS = 3000;
+// כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
+export const UNDO_MS = 5000;
 
 // מיון המוצרים לפי שדה ה-position כדי לשמור על הסדר הנכון מהשרת
 const sortByPosition = data =>
@@ -52,6 +56,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
   // מספר פעולות שלי שעדיין בדרך - רענון שחוזר בזמן הזה נזרק
   const pendingMutations = useRef(0);
   const lostAccessHandled = useRef(false);
+  // מחיקה ממתינה: { item, timer }. המוצר מוסתר מהתצוגה ומתשובות הרענון עד שהמחיקה נשלחת
+  const pendingDelete = useRef(null);
+  const hiddenIds = useRef(new Set());
+  const barTimer = useRef(null);
+  const [undoState, setUndoState] = useState(null);
   const startMutation = () => {
     mutationVersion.current++;
     pendingMutations.current++;
@@ -60,6 +69,56 @@ const ShoppingListScreen = ({ route, navigation }) => {
     mutationVersion.current++;
     pendingMutations.current--;
   };
+
+  const hideBar = () => {
+    clearTimeout(barTimer.current);
+    barTimer.current = null;
+    setUndoState(null);
+  };
+
+  const showBar = (message, onUndo) => {
+    clearTimeout(barTimer.current);
+    setUndoState({ message, onUndo });
+    barTimer.current = setTimeout(() => setUndoState(null), UNDO_MS);
+  };
+
+  // שולח את המחיקה הממתינה לשרת עכשיו (טיימר, יציאה מהמסך, רקע או פעולה חדשה)
+  const commitPendingDelete = async () => {
+    const pending = pendingDelete.current;
+    if (!pending) return;
+    pendingDelete.current = null;
+    clearTimeout(pending.timer);
+    hideBar();
+    try {
+      await deleteItem(pending.item.id);
+      setItems(prev => prev.filter(i => i.id !== pending.item.id));
+    } catch (error) {
+      if (!error.sessionExpired) {
+        Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
+      }
+    } finally {
+      // בכישלון המוצר מופיע שוב, כי הוא עדיין ברשימת המוצרים
+      hiddenIds.current.delete(pending.item.id);
+      setUndoState(prev => prev);
+      endMutation();
+    }
+  };
+
+  const commitPendingDeleteRef = useRef(commitPendingDelete);
+  commitPendingDeleteRef.current = commitPendingDelete;
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'background' || state === 'inactive') {
+        commitPendingDeleteRef.current();
+      }
+    });
+    return () => {
+      subscription?.remove?.();
+      clearTimeout(barTimer.current);
+      commitPendingDeleteRef.current();
+    };
+  }, []);
 
   useEffect(() => {
     if (listId) {
@@ -187,11 +246,31 @@ const ShoppingListScreen = ({ route, navigation }) => {
     }
   };
 
+  // ביטול סימון: שולח את הערך ההפוך, בתוך משמר השינויים
+  const undoToggle = async (itemId, previousPurchased) => {
+    hideBar();
+    startMutation();
+    try {
+      const updated = await updateItem(itemId, { purchased: previousPurchased });
+      setItems(prev => prev.map(i => (i.id === itemId ? updated : i)));
+    } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      Alert.alert('שגיאה', 'לא הצלחנו לבטל את הפעולה');
+    } finally {
+      endMutation();
+    }
+  };
+
   const handleTogglePurchased = async item => {
+    commitPendingDelete();
+    hideBar();
     startMutation();
     try {
       const updated = await updateItem(item.id, { purchased: !item.purchased });
       setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
+      showBar(updated.purchased ? 'סומן כנקנה' : 'הוחזר לרשימה', () =>
+        undoToggle(item.id, item.purchased),
+      );
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
@@ -229,26 +308,27 @@ const ShoppingListScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleDeleteItem = async itemId => {
-    Alert.alert('מחיקת מוצר', 'האם אתה בטוח שברצונך למחוק מוצר זה?', [
-      { text: 'ביטול', style: 'cancel' },
-      {
-        text: 'מחק',
-        style: 'destructive',
-        onPress: async () => {
-          startMutation();
-          try {
-            await deleteItem(itemId);
-            setItems(prev => prev.filter(i => i.id !== itemId));
-          } catch (error) {
-            if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
-            Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
-          } finally {
-            endMutation();
-          }
-        },
-      },
-    ]);
+  const handleDeleteItem = itemId => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    // פעולה אחת בכל רגע: מחיקה קודמת נשלחת עכשיו
+    commitPendingDelete();
+    hideBar();
+    startMutation(); // המחיקה הממתינה נספרת כפעולה שלי - רענון שבדרך נזרק
+    hiddenIds.current.add(itemId);
+    const timer = setTimeout(() => commitPendingDelete(), UNDO_MS);
+    pendingDelete.current = { item, timer };
+    showBar('המוצר נמחק', undoDelete);
+  };
+
+  const undoDelete = () => {
+    const pending = pendingDelete.current;
+    if (!pending) return;
+    pendingDelete.current = null;
+    clearTimeout(pending.timer);
+    hiddenIds.current.delete(pending.item.id);
+    hideBar();
+    endMutation();
   };
 
   const handleDragBegin = () => {
@@ -285,8 +365,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
     );
   }
 
-  const unpurchasedItems = items.filter(item => !item.purchased);
-  const purchasedItems = items.filter(item => item.purchased);
+  // מוצר שמחיקתו ממתינה מוסתר גם אם רענון חי החזיר אותו
+  const visibleItems = items.filter(item => !hiddenIds.current.has(item.id));
+  const unpurchasedItems = visibleItems.filter(item => !item.purchased);
+  const purchasedItems = visibleItems.filter(item => item.purchased);
 
   return (
     <View style={styles.container}>
@@ -388,6 +470,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
             onUpdateAmount={handleUpdateAmount}
           />
         }
+      />
+
+      <UndoBar
+        visible={!!undoState}
+        message={undoState?.message}
+        onUndo={undoState?.onUndo}
       />
 
       <EditItemModal
