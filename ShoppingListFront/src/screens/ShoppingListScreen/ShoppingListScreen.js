@@ -76,12 +76,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
     try {
       const newItem = await addItem(name, currentListId, 1);
 
-      const unpurchasedItems = items.filter(item => !item.purchased);
-      const purchasedItems = items.filter(item => item.purchased);
-
-      // הכנסת המוצר החדש לראש רשימת הלא-נקונים
-      const updatedUnpurchased = [newItem, ...unpurchasedItems];
-      setItems([...updatedUnpurchased, ...purchasedItems]);
+      // הכנסת המוצר החדש לראש רשימת הלא-נקונים.
+      // העדכון נבנה מהמצב העדכני (prev) ולא מעותק ישן - כדי שפעולות מהירות לא ידרסו זו את זו
+      setItems(prev => [
+        newItem,
+        ...prev.filter(item => !item.purchased),
+        ...prev.filter(item => item.purchased),
+      ]);
+      const updatedUnpurchased = [
+        newItem,
+        ...items.filter(item => !item.purchased),
+      ];
 
       // עדכון המיקום (position) בשרת כך שהמוצר החדש יישאר תמיד למעלה גם אחרי רענון
       const reorderedData = updatedUnpurchased.map((item, index) => ({
@@ -98,7 +103,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const handleTogglePurchased = async item => {
     try {
       const updated = await updateItem(item.id, { purchased: !item.purchased });
-      setItems(items.map(i => (i.id === item.id ? updated : i)));
+      setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
@@ -108,7 +113,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const handleUpdateAmount = async (item, newAmount) => {
     try {
       const updated = await updateItem(item.id, { amount: newAmount });
-      setItems(items.map(i => (i.id === item.id ? updated : i)));
+      setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את הכמות');
@@ -119,7 +124,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     if (!editingItem || !newName?.trim()) return;
     try {
       const updated = await updateItem(editingItem.id, { name: newName });
-      setItems(items.map(i => (i.id === editingItem.id ? updated : i)));
+      setItems(prev => prev.map(i => (i.id === editingItem.id ? updated : i)));
       setEditingItem(null);
       setModalVisible(false);
     } catch (error) {
@@ -137,7 +142,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
         onPress: async () => {
           try {
             await deleteItem(itemId);
-            setItems(items.filter(i => i.id !== itemId));
+            setItems(prev => prev.filter(i => i.id !== itemId));
           } catch (error) {
             if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
@@ -148,8 +153,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleDragEnd = async ({ data }) => {
-    const purchasedItems = items.filter(item => item.purchased);
-    setItems([...data, ...purchasedItems]);
+    setItems(prev => [...data, ...prev.filter(item => item.purchased)]);
     const reorderedData = data.map((item, index) => ({
       id: item.id,
       position: index,
