@@ -102,6 +102,18 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'right',
   },
+  joinLink: {
+    alignSelf: 'center',
+    marginTop: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  joinLinkText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,

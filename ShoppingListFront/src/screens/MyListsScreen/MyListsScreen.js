@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -16,6 +17,8 @@ import {
   updateShoppingList,
   deleteShoppingList,
 } from '../../services/api';
+import JoinListModal from '../../components/JoinListModal/JoinListModal';
+import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './MyListsScreen.styles';
 import { colors } from '../../theme/colors';
 
@@ -30,9 +33,43 @@ const MyListsScreen = ({ navigation }) => {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [newNameValue, setNewNameValue] = useState('');
 
+  // מצבים לניהול חלון ההצטרפות עם קוד הזמנה
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
     loadLists();
   }, []);
+
+  // רענון שקט: מחליף את הרשימות בלי מסך טעינה. שגיאות מושתקות - ננסה שוב בפעם הבאה
+  const refreshLists = useCallback(async () => {
+    const data = await getShoppingLists();
+    setLists(data || []);
+  }, []);
+
+  useLiveRefresh(refreshLists, 15000);
+
+  const handlePullToRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshLists();
+    } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      Alert.alert('שגיאה', 'לא הצלחנו לטעון את הרשימות שלך.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleJoined = list => {
+    setJoinModalVisible(false);
+    setLists(prev => (prev.some(l => l.id === list.id) ? prev : [...prev, list]));
+    navigation.navigate('ShoppingListItems', {
+      listId: list.id,
+      listName: list.name,
+      isOwner: false,
+    });
+  };
 
   const loadLists = async () => {
     try {
@@ -154,8 +191,24 @@ const MyListsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity
+        style={styles.joinLink}
+        onPress={() => setJoinModalVisible(true)}
+        testID="join_list_link"
+        accessibilityLabel="join_list_link"
+      >
+        <Text style={styles.joinLinkText}>יש לך קוד הזמנה? הצטרפות לרשימה</Text>
+      </TouchableOpacity>
+
       <FlatList
         data={lists}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handlePullToRefresh}
+            colors={[colors.primary]}
+          />
+        }
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
@@ -171,6 +224,7 @@ const MyListsScreen = ({ navigation }) => {
                 navigation.navigate('ShoppingListItems', {
                   listId: item.id,
                   listName: item.name,
+                  isOwner: item.is_owner !== false,
                 })
               }
               testID="list_card" // <-- מזהה לכרטיס רשימה כדי ללחוץ עליה
@@ -211,6 +265,12 @@ const MyListsScreen = ({ navigation }) => {
             אין עדיין רשימות. צור רשימה חדשה למעלה!
           </Text>
         }
+      />
+
+      <JoinListModal
+        visible={joinModalVisible}
+        onClose={() => setJoinModalVisible(false)}
+        onJoined={handleJoined}
       />
 
       {/* מודאל שינוי שם רשימה */}
