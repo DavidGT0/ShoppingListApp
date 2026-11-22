@@ -33,7 +33,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [currentListId, setCurrentListId] = useState(listId);
+  const currentListId = listId;
 
   useEffect(() => {
     if (listId) {
@@ -77,23 +77,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
       const newItem = await addItem(name, currentListId, 1);
 
       // הכנסת המוצר החדש לראש רשימת הלא-נקונים.
+      // (השרת עצמו שומר מוצר חדש בראש הרשימה - אין צורך בבקשת סידור נוספת)
       // העדכון נבנה מהמצב העדכני (prev) ולא מעותק ישן - כדי שפעולות מהירות לא ידרסו זו את זו
       setItems(prev => [
         newItem,
         ...prev.filter(item => !item.purchased),
         ...prev.filter(item => item.purchased),
       ]);
-      const updatedUnpurchased = [
-        newItem,
-        ...items.filter(item => !item.purchased),
-      ];
-
-      // עדכון המיקום (position) בשרת כך שהמוצר החדש יישאר תמיד למעלה גם אחרי רענון
-      const reorderedData = updatedUnpurchased.map((item, index) => ({
-        id: item.id,
-        position: index,
-      }));
-      await reorderItems(reorderedData);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו להוסיף את המוצר');

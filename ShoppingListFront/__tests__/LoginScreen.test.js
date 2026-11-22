@@ -102,3 +102,28 @@ describe('LoginScreen - slow server', () => {
     jest.useRealTimers();
   });
 });
+
+describe('LoginScreen - registration password length', () => {
+  const { register } = require('../src/services/auth');
+
+  test('registering with a password shorter than 4 characters is rejected before calling the server', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { byTestId } = await renderLogin();
+    await act(async () => byTestId('switch_mode_button').props.onPress());
+    await act(async () => {
+      byTestId('username_input').props.onChangeText('bob');
+      byTestId('email_input').props.onChangeText('bob@example.com');
+      byTestId('password_input').props.onChangeText('abc');
+    });
+    await act(async () => {
+      byTestId('login_button').props.onPress(); // לא מחכים - ההתחברות במוק לא מסתיימת
+    });
+
+    expect(register).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledWith(
+      'שגיאה',
+      'הסיסמה חייבת להכיל לפחות 4 תווים',
+    );
+    alertSpy.mockRestore();
+  });
+});

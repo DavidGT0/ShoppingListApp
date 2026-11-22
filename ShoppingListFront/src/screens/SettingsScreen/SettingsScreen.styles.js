@@ -13,15 +13,6 @@ export const styles = StyleSheet.create({
     marginBottom: 30,
     marginTop: 10,
   },
-  backButton: {
-    marginRight: 16,
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 18,
-    color: colors.primary,
-    fontWeight: '600',
-  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',

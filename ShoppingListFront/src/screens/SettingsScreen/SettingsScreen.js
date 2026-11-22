@@ -15,8 +15,9 @@ import {
   changePassword,
   deleteAccount,
 } from '../../services/auth';
+import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
-const SettingsScreen = ({ navigation, onLogout }) => {
+const SettingsScreen = ({ onLogout }) => {
   const [user, setUser] = useState(null);
 
   // States עבור שינוי סיסמה
@@ -52,6 +53,13 @@ const SettingsScreen = ({ navigation, onLogout }) => {
     }
     if (newPassword !== confirmPassword) {
       Alert.alert('שגיאה', 'הסיסמאות החדשות אינן תואמות');
+      return;
+    }
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      Alert.alert(
+        'שגיאה',
+        `הסיסמה החדשה חייבת להכיל לפחות ${MIN_PASSWORD_LENGTH} תווים`,
+      );
       return;
     }
 
@@ -125,13 +133,8 @@ const SettingsScreen = ({ navigation, onLogout }) => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* ההגדרות הן לשונית בתפריט התחתון - אין צורך בכפתור "חזור" */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>← חזור</Text>
-        </TouchableOpacity>
         <Text style={styles.title}>הגדרות</Text>
       </View>
 

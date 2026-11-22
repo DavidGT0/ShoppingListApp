@@ -4,7 +4,14 @@ import ReactTestRenderer from 'react-test-renderer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListItem';
-import { getShoppingList, updateItem } from '../src/services/api';
+import { Alert } from 'react-native';
+import AddItemInput from '../src/components/AddItemInput/AddItemInput';
+import {
+  getShoppingList,
+  updateItem,
+  addItem,
+  reorderItems,
+} from '../src/services/api';
 
 // הבדיקה כאן היא על ניהול המצב במסך, לא על גרירה/החלקה -
 // לכן הרשימה הנגררת ושורת המוצר מוחלפות ברכיבים פשוטים
@@ -98,4 +105,40 @@ test('checking off two items quickly keeps both checked (no stale state)', async
     .map(n => n.props.item.name)
     .sort();
   expect(purchased).toEqual(['חלב', 'לחם']);
+});
+
+test('adding an item sends a single request and shows it first, with no error', async () => {
+  const milk = { id: 1, name: 'חלב', amount: 1, purchased: false, position: 0 };
+  getShoppingList.mockResolvedValue([milk]);
+  addItem.mockResolvedValue({
+    id: 2,
+    name: 'לחם',
+    amount: 1,
+    purchased: false,
+    position: -1,
+  });
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+  let tree;
+  await act(async () => {
+    tree = ReactTestRenderer.create(
+      <GestureHandlerRootView>
+        <ShoppingListScreen
+          route={{ params: { listId: 7, listName: 'רשימה' } }}
+          navigation={{ goBack: jest.fn() }}
+        />
+      </GestureHandlerRootView>,
+    );
+  });
+
+  await act(async () => tree.root.findByType(AddItemInput).props.onAdd('לחם'));
+
+  expect(addItem).toHaveBeenCalledTimes(1);
+  expect(reorderItems).not.toHaveBeenCalled();
+  expect(alertSpy).not.toHaveBeenCalled();
+  const names = tree.root
+    .findAllByType(ShoppingListItem)
+    .map(n => n.props.item.name);
+  expect(names).toEqual(['לחם', 'חלב']);
+  alertSpy.mockRestore();
 });

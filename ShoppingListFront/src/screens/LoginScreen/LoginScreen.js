@@ -14,6 +14,7 @@ import {
 import { styles } from './LoginScreen.styles';
 import { colors } from '../../theme/colors';
 import { login, register, requestPasswordReset } from '../../services/auth';
+import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
 const LoginScreen = ({ onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -69,6 +70,15 @@ const LoginScreen = ({ onLoginSuccess }) => {
 
     if (!isLogin && !email.trim()) {
       Alert.alert('שגיאה', 'אנא הזן כתובת אימייל');
+      return;
+    }
+
+    // בהרשמה בלבד - משתמשים קיימים עם סיסמה קצרה יותר ממשיכים להתחבר כרגיל
+    if (!isLogin && password.length < MIN_PASSWORD_LENGTH) {
+      Alert.alert(
+        'שגיאה',
+        `הסיסמה חייבת להכיל לפחות ${MIN_PASSWORD_LENGTH} תווים`,
+      );
       return;
     }
 

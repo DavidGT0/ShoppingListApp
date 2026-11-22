@@ -4,8 +4,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
+from typing import Annotated, Optional, List
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -85,8 +85,13 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+# שם של רשימה/מוצר: בלי רווחים מסביב, לא ריק, עד 100 תווים
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+# כמות של מוצר: 1 עד 999
+Amount = Annotated[int, Field(ge=1, le=999)]
+
 class ShoppingListCreate(BaseModel):
-    name: str
+    name: Name
 
 class ShoppingListResponse(BaseModel):
     id: int
@@ -100,19 +105,23 @@ class ShoppingListResponse(BaseModel):
         from_attributes = True
 
 class ItemCreate(BaseModel):
-    name: str
-    amount: int = 1
+    name: Name
+    amount: Amount = 1
     list_id: int
 
 class ItemUpdate(BaseModel):
-    name: Optional[str] = None
-    amount: Optional[int] = None
+    name: Optional[Name] = None
+    amount: Optional[Amount] = None
     purchased: Optional[bool] = None
     position: Optional[int] = None
 
+class ReorderEntry(BaseModel):
+    id: int
+    position: int
+
 class ShareListRequest(BaseModel):
     list_id: int
-    username: str
+    username: Annotated[str, StringConstraints(strip_whitespace=True)]
 
 # ===== פונקציות עזר לאבטחה =====
 def verify_password(plain_password, hashed_password):
@@ -183,6 +192,12 @@ def root():
 @app.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     """רישום משתמש חדש"""
+    if len(user.password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"הסיסמה חייבת להכיל לפחות {MIN_PASSWORD_LENGTH} תווים"
+        )
+
     # בדיקה אם המשתמש כבר קיים
     if get_user_by_username(db, user.username):
         raise HTTPException(
@@ -473,14 +488,17 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
     if shopping_list.owner_id != current_user.id and current_user not in shopping_list.shared_users:
         raise HTTPException(status_code=403, detail="Not authorized to modify this list")
     
-    # חישוב position הבא
-    max_position = db.query(models.ShoppingItem).filter(models.ShoppingItem.list_id == item.list_id).count()
-    
+    # מוצר חדש נכנס לראש הרשימה: position קטן מכל הקיימים
+    # (כך האפליקציה לא צריכה לשלוח בקשת סידור נוספת אחרי כל הוספה)
+    min_position = db.query(func.min(models.ShoppingItem.position)).filter(
+        models.ShoppingItem.list_id == item.list_id
+    ).scalar()
+
     new_item = models.ShoppingItem(
         name=item.name,
         amount=item.amount,
         list_id=item.list_id,
-        position=max_position
+        position=0 if min_position is None else min_position - 1
     )
     db.add(new_item)
     db.commit()
@@ -529,17 +547,17 @@ def delete_item(item_id: int, current_user: models.User = Depends(get_current_us
     return {"message": "Item deleted successfully"}
 
 @app.post("/items/reorder")
-async def reorder_items(reordered_items: List[dict], current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def reorder_items(reordered_items: List[ReorderEntry], current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """עדכון סדר הפריטים"""
     for item_data in reordered_items:
-        item = db.query(models.ShoppingItem).filter(models.ShoppingItem.id == item_data['id']).first()
+        item = db.query(models.ShoppingItem).filter(models.ShoppingItem.id == item_data.id).first()
         if item:
             # בדיקת הרשאות
             shopping_list = item.shopping_list
             if shopping_list.owner_id != current_user.id and current_user not in shopping_list.shared_users:
                 raise HTTPException(status_code=403, detail="Not authorized to modify this list")
             
-            item.position = item_data['position']
+            item.position = item_data.position
     
     db.commit()
     return {"status": "success"}
