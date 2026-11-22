@@ -178,7 +178,11 @@ const MyListsScreen = ({ navigation }) => {
       await Share.share({ message });
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
-      Alert.alert('שגיאה', error.message || 'לא הצלחנו לשלוח את הרשימה');
+      // שגיאות רשת כבר בעברית; שגיאות שרת (למשל 403) מגיעות באנגלית
+      Alert.alert(
+        'שגיאה',
+        error.network ? error.message : 'לא הצלחנו לשלוח את הרשימה',
+      );
     }
   };
 

@@ -172,6 +172,37 @@ describe('MyListsScreen', () => {
     expect(shareSpy).toHaveBeenCalledWith({ message: '🛒 שלי\n• חלב ×2' });
   });
 
+  test('share text failure shows a Hebrew error and does not share', async () => {
+    const err = new Error('Network response was not ok');
+    err.status = 403;
+    getShoppingList.mockRejectedValue(err);
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({});
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { byTestId } = await renderScreen();
+    await act(async () => byTestId('list_menu_1').props.onPress());
+    await act(async () => {
+      await byTestId('menu_share_text').props.onPress();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith('שגיאה', 'לא הצלחנו לשלוח את הרשימה');
+    expect(shareSpy).not.toHaveBeenCalled();
+  });
+
+  test('a dismissed share sheet shows no alert', async () => {
+    getShoppingList.mockResolvedValue([
+      { id: 1, name: 'חלב', amount: 1, purchased: false },
+    ]);
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction });
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { byTestId } = await renderScreen();
+    await act(async () => byTestId('list_menu_1').props.onPress());
+    await act(async () => {
+      await byTestId('menu_share_text').props.onPress();
+    });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
   test('share text of an empty list alerts and does not share', async () => {
     getShoppingList.mockResolvedValue([]);
     const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({});
