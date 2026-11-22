@@ -20,7 +20,9 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 # הגדרות אבטחה
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")  # ⚠️ חשוב לשנות בייצור!
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY is not set. Add it in Render → Environment, or to .env for local runs.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # שבוע
 

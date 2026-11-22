@@ -10,15 +10,12 @@ load_dotenv()
 # הגדרת קונפיגורציה של Alembic
 config = context.config
 
-# שליפת כתובת הדאטה-בייס ועדכון אלמביק
-database_url = os.getenv("DATABASE_URL")
-if database_url:
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
-    config.set_main_option("sqlalchemy.url", database_url)
+# שימוש באותה כתובת (כבר מנורמלת ל-psycopg2) שהשרת עצמו משתמש בה, מתוך database.py.
+# הכפלת % נדרשת כי קובץ הקונפיגורציה של Alembic מפרש % כתחביר מיוחד.
+from database import Base, SQLALCHEMY_DATABASE_URL
+config.set_main_option("sqlalchemy.url", SQLALCHEMY_DATABASE_URL.replace("%", "%%"))
 
-# ייבוא ה-Base מהפרויקט שלך והגדרת ה-Metadata
-from database import Base
+# הגדרת ה-Metadata
 target_metadata = Base.metadata
 
 # שאר הקוד המקורי של Alembic שנמצא בהמשך הקובץ (run_migrations_offline / run_migrations_online) נשאר ללא שינוי...

@@ -15,6 +15,13 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 if not SQLALCHEMY_DATABASE_URL:
     raise ValueError(f"DATABASE_URL is not set. Please make sure a .env file exists at: {env_path}")
 
+# תמיד משתמשים במפורש בדרייבר psycopg2.
+# החל מ-SQLAlchemy 2.1 הכתובת postgresql:// מחפשת כברירת מחדל את psycopg (גרסה 3), שלא מותקן אצלנו.
+for _prefix in ("postgres://", "postgresql://"):
+    if SQLALCHEMY_DATABASE_URL.startswith(_prefix):
+        SQLALCHEMY_DATABASE_URL = "postgresql+psycopg2://" + SQLALCHEMY_DATABASE_URL[len(_prefix):]
+        break
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
