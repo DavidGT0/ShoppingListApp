@@ -662,14 +662,19 @@ def join_list(join_request: JoinListRequest, current_user: models.User = Depends
 
 # === Members Endpoints ===
 
-@app.get("/lists/{list_id}/members")
-def get_list_members(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """משתתפי הרשימה: הבעלים ראשון ואחריו המשתתפים לפי שם משתמש. בלי אימייל"""
+def get_accessible_list_or_error(db: Session, list_id: int, user: models.User):
+    """מחזיר רשימה שהמשתמש הוא הבעלים שלה או משתתף בה, או 404/403"""
     shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
     if not shopping_list:
         raise HTTPException(status_code=404, detail="List not found")
-    if shopping_list.owner_id != current_user.id and current_user not in shopping_list.shared_users:
+    if shopping_list.owner_id != user.id and user not in shopping_list.shared_users:
         raise HTTPException(status_code=403, detail="Not authorized to access this list")
+    return shopping_list
+
+@app.get("/lists/{list_id}/members")
+def get_list_members(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """משתתפי הרשימה: הבעלים ראשון ואחריו המשתתפים לפי שם משתמש. בלי אימייל"""
+    shopping_list = get_accessible_list_or_error(db, list_id, current_user)
     members = [{"id": shopping_list.owner.id, "username": shopping_list.owner.username, "is_owner": True}]
     for user in sorted(shopping_list.shared_users, key=lambda u: u.username):
         members.append({"id": user.id, "username": user.username, "is_owner": False})
@@ -678,11 +683,7 @@ def get_list_members(list_id: int, current_user: models.User = Depends(get_curre
 @app.delete("/lists/{list_id}/members/{user_id}")
 def remove_list_member(list_id: int, user_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """הוצאת משתתף מהרשימה. רק הבעלים"""
-    shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
-    if not shopping_list:
-        raise HTTPException(status_code=404, detail="List not found")
-    if shopping_list.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="רק הבעלים יכול להוציא משתתפים")
+    shopping_list = get_owned_list_or_error(db, list_id, current_user)
     member = next((u for u in shopping_list.shared_users if u.id == user_id), None)
     if not member:
         raise HTTPException(status_code=404, detail="המשתתף לא נמצא ברשימה")
@@ -693,13 +694,9 @@ def remove_list_member(list_id: int, user_id: int, current_user: models.User = D
 @app.post("/lists/{list_id}/leave")
 def leave_list(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """עזיבת רשימה משותפת. הבעלים לא יכול לעזוב"""
-    shopping_list = db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).first()
-    if not shopping_list:
-        raise HTTPException(status_code=404, detail="List not found")
+    shopping_list = get_accessible_list_or_error(db, list_id, current_user)
     if shopping_list.owner_id == current_user.id:
         raise HTTPException(status_code=400, detail="הבעלים לא יכול לעזוב את הרשימה")
-    if current_user not in shopping_list.shared_users:
-        raise HTTPException(status_code=403, detail="Not authorized to access this list")
     shopping_list.shared_users.remove(current_user)
     db.commit()
     return {"message": "עזבת את הרשימה"}
