@@ -123,4 +123,54 @@ describe('useLiveRefresh', () => {
     expect(errorSpy).not.toHaveBeenCalled();
     expect(removeSpy).toHaveBeenCalled();
   });
+
+  const deferred = () => {
+    const resolvers = [];
+    const refresh = jest.fn(() => new Promise(r => resolvers.push(r)));
+    return { refresh, resolveAll: () => resolvers.splice(0).forEach(r => r()) };
+  };
+
+  test('background during an in-flight refresh does not keep polling', async () => {
+    const { refresh, resolveAll } = deferred();
+    await mount({ refresh });
+    await act(async () => handler('background'));
+    await act(async () => resolveAll());
+    await flush(10000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  test('inactive then active during an in-flight refresh yields a single loop', async () => {
+    const { refresh, resolveAll } = deferred();
+    await mount({ refresh });
+    await act(async () => handler('inactive'));
+    await act(async () => handler('active'));
+    await act(async () => resolveAll());
+    expect(refresh).toHaveBeenCalledTimes(2);
+    await act(async () => resolveAll());
+    await flush(3000);
+    await act(async () => resolveAll());
+    expect(refresh).toHaveBeenCalledTimes(3);
+    await flush(3000);
+    await act(async () => resolveAll());
+    expect(refresh).toHaveBeenCalledTimes(4);
+    await act(async () => handler('background'));
+    await flush(10000);
+    expect(refresh).toHaveBeenCalledTimes(4);
+  });
+
+  test('unpausing while a refresh is in flight refreshes right after it settles', async () => {
+    const { refresh, resolveAll } = deferred();
+    const tree = await mount({ refresh });
+    await act(async () => tree.update(<Probe refresh={refresh} paused />));
+    await act(async () => tree.update(<Probe refresh={refresh} paused={false} />));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await act(async () => resolveAll());
+    expect(refresh).toHaveBeenCalledTimes(2);
+    await act(async () => resolveAll());
+    await flush(3000);
+    await act(async () => resolveAll());
+    expect(refresh).toHaveBeenCalledTimes(3);
+    await flush(3000);
+    expect(refresh).toHaveBeenCalledTimes(4);
+  });
 });

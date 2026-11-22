@@ -8,6 +8,7 @@ export default function useLiveRefresh(refresh, intervalMs, options = {}) {
   const paused = !!options.paused;
   const refreshRef = useRef(refresh);
   const inFlight = useRef(false);
+  const settleRef = useRef(() => {});
 
   useEffect(() => {
     refreshRef.current = refresh;
@@ -18,22 +19,41 @@ export default function useLiveRefresh(refresh, intervalMs, options = {}) {
       return undefined;
     }
     let cancelled = false;
+    let active = false; // האם הלולאה מורשית לרוץ (חזית)
+    let rerun = false; // להריץ מיד אחרי שהקריאה שבתהליך תסתיים
     let timer = null;
 
-    const stop = () => {
+    const clear = () => {
       if (timer) {
         clearTimeout(timer);
         timer = null;
       }
     };
 
-    const tick = async () => {
+    const schedule = () => {
+      clear();
+      timer = setTimeout(tick, intervalMs);
+    };
+
+    const afterSettle = () => {
+      if (cancelled || !active) {
+        return;
+      }
+      if (rerun) {
+        rerun = false;
+        tick();
+      } else {
+        schedule();
+      }
+    };
+
+    async function tick() {
       timer = null;
-      if (cancelled) {
+      if (cancelled || !active) {
         return;
       }
       if (inFlight.current) {
-        timer = setTimeout(tick, intervalMs);
+        rerun = true;
         return;
       }
       inFlight.current = true;
@@ -44,16 +64,27 @@ export default function useLiveRefresh(refresh, intervalMs, options = {}) {
       } finally {
         inFlight.current = false;
       }
-      if (!cancelled) {
-        timer = setTimeout(tick, intervalMs);
+      // הריצה האחרונה היא זו שמחליטה מה קורה אחרי סיום קריאה
+      settleRef.current();
+    }
+
+    const start = () => {
+      active = true;
+      clear();
+      if (inFlight.current) {
+        rerun = true;
+      } else {
+        tick();
       }
     };
 
-    const start = () => {
-      stop();
-      tick();
+    const stop = () => {
+      active = false;
+      rerun = false;
+      clear();
     };
 
+    settleRef.current = afterSettle;
     if (AppState.currentState === 'active') {
       start();
     }
