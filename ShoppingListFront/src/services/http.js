@@ -40,7 +40,7 @@ export const apiFetch = async (path, options = {}) => {
   });
 
   if (response.status === 401) {
-    await AsyncStorage.multiRemove(['access_token', 'username']);
+    await AsyncStorage.removeMany(['access_token', 'username']); // AsyncStorage v3 (אין multiRemove)
     if (token && token !== lastExpiredToken) {
       lastExpiredToken = token;
       onSessionExpired?.();
