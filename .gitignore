@@ -70,3 +70,9 @@ ShoppingListServer/.env
 venv/
 __pycache__/
 *.jks
+
+# Output of a manual `react-native bundle` into the Android source tree.
+# Gradle generates these by itself in release builds - do not commit them.
+ShoppingListFront/android/app/src/main/assets/index.android.bundle
+ShoppingListFront/android/app/src/main/res/drawable-*/node_modules_*
+ShoppingListFront/android/app/src/main/res/raw/keep.xml
