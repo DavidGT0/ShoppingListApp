@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  Switch,
   TextInput,
   ActivityIndicator,
 } from 'react-native';
@@ -16,12 +15,9 @@ import {
   changePassword,
   deleteAccount,
 } from '../../services/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SettingsScreen = ({ navigation, onLogout }) => {
   const [user, setUser] = useState(null);
-  const [autoResetEnabled, setAutoResetEnabled] = useState(false);
-  const [resetInterval, setResetInterval] = useState('daily');
 
   // States עבור שינוי סיסמה
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -37,7 +33,6 @@ const SettingsScreen = ({ navigation, onLogout }) => {
 
   useEffect(() => {
     loadUser();
-    loadSettings();
   }, []);
 
   const loadUser = async () => {
@@ -46,37 +41,6 @@ const SettingsScreen = ({ navigation, onLogout }) => {
       setUser(userData);
     } catch (error) {
       console.error('Failed to load user:', error);
-    }
-  };
-
-  const loadSettings = async () => {
-    try {
-      const savedAutoReset = await AsyncStorage.getItem('@auto_reset_enabled');
-      const savedInterval = await AsyncStorage.getItem('@reset_interval');
-      if (savedAutoReset !== null)
-        setAutoResetEnabled(JSON.parse(savedAutoReset));
-      if (savedInterval !== null) setResetInterval(savedInterval);
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-    }
-  };
-
-  const handleToggleAutoReset = async value => {
-    setAutoResetEnabled(value);
-    try {
-      await AsyncStorage.setItem('@auto_reset_enabled', JSON.stringify(value));
-    } catch (error) {
-      console.error('Failed to save setting:', error);
-    }
-  };
-
-  const handleSelectInterval = async interval => {
-    setResetInterval(interval);
-    try {
-      await AsyncStorage.setItem('@reset_interval', interval);
-      Alert.alert('הגדרות נשמרו', 'תזמון איפוס המוצרים עודכן בהצלחה.');
-    } catch (error) {
-      console.error('Failed to save interval:', error);
     }
   };
 
@@ -247,62 +211,6 @@ const SettingsScreen = ({ navigation, onLogout }) => {
                 disabled={isChangingPassword}
               >
                 <Text style={styles.cancelButtonText}>ביטול</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* הגדרת איפוס אוטומטי של מוצרים שנקנו */}
-      <View style={styles.userSection}>
-        <Text style={styles.sectionTitle}>ניהול רשימה אוטומטי</Text>
-
-        <View style={styles.rowBetween}>
-          <Text style={styles.label}>החזרת מוצרים שנקנו אוטומטית</Text>
-          <Switch
-            value={autoResetEnabled}
-            onValueChange={handleToggleAutoReset}
-          />
-        </View>
-
-        {autoResetEnabled && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={[styles.label, { marginBottom: 8 }]}>
-              תדירות איפוס:
-            </Text>
-            <View style={styles.intervalContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.intervalButton,
-                  resetInterval === 'daily' && styles.intervalButtonActive,
-                ]}
-                onPress={() => handleSelectInterval('daily')}
-              >
-                <Text
-                  style={[
-                    styles.intervalText,
-                    resetInterval === 'daily' && styles.intervalTextActive,
-                  ]}
-                >
-                  יומי (כל 24 שעות)
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.intervalButton,
-                  resetInterval === 'weekly' && styles.intervalButtonActive,
-                ]}
-                onPress={() => handleSelectInterval('weekly')}
-              >
-                <Text
-                  style={[
-                    styles.intervalText,
-                    resetInterval === 'weekly' && styles.intervalTextActive,
-                  ]}
-                >
-                  שבועי
-                </Text>
               </TouchableOpacity>
             </View>
           </View>

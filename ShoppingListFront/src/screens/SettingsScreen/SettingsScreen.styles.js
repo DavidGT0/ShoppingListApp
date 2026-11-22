@@ -93,38 +93,6 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  intervalContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  intervalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-  },
-  intervalButtonActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surfaceHighlight || '#f0f4f8',
-  },
-  intervalText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
-  intervalTextActive: {
-    color: colors.primary,
-  },
   // --- סגנונות חדשים עבור שינוי סיסמה ---
   actionButton: {
     backgroundColor: colors.primary,
