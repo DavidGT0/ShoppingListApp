@@ -43,7 +43,7 @@ jest.mock('react-native-draggable-flatlist', () => {
 // ה-hook נבדק בנפרד - כאן רק רושמים עם אילו ארגומנטים המסך קרא לו
 jest.mock('../src/hooks/useLiveRefresh', () => ({
   __esModule: true,
-  useLiveRefresh: jest.fn((refresh, intervalMs, options) => {
+  default: jest.fn((refresh, intervalMs, options) => {
     global.__live = { refresh, intervalMs, options };
   }),
 }));
@@ -257,4 +257,33 @@ test('refresh is paused while dragging', async () => {
 
   await act(async () => global.__listProps.onDragEnd({ data: [milk] }));
   expect(global.__live.options.paused).toBe(false);
+});
+
+test('the real useLiveRefresh module has a default function export', () => {
+  const mod = jest.requireActual('../src/hooks/useLiveRefresh');
+  expect(typeof mod.default).toBe('function');
+});
+
+test('a refresh that starts and resolves inside an in-flight mutation is discarded', async () => {
+  getShoppingList.mockReset();
+  updateItem.mockReset();
+  getShoppingList.mockResolvedValueOnce([milk]);
+  const tree = await renderScreen();
+
+  const pendingUpdate = deferred();
+  updateItem.mockReturnValueOnce(pendingUpdate.promise);
+  await act(async () => {
+    tree.root.findByType(ShoppingListItem).props.onTogglePurchased();
+  });
+  // הרענון מתחיל ומסתיים כשהפעולה שלי עדיין בדרך
+  getShoppingList.mockResolvedValueOnce([milk]);
+  await act(async () => global.__live.refresh());
+  expect(tree.root.findByType(ShoppingListItem).props.item.purchased).toBe(
+    false,
+  );
+  await act(async () => pendingUpdate.resolve({ ...milk, purchased: true }));
+
+  expect(tree.root.findByType(ShoppingListItem).props.item.purchased).toBe(
+    true,
+  );
 });

@@ -23,7 +23,7 @@ import {
   deleteItem,
   reorderItems,
 } from '../../services/api';
-import { useLiveRefresh } from '../../hooks/useLiveRefresh';
+import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
 
@@ -35,7 +35,9 @@ const sortByPosition = data =>
 
 const ShoppingListScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
-  const { listId, listName } = route.params || {};
+  // isOwner ישמש את חלון המשתתפים (משימה 8)
+  // eslint-disable-next-line no-unused-vars
+  const { listId, listName, isOwner = true } = route.params || {};
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingItem, setEditingItem] = useState(null);
@@ -45,7 +47,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const currentListId = listId;
   // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
   const mutationVersion = useRef(0);
+  // מספר פעולות שלי שעדיין בדרך - רענון שחוזר בזמן הזה נזרק
+  const pendingMutations = useRef(0);
   const lostAccessHandled = useRef(false);
+  const startMutation = () => {
+    mutationVersion.current++;
+    pendingMutations.current++;
+  };
+  const endMutation = () => {
+    mutationVersion.current++;
+    pendingMutations.current--;
+  };
 
   useEffect(() => {
     if (listId) {
@@ -72,7 +84,9 @@ const ShoppingListScreen = ({ route, navigation }) => {
     const version = mutationVersion.current;
     try {
       const data = await getShoppingList(listId);
-      if (version !== mutationVersion.current) return; // בוצע שינוי שלי בינתיים
+      if (pendingMutations.current > 0 || version !== mutationVersion.current) {
+        return;
+      } // בוצע שינוי שלי בינתיים
       setItems(sortByPosition(data));
     } catch (error) {
       if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה
@@ -112,7 +126,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       return;
     }
 
-    mutationVersion.current++;
+    startMutation();
     try {
       const newItem = await addItem(name, currentListId, 1);
 
@@ -128,12 +142,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו להוסיף את המוצר');
     } finally {
-      mutationVersion.current++;
+      endMutation();
     }
   };
 
   const handleTogglePurchased = async item => {
-    mutationVersion.current++;
+    startMutation();
     try {
       const updated = await updateItem(item.id, { purchased: !item.purchased });
       setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
@@ -141,12 +155,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
     } finally {
-      mutationVersion.current++;
+      endMutation();
     }
   };
 
   const handleUpdateAmount = async (item, newAmount) => {
-    mutationVersion.current++;
+    startMutation();
     try {
       const updated = await updateItem(item.id, { amount: newAmount });
       setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
@@ -154,13 +168,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את הכמות');
     } finally {
-      mutationVersion.current++;
+      endMutation();
     }
   };
 
   const handleEditItem = async newName => {
     if (!editingItem || !newName?.trim()) return;
-    mutationVersion.current++;
+    startMutation();
     try {
       const updated = await updateItem(editingItem.id, { name: newName });
       setItems(prev => prev.map(i => (i.id === editingItem.id ? updated : i)));
@@ -170,7 +184,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לערוך את המוצר');
     } finally {
-      mutationVersion.current++;
+      endMutation();
     }
   };
 
@@ -181,7 +195,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
         text: 'מחק',
         style: 'destructive',
         onPress: async () => {
-          mutationVersion.current++;
+          startMutation();
           try {
             await deleteItem(itemId);
             setItems(prev => prev.filter(i => i.id !== itemId));
@@ -189,7 +203,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
             if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
           } finally {
-            mutationVersion.current++;
+            endMutation();
           }
         },
       },
@@ -197,7 +211,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleDragBegin = () => {
-    mutationVersion.current++; // גרירה נחשבת תחילת שינוי - רענון שבדרך נזרק
+    startMutation(); // גרירה נחשבת תחילת שינוי - רענון שבדרך נזרק
     setIsDragging(true);
   };
 
@@ -213,7 +227,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     } catch (error) {
       console.log('Failed to save order to server');
     } finally {
-      mutationVersion.current++;
+      endMutation();
     }
   };
 
