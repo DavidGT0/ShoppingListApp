@@ -599,13 +599,38 @@ describe('undo', () => {
     expect(names(tree)).toEqual(['ביצים']);
   });
 
-  test('a delete that gets 403 shows no alert of its own', async () => {
+  test('a delete that gets 403 runs the lost-access flow once, with no delete error', async () => {
     deleteItem.mockRejectedValueOnce(Object.assign(new Error('x'), { status: 403 }));
-    const tree = await renderScreen();
+    const goBack = jest.fn();
+    const tree = await renderScreen(goBack);
     await act(async () => rowFor(tree, 1).props.onDelete());
     await act(async () => jest.advanceTimersByTime(UNDO_MS));
 
-    expect(alertSpy).not.toHaveBeenCalled();
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][1]).toBe('אין לך יותר גישה לרשימה הזו');
+    expect(goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('buy again waits for the pending delete of the same bought item', async () => {
+    const boughtMilk = { ...milk, purchased: true };
+    getShoppingList.mockResolvedValue([boughtMilk, eggs]);
+    const del = deferred();
+    deleteItem.mockReturnValueOnce(del.promise);
+    addItem.mockReset();
+    addItem.mockResolvedValue({ ...milk, purchased: false, position: -1 });
+    const tree = await renderScreen();
+    await act(async () => rowFor(tree, 1).props.onDelete());
+    await act(async () => {
+      tree.root.findByType(AddItemInput).props.onAdd('חלב');
+    });
+    expect(addItem).not.toHaveBeenCalled();
+
+    await act(async () => del.resolve());
+    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem.mock.invocationCallOrder[0]).toBeLessThan(
+      addItem.mock.invocationCallOrder[0],
+    );
+    expect(names(tree)).toEqual(['חלב', 'ביצים']);
   });
 
   test('a late toggle does not replace the newer delete bar', async () => {

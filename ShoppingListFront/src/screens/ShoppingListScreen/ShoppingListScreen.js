@@ -101,7 +101,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
         // המוצר כבר נמחק (למשל על ידי בן משפחה) - נחשב הצלחה
         setItems(prev => prev.filter(i => i.id !== pending.item.id));
       } else if (error.status === 403) {
-        // אבדה הגישה לרשימה - הרענון החי מטפל בהודעה ובחזרה
+        // אבדה הגישה לרשימה - הודעה אחת וחזרה (מוגן מפני כפילות)
+        handleLostAccess();
       } else if (!error.sessionExpired) {
         Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
       }
@@ -227,15 +228,18 @@ const ShoppingListScreen = ({ route, navigation }) => {
       return;
     }
 
-    // פעולה חדשה מאשרת מחיקה ממתינה ומסתירה פס ביטול קודם
-    commitPendingDelete();
-    hideBar();
-    actionSeq.current++;
-    // מוצר שמחיקתו ממתינה מוסתר, ולכן אפשר להוסיף שוב את אותו שם
+    // מוצר שמחיקתו ממתינה מוסתר, ולכן אפשר להוסיף שוב את אותו שם.
+    // ההתאמה נבדקת לפני שהמחיקה נשלחת (אחריה המוצר כבר לא מוסתר אבל גם לא נמחק מהעותק הזה)
     const wanted = name.trim().toLowerCase();
     const matches = items
       .filter(item => !hiddenIds.current.has(item.id))
       .filter(item => item.name.trim().toLowerCase() === wanted);
+
+    // פעולה חדשה מאשרת מחיקה ממתינה ומסתירה פס ביטול קודם.
+    // ממתינים לסיום המחיקה: אחרת השרת עלול להחיות בדיוק את המוצר שנמחק עכשיו
+    await commitPendingDelete();
+    hideBar();
+    actionSeq.current++;
 
     // מוצר פתוח באותו שם - כפילות. מוצר שנקנה אינו חוסם: השרת מחזיר אותו לרשימה (קנייה חוזרת)
     if (matches.some(item => !item.purchased)) {

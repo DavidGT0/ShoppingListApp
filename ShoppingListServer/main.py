@@ -568,7 +568,9 @@ def _record_history(db: Session, user_id: int, name: str):
             ))
     except IntegrityError:
         # הוספה מקבילה יצרה את השורה קודם - מגדילים אותה
-        bump(_find_history(db, user_id, name_key))
+        row = _find_history(db, user_id, name_key)
+        if row:
+            bump(row)
 
 
 @app.post("/items")
