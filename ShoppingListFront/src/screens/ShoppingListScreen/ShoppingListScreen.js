@@ -61,6 +61,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [membersVisible, setMembersVisible] = useState(false);
   const [memberCount, setMemberCount] = useState(null);
+  const [currentUsername, setCurrentUsername] = useState(null);
   const [customCategories, setCustomCategories] = useState([]);
   // 'manual' (גרירה) או 'category' (מקובץ לפי מחלקות)
   const [sortMode, setSortMode] = useState('manual');
@@ -186,6 +187,19 @@ const ShoppingListScreen = ({ route, navigation }) => {
       () => {},
     );
   };
+
+  // שם המשתמש הנוכחי (נשמר בכניסה) - לצורך "נוסף ע״י"
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve(AsyncStorage.getItem('username'))
+      .then(value => {
+        if (!cancelled) setCurrentUsername(value || null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // מספר המשתתפים מוצג על כפתור הכותרת
   const loadMemberCount = async () => {
@@ -330,7 +344,9 @@ const ShoppingListScreen = ({ route, navigation }) => {
     hideBar();
     startMutation();
     try {
-      const updated = await updateItem(itemId, { purchased: previousPurchased });
+      const updated = await updateItem(itemId, {
+        purchased: previousPurchased,
+      });
       setItems(prev => prev.map(i => (i.id === itemId ? updated : i)));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
@@ -377,7 +393,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleEditItem = async ({ name: newName, category }) => {
+  const handleEditItem = async ({ name: newName, category, unit, note }) => {
     if (!editingItem || !newName?.trim()) return;
     commitPendingDelete();
     actionSeq.current++;
@@ -391,6 +407,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
         category !== (editingItem.category ?? null)
       ) {
         updates.category = category ?? null;
+      }
+      // יחידה והערה: undefined = לא השתנה, null = ניקוי
+      if (unit !== undefined && unit !== (editingItem.unit ?? null)) {
+        updates.unit = unit;
+      }
+      if (note !== undefined && note !== (editingItem.note ?? null)) {
+        updates.note = note;
       }
       const updated = await updateItem(editingItem.id, updates);
       setItems(prev => prev.map(i => (i.id === editingItem.id ? updated : i)));
@@ -520,9 +543,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     // מוצר מוסתר (מחיקה בדרך) נשאר במצב, כדי שיוצג שוב אם המחיקה תיכשל
     setItems(prev => [
       ...data,
-      ...prev.filter(
-        item => item.purchased || hiddenIds.current.has(item.id),
-      ),
+      ...prev.filter(item => item.purchased || hiddenIds.current.has(item.id)),
     ]);
     const reorderedData = data.map((item, index) => ({
       id: item.id,
@@ -735,6 +756,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
                     handleUpdateAmount(item, newAmount)
                   }
                   isActive={false}
+                  showAddedBy={memberCount > 1}
+                  currentUsername={currentUsername}
                 />
               ))}
             </View>
@@ -760,6 +783,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
               onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
               onDrag={drag}
               isActive={isActive}
+              showAddedBy={memberCount > 1}
+              currentUsername={currentUsername}
             />
           )}
           ListFooterComponent={purchasedFooter}

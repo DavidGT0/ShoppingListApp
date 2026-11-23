@@ -55,6 +55,11 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text.primary,
   },
+  itemMeta: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
   purchasedTextColor: {
     color: colors.text.secondary,
   },

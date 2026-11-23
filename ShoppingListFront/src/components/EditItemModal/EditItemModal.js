@@ -12,6 +12,8 @@ import { styles } from './EditItemModal.styles';
 import { BUILTIN_CATEGORIES, customKey } from '../../services/categories';
 
 const MAX_CATEGORY_NAME = 30;
+const MAX_NOTE = 100;
+const UNITS = ['יח׳', 'ק״ג', 'גרם', 'ליטר', 'חבילה'];
 
 // הפניה למחלקה מותאמת שכבר לא קיימת נחשבת אוטומטי
 const initialSelection = (item, categories) => {
@@ -38,6 +40,11 @@ const EditItemModal = ({
   const [creating, setCreating] = useState(false);
   // בלי נגיעה בצ'יפ המחלקה לא נשלחת, כך שעריכת שם בלבד לא דורסת בחירה ידנית
   const [touched, setTouched] = useState(false);
+  // יחידה והערה נשלחות רק אם השתנו (null = ניקוי)
+  const [unit, setUnit] = useState(null);
+  const [unitTouched, setUnitTouched] = useState(false);
+  const [note, setNote] = useState('');
+  const [noteTouched, setNoteTouched] = useState(false);
 
   // בכל פתיחה של החלון - טוענים מחדש את השם והמחלקה השמורים של המוצר
   // (גם כשפותחים שוב את אותו מוצר אחרי ביטול, כדי שלא יוצג טקסט שלא נשמר)
@@ -46,6 +53,10 @@ const EditItemModal = ({
       setEditName(item.name);
       setSelected(initialSelection(item, categories));
       setTouched(false);
+      setUnit(item.unit || null);
+      setUnitTouched(false);
+      setNote(item.note || '');
+      setNoteTouched(false);
       setAdding(false);
       setNewName('');
     }
@@ -176,6 +187,44 @@ const EditItemModal = ({
             )}
           </ScrollView>
 
+          <Text style={styles.sectionTitle}>יחידה</Text>
+          <View style={styles.chipsRow}>
+            {[null, ...UNITS].map(u => {
+              const active = unit === u;
+              return (
+                <TouchableOpacity
+                  key={u || 'none'}
+                  testID={`unit_chip_${u || 'none'}`}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => {
+                    setUnit(u);
+                    setUnitTouched(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                  >
+                    {u || 'ללא'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.sectionTitle}>הערה</Text>
+          <TextInput
+            testID="note_input"
+            style={styles.modalInput}
+            value={note}
+            onChangeText={text => {
+              setNote(text);
+              setNoteTouched(true);
+            }}
+            maxLength={MAX_NOTE}
+            placeholder="הערה (לא חובה)"
+          />
+
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={[styles.modalButton, styles.cancelButton]}
@@ -190,6 +239,8 @@ const EditItemModal = ({
                 onSave({
                   name: editName,
                   category: touched ? selected : undefined,
+                  unit: unitTouched ? unit : undefined,
+                  note: noteTouched ? note.trim() || null : undefined,
                 })
               }
             >

@@ -21,6 +21,8 @@ const ShoppingListItem = ({
   onUpdateAmount,
   onDrag,
   isActive,
+  showAddedBy = false,
+  currentUsername = null,
 }) => {
   const swipeableRef = useRef(null);
   const cardScale = useRef(new Animated.Value(1)).current;
@@ -34,6 +36,10 @@ const ShoppingListItem = ({
       useNativeDriver: false,
     }).start();
   }, [item.purchased, lineAnim]);
+
+  // "נוסף ע״י" רק ברשימה משותפת ורק למוצר של מישהו אחר
+  const showAdder =
+    showAddedBy && !!item.added_by && item.added_by !== currentUsername;
 
   const handleCardPressIn = () => {
     Animated.spring(cardScale, {
@@ -158,6 +164,17 @@ const ShoppingListItem = ({
                 style={[styles.strikeLine, { width: strikeWidth }]}
               />
             </View>
+            {!!item.note && (
+              <Text testID="item_note" style={styles.itemMeta}>
+                {item.note}
+              </Text>
+            )}
+            {showAdder && (
+              <Text testID="item_added_by" style={styles.itemMeta}>
+                {'נוסף ע״י '}
+                {item.added_by}
+              </Text>
+            )}
           </View>
 
           <View style={styles.amountContainer}>
@@ -172,7 +189,9 @@ const ShoppingListItem = ({
             >
               <Icon name="minus" size={16} color={colors.primary} />
             </Pressable>
-            <Text style={styles.amountText}>{item.amount}</Text>
+            <Text testID="item_amount" style={styles.amountText}>
+              {item.unit ? `${item.amount} ${item.unit}` : String(item.amount)}
+            </Text>
             <Pressable
               style={styles.amountButton}
               android_ripple={{
