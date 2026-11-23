@@ -10,7 +10,10 @@ import {
 } from 'react-native';
 import { ScrollView, RefreshControl } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DraggableFlatList from 'react-native-draggable-flatlist';
+import {
+  NestableScrollContainer,
+  NestableDraggableFlatList,
+} from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // קומפוננטות מופרדות
@@ -57,11 +60,11 @@ import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
-// מחוות הגרירה של הרשימה תופסת כל תנועה אנכית ובולעת את המשיכה לריענון.
-// מגבילים את תחילת המחווה לרצועה של ידית הגרירה, שבקצה השמאלי של השורה:
-// ריווח הרשימה 20 + ריווח השורה 12 = הידית ב-32-60dp, ועם hitSlop ב-22-70dp.
-// הרצועה (72dp) מכסה רק אותה, כך שמשיכה מכל מקום אחר (גם מהפח) מגיעה לרכיב הריענון
-const DRAG_HIT_SLOP = { [I18nManager.isRTL ? 'right' : 'left']: 0, width: 72 };
+// מחוות הגרירה של הרשימה תופסת תנועה אנכית ועלולה לבלוע את המשיכה לריענון.
+// מגבילים את תחילת המחווה לרצועה של ידית הגרירה, שבקצה השמאלי של השורה.
+// הרשימה המקוננת מתחילה אחרי ריווח המיכל (20dp); ריווח השורה 12 = הידית ב-12-40dp
+// מתחילת הרשימה, ועם hitSlop ב-2-50dp. הרצועה (56dp) מכסה רק אותה
+const DRAG_HIT_SLOP = { [I18nManager.isRTL ? 'right' : 'left']: 0, width: 56 };
 // כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
 export const UNDO_MS = 5000;
 
@@ -935,7 +938,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       <OfflineBanner visible={isOffline} />
 
-      <View style={styles.sortSegments}>
+      {/* מתג גלולה: מיכל מעוגל, והמקטע הפעיל גלולה מלאה בצבע הראשי */}
+      <View style={styles.sortSegments} testID="sort_segments">
         {[
           { mode: 'manual', label: 'סדר ידני', icon: 'drag-horizontal-variant' },
           { mode: 'category', label: 'לפי מחלקות', icon: 'shape-outline' },
@@ -958,7 +962,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               <Icon
                 name={icon}
                 size={18}
-                color={selected ? colors.text.inverse : colors.primaryText}
+                color={selected ? colors.text.inverse : colors.text.secondary}
               />
               <Text
                 style={[
@@ -995,13 +999,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
           {purchasedFooter}
         </ScrollView>
       ) : (
-        <DraggableFlatList
-          data={unpurchasedItems}
-          keyExtractor={item => item.id.toString()}
+        // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה של gesture-handler (כמו במצב
+        // מחלקות), כך שהמשיכה לריענון שייכת למיכל ולא נבלעת במחוות הגרירה.
+        // הכותרת, הרשימה והחלק של מה שנקנה נגללים יחד כעמוד אחד
+        <NestableScrollContainer
+          testID="manual_list"
           contentContainerStyle={styles.listContent}
-          onDragBegin={handleDragBegin}
-          onDragEnd={handleDragEnd}
-          dragHitSlop={DRAG_HIT_SLOP}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1010,23 +1013,33 @@ const ShoppingListScreen = ({ route, navigation }) => {
               progressBackgroundColor={colors.raised}
             />
           }
-          ListHeaderComponent={listHeader}
-          renderItem={({ item, drag, isActive }) => (
-            <ShoppingListItem
-              item={item}
-              onTogglePurchased={() => handleTogglePurchased(item)}
-              onEdit={() => openEditModal(item)}
-              onDelete={() => handleDeleteItem(item.id)}
-              onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
-              onDrag={isOffline ? undefined : drag}
-              isActive={isActive}
-              showAddedBy={memberCount > 1}
-              currentUsername={currentUsername}
-              disabled={isOffline}
-            />
-          )}
-          ListFooterComponent={purchasedFooter}
-        />
+        >
+          {listHeader}
+          <NestableDraggableFlatList
+            data={unpurchasedItems}
+            keyExtractor={item => item.id.toString()}
+            onDragBegin={handleDragBegin}
+            onDragEnd={handleDragEnd}
+            dragHitSlop={DRAG_HIT_SLOP}
+            renderItem={({ item, drag, isActive }) => (
+              <ShoppingListItem
+                item={item}
+                onTogglePurchased={() => handleTogglePurchased(item)}
+                onEdit={() => openEditModal(item)}
+                onDelete={() => handleDeleteItem(item.id)}
+                onUpdateAmount={newAmount =>
+                  handleUpdateAmount(item, newAmount)
+                }
+                onDrag={isOffline ? undefined : drag}
+                isActive={isActive}
+                showAddedBy={memberCount > 1}
+                currentUsername={currentUsername}
+                disabled={isOffline}
+              />
+            )}
+          />
+          {purchasedFooter}
+        </NestableScrollContainer>
       )}
 
       <UndoBar

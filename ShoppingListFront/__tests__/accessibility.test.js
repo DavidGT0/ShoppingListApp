@@ -95,7 +95,17 @@ jest.mock('react-native-draggable-flatlist', () => {
       ),
       ListFooterComponent,
     );
-  return { __esModule: true, default: MockDraggableFlatList };
+  // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה (עם המשיכה לריענון)
+  const MockNestableScrollContainer = ({ children, ...rest }) => {
+    global.__scrollProps = rest;
+    return ReactLib.createElement(View, { testID: 'nestable_scroll' }, children);
+  };
+  return {
+    __esModule: true,
+    default: MockDraggableFlatList,
+    NestableDraggableFlatList: MockDraggableFlatList,
+    NestableScrollContainer: MockNestableScrollContainer,
+  };
 });
 
 const { act } = ReactTestRenderer;

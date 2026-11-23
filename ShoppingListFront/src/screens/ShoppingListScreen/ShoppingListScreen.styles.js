@@ -131,12 +131,18 @@ export const makeStyles = colors => StyleSheet.create({
     marginBottom: 12,
     textAlign: 'right',
   },
+  // מתג גלולה: מיכל מעוגל עם ריווח פנימי. בלי overflow: 'hidden' (שחותך את המסגרת
+  // בפינות באנדרואיד) - המקטעים מעוגלים בעצמם
   sortSegments: {
     flexDirection: 'row-reverse',
     marginHorizontal: 20,
-    marginTop: 4,
-    borderRadius: 12,
-    overflow: 'hidden',
+    marginTop: 10,
+    marginBottom: 8,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: colors.raised,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   sortSegment: {
     flex: 1,
@@ -144,21 +150,25 @@ export const makeStyles = colors => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
+    borderRadius: 10,
   },
   sortSegmentActive: {
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sortSegmentText: {
     fontSize: 14,
     marginRight: 6,
-    color: colors.primaryText,
+    color: colors.text.secondary,
     fontWeight: '600',
   },
   sortSegmentTextActive: {
     color: colors.text.inverse,
+    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: 20,

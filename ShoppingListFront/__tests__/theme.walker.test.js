@@ -24,8 +24,18 @@ import { resolveCategory } from '../src/services/categories';
 jest.mock('react-native-draggable-flatlist', () => {
   const ReactLib = require('react');
   const { View } = require('react-native');
+  // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה (עם המשיכה לריענון)
+  const MockNestableScrollContainer = ({ children, ...rest }) => {
+    global.__scrollProps = rest;
+    return ReactLib.createElement(View, { testID: 'nestable_scroll' }, children);
+  };
   return {
     __esModule: true,
+    NestableScrollContainer: MockNestableScrollContainer,
+    // הרשימה המקוננת זהה למוק של הרשימה הרגילה
+    get NestableDraggableFlatList() {
+      return this.default;
+    },
     default: ({ data, renderItem, ListHeaderComponent }) =>
       ReactLib.createElement(
         View,
