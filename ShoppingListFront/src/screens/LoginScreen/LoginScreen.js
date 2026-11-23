@@ -12,12 +12,14 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { styles } from './LoginScreen.styles';
-import { colors } from '../../theme/colors';
+import { makeStyles } from './LoginScreen.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 import { login, register, requestPasswordReset } from '../../services/auth';
 import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
 const LoginScreen = ({ onLoginSuccess }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -134,6 +136,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             <TextInput
               style={styles.input}
               placeholder={isLogin ? 'שם משתמש או אימייל' : 'הזן שם משתמש'}
+              placeholderTextColor={colors.placeholder}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
@@ -149,6 +152,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
               <TextInput
                 style={styles.input}
                 placeholder="הזן כתובת אימייל"
+                placeholderTextColor={colors.placeholder}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -165,6 +169,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             <TextInput
               style={styles.input}
               placeholder="הזן סיסמא"
+              placeholderTextColor={colors.placeholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -246,6 +251,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             <TextInput
               style={styles.input}
               placeholder="כתובת אימייל"
+              placeholderTextColor={colors.placeholder}
               value={forgotEmail}
               onChangeText={setForgotEmail}
               autoCapitalize="none"

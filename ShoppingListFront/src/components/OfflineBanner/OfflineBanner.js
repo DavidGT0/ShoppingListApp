@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, Alert, AccessibilityInfo } from 'react-native';
-import { styles } from './OfflineBanner.styles';
+import { makeStyles } from './OfflineBanner.styles';
+import { useStyles } from '../../theme/ThemeContext';
 
 export const OFFLINE_BANNER_TEXT =
   'אין חיבור לאינטרנט — מוצגת הגרסה האחרונה שנשמרה';
@@ -10,6 +11,7 @@ export const showOfflineBlockedAlert = () =>
   Alert.alert('אין חיבור לאינטרנט', 'אפשר רק לצפות ברשימה עד שהחיבור יחזור');
 
 const OfflineBanner = ({ visible }) => {
+  const styles = useStyles(makeStyles);
   // הכרזה אחת בכל הופעה של הבאנר (אזור חי שנטען עם הטקסט לא תמיד מוכרז)
   useEffect(() => {
     if (visible) AccessibilityInfo.announceForAccessibility(OFFLINE_BANNER_TEXT);

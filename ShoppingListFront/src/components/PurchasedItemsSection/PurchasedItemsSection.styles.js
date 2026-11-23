@@ -1,7 +1,6 @@
 ﻿import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: colors.border,
@@ -33,6 +32,6 @@ export const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   actionTextDanger: {
-    color: colors.danger,
+    color: colors.dangerText,
   },
 });

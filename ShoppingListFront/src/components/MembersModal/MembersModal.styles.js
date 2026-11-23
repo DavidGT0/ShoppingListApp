@@ -1,7 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -9,7 +8,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.sheet,
     width: '85%',
     maxHeight: '80%',
     borderRadius: 12,
@@ -54,7 +53,7 @@ export const styles = StyleSheet.create({
   },
   removeButtonText: {
     fontSize: 14,
-    color: colors.danger,
+    color: colors.dangerText,
     fontWeight: 'bold',
   },
   actions: {
@@ -81,7 +80,7 @@ export const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    color: 'white',
+    color: colors.text.inverse,
     fontWeight: 'bold',
   },
   secondaryButtonText: {
@@ -91,7 +90,7 @@ export const styles = StyleSheet.create({
   },
   dangerButtonText: {
     fontSize: 16,
-    color: colors.danger,
+    color: colors.dangerText,
     fontWeight: 'bold',
   },
 });

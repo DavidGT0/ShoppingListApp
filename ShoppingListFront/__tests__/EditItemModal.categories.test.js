@@ -3,7 +3,10 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { Alert, StyleSheet, TextInput } from 'react-native';
 import EditItemModal from '../src/components/EditItemModal/EditItemModal';
-import { styles } from '../src/components/EditItemModal/EditItemModal.styles';
+import { makeStyles } from '../src/components/EditItemModal/EditItemModal.styles';
+import { colors } from '../src/theme/colors';
+
+const styles = makeStyles(colors);
 
 const { act } = ReactTestRenderer;
 const customs = [{ id: 5, name: 'מתנות', color: '#123456' }];

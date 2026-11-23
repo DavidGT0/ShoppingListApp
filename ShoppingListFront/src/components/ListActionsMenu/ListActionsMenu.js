@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
-import { styles } from './ListActionsMenu.styles';
+import { makeStyles } from './ListActionsMenu.styles';
+import { useStyles } from '../../theme/ThemeContext';
 
 // תפריט פעולות לרשימה. הבעלים רואה הכול; חבר רואה רק שכפול ושליחה כטקסט
 const ListActionsMenu = ({
@@ -12,6 +13,7 @@ const ListActionsMenu = ({
   onShareText,
   onDelete,
 }) => {
+  const styles = useStyles(makeStyles);
   if (!list) return null;
   const isOwner = list.is_owner !== false;
 

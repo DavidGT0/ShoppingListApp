@@ -45,8 +45,8 @@ import {
   INITIAL_LOAD_GRACE_MS,
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
-import { styles } from './ShoppingListScreen.styles';
-import { colors } from '../../theme/colors';
+import { makeStyles } from './ShoppingListScreen.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
@@ -64,6 +64,8 @@ const sortByPosition = data =>
   (data || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
 const ShoppingListScreen = ({ route, navigation }) => {
+  const styles = useStyles(makeStyles);
+  const { colors, isDark, setMode } = useTheme();
   const insets = useSafeAreaInsets();
   const { listId, listName, isOwner = true } = route.params || {};
   const [items, setItems] = useState([]);
@@ -838,31 +840,47 @@ const ShoppingListScreen = ({ route, navigation }) => {
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerEyebrow}>ניהול מוצרים ברשימה</Text>
-          <TouchableOpacity
-            onPress={() => {
-              if (blockIfOffline()) return;
-              setMembersVisible(true);
-            }}
-            style={styles.membersButton}
-            activeOpacity={0.8}
-            testID="members_button"
-            accessibilityLabel="משתתפים ברשימה"
-            accessibilityValue={
-              memberCount !== null
-                ? { text: `${memberCount} משתתפים` }
-                : undefined
-            }
-            accessibilityRole="button"
-          >
-            <Icon
-              name="account-group"
-              size={22}
-              color={colors.text.inverse}
-            />
-            {memberCount !== null && (
-              <Text style={styles.membersButtonText}>{memberCount}</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => setMode(isDark ? 'light' : 'dark')}
+              style={styles.themeToggle}
+              activeOpacity={0.8}
+              testID="theme_toggle"
+              accessibilityLabel={isDark ? 'מצב בהיר' : 'מצב כהה'}
+              accessibilityRole="button"
+            >
+              <Icon
+                name={isDark ? 'white-balance-sunny' : 'weather-night'}
+                size={22}
+                color={colors.text.inverse}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (blockIfOffline()) return;
+                setMembersVisible(true);
+              }}
+              style={styles.membersButton}
+              activeOpacity={0.8}
+              testID="members_button"
+              accessibilityLabel="משתתפים ברשימה"
+              accessibilityValue={
+                memberCount !== null
+                  ? { text: `${memberCount} משתתפים` }
+                  : undefined
+              }
+              accessibilityRole="button"
+            >
+              <Icon
+                name="account-group"
+                size={22}
+                color={colors.text.inverse}
+              />
+              {memberCount !== null && (
+                <Text style={styles.membersButtonText}>{memberCount}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.mainTitle} numberOfLines={1}>
@@ -911,7 +929,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               <Icon
                 name={icon}
                 size={18}
-                color={selected ? colors.text.inverse : colors.primary}
+                color={selected ? colors.text.inverse : colors.primaryText}
               />
               <Text
                 style={[
@@ -936,6 +954,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={[colors.primary]}
+              progressBackgroundColor={colors.raised}
             />
           }
         >
@@ -989,6 +1008,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={[colors.primary]}
+              progressBackgroundColor={colors.raised}
             />
           }
           ListHeaderComponent={listHeader}

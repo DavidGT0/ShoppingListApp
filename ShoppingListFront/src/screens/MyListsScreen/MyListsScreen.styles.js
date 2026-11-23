@@ -1,7 +1,6 @@
 ﻿import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -22,7 +21,7 @@ export const styles = StyleSheet.create({
     borderBottomRightRadius: 32,
   },
   headerEyebrow: {
-    color: 'rgba(255,255,255,0.75)',
+    color: colors.onPrimaryMuted,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'right',
@@ -38,7 +37,7 @@ export const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
+    color: colors.onPrimarySoft,
     textAlign: 'right',
     marginTop: 6,
     fontWeight: '500',
@@ -109,7 +108,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   joinLinkText: {
-    color: colors.primary,
+    color: colors.primaryText,
     fontSize: 14,
     fontWeight: '600',
     textDecorationLine: 'underline',
@@ -181,10 +180,10 @@ export const styles = StyleSheet.create({
   },
   modalContent: {
     width: '85%',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: colors.shadowBase,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,

@@ -10,8 +10,8 @@ import { TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-han
 import Swipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-import { styles } from './ShoppingListItem.styles';
-import { colors } from '../../theme/colors';
+import { makeStyles } from './ShoppingListItem.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 
 const ShoppingListItem = ({
   item,
@@ -25,6 +25,8 @@ const ShoppingListItem = ({
   currentUsername = null,
   disabled = false,
 }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const swipeableRef = useRef(null);
   const cardScale = useRef(new Animated.Value(1)).current;
   const lineAnim = useRef(new Animated.Value(item.purchased ? 1 : 0)).current;
@@ -79,7 +81,7 @@ const ShoppingListItem = ({
           onTogglePurchased();
         }}
       >
-        <Icon name={item.purchased ? 'undo' : 'check'} size={24} color="#fff" />
+        <Icon name={item.purchased ? 'undo' : 'check'} size={24} color={colors.text.inverse} />
       </TouchableOpacity>
     );
   };
@@ -96,7 +98,7 @@ const ShoppingListItem = ({
           onDelete();
         }}
       >
-        <Icon name="trash-can-outline" size={24} color="#fff" />
+        <Icon name="trash-can-outline" size={24} color={colors.text.inverse} />
       </TouchableOpacity>
     );
   };
@@ -236,7 +238,7 @@ const ShoppingListItem = ({
               accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(Math.max(1, item.amount - 1))}
             >
-              <Icon name="minus" size={16} color={colors.primary} />
+              <Icon name="minus" size={16} color={colors.primaryText} />
             </Pressable>
             <Text testID="item_amount" style={styles.amountText}>
               {item.unit ? `${item.amount} ${item.unit}` : String(item.amount)}
@@ -255,7 +257,7 @@ const ShoppingListItem = ({
               accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(item.amount + 1)}
             >
-              <Icon name="plus" size={16} color={colors.primary} />
+              <Icon name="plus" size={16} color={colors.primaryText} />
             </Pressable>
           </View>
 

@@ -1,7 +1,8 @@
 ﻿import React from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import ShoppingListItem from '../ShoppingListItem/ShoppingListItem';
-import { styles } from './PurchasedItemsSection.styles';
+import { makeStyles } from './PurchasedItemsSection.styles';
+import { useStyles } from '../../theme/ThemeContext';
 
 const PurchasedItemsSection = ({
   items,
@@ -16,6 +17,7 @@ const PurchasedItemsSection = ({
   disabled = false,
   blockIfOffline,
 }) => {
+  const styles = useStyles(makeStyles);
   // אם אין מוצרים שנקנו, לא מרנדרים כלום
   if (!items || items.length === 0) return null;
 

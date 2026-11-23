@@ -1,7 +1,6 @@
 ﻿import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -93,7 +92,7 @@ export const styles = StyleSheet.create({
     padding: 8,
   },
   switchButtonText: {
-    color: colors.primary,
+    color: colors.primaryText,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -131,7 +130,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
     width: '85%',
     borderRadius: 16,
     padding: 20,

@@ -16,7 +16,8 @@ import {
   removeListMember,
   leaveList,
 } from '../../services/api';
-import { styles } from './MembersModal.styles';
+import { makeStyles } from './MembersModal.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 
 const MembersModal = ({
   visible,
@@ -26,6 +27,8 @@ const MembersModal = ({
   onClose,
   onLeft,
 }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const [members, setMembers] = useState([]);
   const [busy, setBusy] = useState(false);
   // ה-ref חוסם גם לחיצה כפולה מהירה לפני שה-state הספיק להתעדכן
@@ -198,7 +201,7 @@ const MembersModal = ({
                   accessibilityState={{ disabled: busy }}
                 >
                   {busy ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={colors.text.inverse} />
                   ) : (
                     <Text style={styles.primaryButtonText}>הזמן בני משפחה</Text>
                   )}

@@ -1,7 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   bar: {
     position: 'absolute',
     left: 16,
@@ -10,7 +9,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.text.primary,
+    backgroundColor: colors.snackbar,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -18,7 +17,7 @@ export const styles = StyleSheet.create({
   },
   message: {
     flex: 1,
-    color: colors.text.inverse,
+    color: colors.onSnackbar,
     fontSize: 15,
     textAlign: 'right',
   },
@@ -29,7 +28,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   undoText: {
-    color: colors.primaryLight,
+    color: colors.snackbarAction,
     fontSize: 15,
     fontWeight: 'bold',
   },

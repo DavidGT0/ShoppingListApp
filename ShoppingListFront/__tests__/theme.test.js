@@ -23,13 +23,46 @@ describe('theme', () => {
     expect(colors.surfaceHighlight).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 
-  test('no hex literal outside theme/colors.js and services/categories.js', () => {
+  test('no color literals (hex or named) outside theme/ and services/categories.js', () => {
+    const files = [...walk(SRC), path.join(SRC, '..', 'App.js')].filter(f => {
+      const rel = path.relative(SRC, f).split(path.sep).join('/');
+      return !rel.startsWith('theme/') && rel !== 'services/categories.js';
+    });
+    const offenders = files
+      .filter(f =>
+        /#[0-9A-Fa-f]{3,8}\b|['"](white|black|gray|grey)['"]/i.test(
+          fs.readFileSync(f, 'utf8'),
+        ),
+      )
+      .map(f => path.relative(SRC, f));
+    expect(offenders).toEqual([]);
+  });
+
+  test('components and screens do not import theme/colors', () => {
     const offenders = walk(SRC)
       .filter(f => {
         const rel = path.relative(SRC, f).split(path.sep).join('/');
-        return rel !== 'theme/colors.js' && rel !== 'services/categories.js';
+        return !rel.startsWith('theme/') && rel !== 'services/categories.js';
       })
-      .filter(f => /#[0-9A-Fa-f]{6}\b/.test(fs.readFileSync(f, 'utf8')))
+      .filter(f =>
+        /from\s+['"][^'"]*theme\/colors['"]/.test(fs.readFileSync(f, 'utf8')),
+      )
+      .map(f => path.relative(SRC, f));
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe('placeholder colours', () => {
+  test('every TextInput with a placeholder sets placeholderTextColor', () => {
+    const offenders = walk(SRC)
+      .filter(f => /<TextInput[\s\S]*?\/>/.test(fs.readFileSync(f, 'utf8')))
+      .filter(f => {
+        const blocks =
+          fs.readFileSync(f, 'utf8').match(/<TextInput[\s\S]*?\/>/g) || [];
+        return blocks.some(
+          b => /placeholder=/.test(b) && !/placeholderTextColor=/.test(b),
+        );
+      })
       .map(f => path.relative(SRC, f));
     expect(offenders).toEqual([]);
   });

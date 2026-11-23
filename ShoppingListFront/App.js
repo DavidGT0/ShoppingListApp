@@ -1,14 +1,17 @@
 ﻿import React, { useState, useEffect } from 'react';
 import {
   StatusBar,
-  useColorScheme,
   ActivityIndicator,
   View,
   Alert,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -21,7 +24,7 @@ import LoginScreen from './src/screens/LoginScreen/LoginScreen';
 import { isAuthenticated } from './src/services/auth';
 import { setSessionExpiredHandler, wakeUpServer } from './src/services/http';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { colors } from './src/theme/colors';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -42,11 +45,12 @@ function ListsStackNavigator() {
 
 // הטאבים הראשיים בתחתית המסך
 function MainTabNavigator({ onLogout }) {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.primaryText,
         tabBarInactiveTintColor: colors.text.secondary,
         tabBarStyle: {
           backgroundColor: colors.surface,
@@ -88,8 +92,8 @@ function MainTabNavigator({ onLogout }) {
   );
 }
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+function AppContent() {
+  const { colors, isDark: isDarkMode, ready } = useTheme();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -106,6 +110,19 @@ function App() {
     return () => setSessionExpiredHandler(null);
   }, []);
 
+  const base = isDarkMode ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.surface,
+      text: colors.text.primary,
+      border: colors.border,
+    },
+  };
+
   const checkAuth = async () => {
     const authenticated = await isAuthenticated();
     setIsLoggedIn(authenticated);
@@ -117,7 +134,7 @@ function App() {
   // כראוי במסכים מסוימים, במיוחד לאחר ניווט.
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {isLoading ? (
+      {isLoading || !ready ? (
         <View
           style={{
             flex: 1,
@@ -130,11 +147,14 @@ function App() {
         </View>
       ) : (
         <SafeAreaProvider>
-          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <StatusBar
+            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+            backgroundColor={colors.background}
+          />
           {!isLoggedIn ? (
             <LoginScreen onLoginSuccess={() => setIsLoggedIn(true)} />
           ) : (
-            <NavigationContainer>
+            <NavigationContainer theme={navTheme}>
               <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Main">
                   {props => (
@@ -150,6 +170,14 @@ function App() {
         </SafeAreaProvider>
       )}
     </GestureHandlerRootView>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

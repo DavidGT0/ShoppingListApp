@@ -1,7 +1,6 @@
 ﻿import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -43,6 +42,31 @@ export const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: 16,
   },
+  themeSegments: {
+    flexDirection: 'row-reverse',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  themeSegment: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  themeSegmentActive: {
+    backgroundColor: colors.primary,
+  },
+  themeSegmentText: {
+    fontSize: 14,
+    color: colors.primaryText,
+    fontWeight: '600',
+  },
+  themeSegmentTextActive: {
+    color: colors.text.inverse,
+  },
   userInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -64,7 +88,7 @@ export const styles = StyleSheet.create({
   },
   editButtonText: {
     fontSize: 14,
-    color: colors.primary,
+    color: colors.primaryText,
     fontWeight: '600',
   },
   section: {
@@ -110,7 +134,7 @@ export const styles = StyleSheet.create({
     marginTop: 10,
   },
   actionButtonText: {
-    color: '#fff',
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -157,7 +181,7 @@ export const styles = StyleSheet.create({
     marginRight: 8,
   },
   saveButtonText: {
-    color: '#fff',
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -182,7 +206,7 @@ export const styles = StyleSheet.create({
     marginTop: 14,
   },
   deleteAccountButtonText: {
-    color: colors.danger,
+    color: colors.dangerText,
     fontSize: 16,
     fontWeight: '700',
   },

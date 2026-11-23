@@ -1,7 +1,6 @@
 ﻿import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -31,7 +30,7 @@ export const styles = StyleSheet.create({
   backButton: {
     width: 44, // גודל קבוע כדי ליצור ריבוע/מלבן מדויק
     height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)', // רקע חצי שקוף כמו בתמונה (אם כבר יש לך צבע משלך, השאר אותו)
+    backgroundColor: colors.onPrimarySubtle,
     borderRadius: 12,
     justifyContent: 'center', // מרכוז אנכי של החץ בתוך הכפתור
     alignItems: 'center', // מרכוז אופקי של החץ בתוך הכפתור
@@ -43,13 +42,26 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: -4, // תיקון אופטי קטן: לתווי טקסט של חצים יש לרוב רווח תחתון מובנה, זה ממקם אותו בול באמצע
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeToggle: {
+    width: 44,
+    height: 44,
+    backgroundColor: colors.onPrimarySubtle,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   membersButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     height: 44,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: colors.onPrimarySubtle,
     borderRadius: 12,
   },
   membersButtonText: {
@@ -58,7 +70,7 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   headerEyebrow: {
-    color: 'rgba(255,255,255,0.75)',
+    color: colors.onPrimaryMuted,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'right',
@@ -76,7 +88,7 @@ export const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
+    color: colors.onPrimarySoft,
     textAlign: 'right',
     marginTop: 0,
     fontWeight: '500',
@@ -132,7 +144,7 @@ export const styles = StyleSheet.create({
   sortSegmentText: {
     fontSize: 14,
     marginRight: 6,
-    color: colors.primary,
+    color: colors.primaryText,
     fontWeight: '600',
   },
   sortSegmentTextActive: {
@@ -169,7 +181,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
     borderRadius: 16,
     padding: 24,
     width: '85%',
@@ -238,24 +250,25 @@ export const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 12,
     borderWidth: 0.2,
+    borderColor: colors.border,
     elevation: 0,
     shadowOpacity: 0,
   },
   tipTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: colors.navy,
+    color: colors.heading,
     marginBottom: 4,
     textAlign: 'right',
   },
   tipText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.text.secondary,
     lineHeight: 18,
     textAlign: 'right',
   },
   boldText: {
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text.primary,
   },
 });

@@ -1,7 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -9,7 +8,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.sheet,
     width: '75%',
     borderRadius: 12,
     paddingVertical: 8,
@@ -33,6 +32,6 @@ export const styles = StyleSheet.create({
     textAlign: 'right',
   },
   destructiveText: {
-    color: colors.danger,
+    color: colors.dangerText,
   },
 });

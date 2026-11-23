@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { styles } from './EditItemModal.styles';
+import { makeStyles } from './EditItemModal.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 import { BUILTIN_CATEGORIES, customKey } from '../../services/categories';
 
 const MAX_CATEGORY_NAME = 30;
@@ -35,6 +36,8 @@ const EditItemModal = ({
   onCreateCategory,
   onDeleteCategory,
 }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const [editName, setEditName] = useState('');
   // null = אוטומטי; אחרת מפתח מובנה או custom:<id>
   const [selected, setSelected] = useState(null);
@@ -220,6 +223,7 @@ const EditItemModal = ({
                     onChangeText={setNewName}
                     maxLength={MAX_CATEGORY_NAME}
                     placeholder="שם המחלקה"
+                    placeholderTextColor={colors.placeholder}
                     autoFocus
                   />
                   <TouchableOpacity
@@ -274,6 +278,7 @@ const EditItemModal = ({
               }}
               maxLength={MAX_NOTE}
               placeholder="הערה (לא חובה)"
+              placeholderTextColor={colors.placeholder}
             />
 
             <View style={styles.modalButtons}>

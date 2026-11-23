@@ -32,11 +32,13 @@ import {
   INITIAL_LOAD_GRACE_MS,
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
-import { styles } from './MyListsScreen.styles';
-import { colors } from '../../theme/colors';
+import { makeStyles } from './MyListsScreen.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const MyListsScreen = ({ navigation }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [lists, setLists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -379,6 +381,7 @@ const MyListsScreen = ({ navigation }) => {
             refreshing={refreshing}
             onRefresh={handlePullToRefresh}
             colors={[colors.primary]}
+            progressBackgroundColor={colors.raised}
           />
         }
         keyExtractor={item => item.id.toString()}
@@ -406,7 +409,7 @@ const MyListsScreen = ({ navigation }) => {
               <Icon
                 name="cart-outline"
                 size={22}
-                color={colors.primary}
+                color={colors.primaryText}
                 style={styles.cardIcon}
               />
               <Text style={styles.listNameText}>{item.name}</Text>
