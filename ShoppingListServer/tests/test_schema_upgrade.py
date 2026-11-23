@@ -110,3 +110,12 @@ def test_missing_tables_are_skipped():
     finally:
         engine.dispose()
         os.remove(path)
+
+
+def test_custom_category_list_fk_cascades_on_delete(client):
+    from database import engine
+    fks = inspect(engine).get_foreign_keys("custom_categories")
+    fk = [f for f in fks if f["constrained_columns"] == ["list_id"]]
+    assert len(fk) == 1
+    assert fk[0]["referred_table"] == "shopping_lists"
+    assert fk[0].get("options", {}).get("ondelete") == "CASCADE"

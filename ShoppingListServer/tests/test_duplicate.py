@@ -128,7 +128,7 @@ def test_duplicate_remaps_custom_categories(client, register):
     assert src["Dog food"] == custom_value
 
 
-def test_duplicate_copies_unit_note_and_keeps_added_by(client, register):
+def test_duplicate_copies_unit_note_and_clears_added_by(client, register):
     alice = register("alice")
     bob = register("bob")
     list_id = _make_list(client, alice)
@@ -145,4 +145,4 @@ def test_duplicate_copies_unit_note_and_keeps_added_by(client, register):
     assert len(copy) == 1
     assert copy[0]["unit"] == "ליטר"
     assert copy[0]["note"] == "בלי לקטוז"
-    assert copy[0]["added_by"] == "alice"
+    assert copy[0]["added_by"] is None

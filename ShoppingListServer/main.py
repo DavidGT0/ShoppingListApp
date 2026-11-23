@@ -29,7 +29,7 @@ models.Base.metadata.create_all(bind=engine)
 # הוספת עמודות חדשות לטבלאות קיימות (בטוח להרצה חוזרת)
 added_columns = ensure_columns(engine)
 if added_columns:
-    print("schema upgrade added:", added_columns)
+    print("schema upgrade added:", added_columns, flush=True)
 
 app = FastAPI()
 
@@ -529,7 +529,7 @@ def duplicate_list(list_id: int, current_user: models.User = Depends(get_current
             category=id_map.get(item.category, item.category if item.category in BUILTIN_CATEGORIES else None),
             unit=item.unit,
             note=item.note,
-            added_by_id=item.added_by_id,
+            added_by_id=None,  # ההעתק שייך למשכפל, לא למוסיפים המקוריים
         ))
     db.commit()
     db.refresh(new_list)

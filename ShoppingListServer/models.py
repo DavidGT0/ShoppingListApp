@@ -83,7 +83,7 @@ class CustomCategory(Base):
     __table_args__ = (UniqueConstraint("list_id", "name", name="uq_custom_category_list_name"),)
 
     id = Column(Integer, primary_key=True, index=True)
-    list_id = Column(Integer, ForeignKey('shopping_lists.id'), nullable=False, index=True)
+    list_id = Column(Integer, ForeignKey('shopping_lists.id', ondelete='CASCADE'), nullable=False, index=True)
     name = Column(String(30), nullable=False)
     color = Column(String(9), nullable=False)
     created_at = Column(DateTime, nullable=False)  # UTC
