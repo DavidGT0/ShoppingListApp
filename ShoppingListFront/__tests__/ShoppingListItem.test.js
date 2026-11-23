@@ -1,4 +1,4 @@
-/* global jest, test, expect, afterEach */
+/* global jest, describe, test, expect, afterEach */
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
@@ -173,4 +173,56 @@ test('drag handle shows only when onDrag is given', async () => {
     r.tree.root.findAll(n => n.props.accessibilityLabel === 'גרור לסידור מחדש')
       .length,
   ).toBeGreaterThan(0);
+});
+
+// שורות כרטיס "עכשיו במחלקה": עיגול גדול, טקסט לבן ופח לבן על הצבע הראשי
+describe('focus variant', () => {
+  const { StyleSheet } = require('react-native');
+  const { light } = require('../src/theme/palettes');
+  const hostOf = (tree, id) =>
+    tree.root.findAll(
+      n => n.props.testID === id && typeof n.type === 'string',
+    )[0];
+  const press = (tree, id) =>
+    tree.root
+      .findAll(n => n.props.testID === id && n.props.onPress)[0]
+      .props.onPress();
+
+  test('the check circle is at least 28dp and the text is inverse', async () => {
+    const { tree } = await render({ id: 7, note: 'שרי' }, { variant: 'focus' });
+    const circle = StyleSheet.flatten(hostOf(tree, 'item_check_7').props.style);
+    expect(circle.width).toBeGreaterThanOrEqual(28);
+    expect(circle.height).toBeGreaterThanOrEqual(28);
+    expect(circle.borderColor).toBe(light.text.inverse);
+    const name = tree.root.findAll(
+      n => n.type === 'Text' && n.props.children === 'עגבניות',
+    )[0];
+    expect(StyleSheet.flatten(name.props.style).color).toBe(light.text.inverse);
+    const note = hostOf(tree, 'item_note');
+    expect(StyleSheet.flatten(note.props.style).color).toBe(light.text.inverse);
+  });
+
+  test('the trash icon is inverse and every control keeps working', async () => {
+    const fns = {
+      onTogglePurchased: jest.fn(),
+      onEdit: jest.fn(),
+      onDelete: jest.fn(),
+    };
+    const { tree } = await render({ id: 7 }, { variant: 'focus', ...fns });
+    const trash = hostOf(tree, 'item_delete_7').findAll(
+      n => n.props.name === 'trash-can-outline',
+    )[0];
+    expect(trash.props.color).toBe(light.text.inverse);
+    press(tree, 'item_check_7');
+    press(tree, 'item_name_7');
+    press(tree, 'item_delete_7');
+    Object.values(fns).forEach(f => expect(f).toHaveBeenCalledTimes(1));
+  });
+
+  test('the default row is unchanged without the variant', async () => {
+    const { tree } = await render({ id: 7 });
+    const circle = StyleSheet.flatten(hostOf(tree, 'item_check_7').props.style);
+    expect(circle.width).toBe(26);
+    expect(circle.borderColor).toBe(light.primaryText);
+  });
 });

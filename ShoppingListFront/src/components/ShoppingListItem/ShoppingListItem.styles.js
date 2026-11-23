@@ -122,4 +122,28 @@ export const makeStyles = colors => StyleSheet.create({
     backgroundColor: colors.success,
     borderColor: colors.success,
   },
+  // שורה בכרטיס "עכשיו במחלקה": משטח כהה מהצבע הראשי, כדי שהטקסט הלבן יעמוד ב-AA
+  focusContainer: {
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  checkCircleFocus: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderColor: colors.text.inverse,
+  },
+  focusName: {
+    fontSize: 17,
+    color: colors.text.inverse,
+  },
+  focusMeta: {
+    color: colors.text.inverse,
+  },
 });

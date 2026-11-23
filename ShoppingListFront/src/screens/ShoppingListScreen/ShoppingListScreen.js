@@ -20,6 +20,9 @@ import AddItemInput from '../../components/AddItemInput/AddItemInput';
 import EditItemModal from '../../components/EditItemModal/EditItemModal';
 import MembersModal from '../../components/MembersModal/MembersModal';
 import UndoBar from '../../components/UndoBar/UndoBar';
+import ProgressRing from '../../components/ProgressRing/ProgressRing';
+import DepartmentRoute from '../../components/DepartmentRoute/DepartmentRoute';
+import { buildRoute } from '../../components/DepartmentRoute/buildRoute';
 import OfflineBanner, {
   showOfflineBlockedAlert,
 } from '../../components/OfflineBanner/OfflineBanner';
@@ -774,30 +777,45 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const purchasedItems = visibleItems.filter(item => item.purchased);
   const categoryMode = sortMode === 'category';
 
-  // קבוצות לפי מחלקה, לפי הסדר ששמור בפריסת הרשימה (cat.order), "אחר" תמיד אחרונה
-  const groups = [];
-  if (categoryMode) {
-    const byKey = new Map();
-    visibleResolved
-      .filter(r => !r.item.purchased)
-      .forEach(({ item, cat }) => {
-        if (!byKey.has(cat.key)) {
-          const group = { ...cat, items: [] };
-          byKey.set(cat.key, group);
-          groups.push(group);
-        }
-        byKey.get(cat.key).items.push(item);
-      });
-    groups.sort((x, y) => x.order - y.order);
-  }
+  // המסלול לפי מחלקות: רק מחלקות עם מוצרים, בסדר הפריסה של הרשימה ("אחר" תמיד אחרונה).
+  // המונה סופר גם מה שנקנה, אבל המוצרים שנקנו מופיעים רק בחלק התחתון
+  const departmentPlan = categoryMode ? buildRoute(visibleResolved) : null;
+  const departmentCount = departmentPlan ? departmentPlan.stations.length : 0;
+
+  const subtitle =
+    unpurchasedItems.length > 0
+      ? `${unpurchasedItems.length} מוצרים לקנייה`
+      : visibleItems.length > 0
+      ? 'כל המוצרים נקנו 🎉'
+      : 'הרשימה עדיין ריקה';
+  const departmentsLabel =
+    departmentCount === 1 ? 'מחלקה אחת' : `${departmentCount} מחלקות`;
+
+  // שורת מוצר במסלול (רגילה, או גדולה בכרטיס "עכשיו במחלקה").
+  // כל הפעולות עוברות דרך המסך: חסימה במצב לא מקוון, פס ביטול ומשמר השינויים
+  const renderRouteRow = (item, { variant } = {}) => (
+    <ShoppingListItem
+      item={item}
+      variant={variant}
+      onTogglePurchased={() => handleTogglePurchased(item)}
+      onEdit={() => openEditModal(item)}
+      onDelete={() => handleDeleteItem(item.id)}
+      onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
+      isActive={false}
+      showAddedBy={memberCount > 1}
+      currentUsername={currentUsername}
+      disabled={isOffline}
+    />
+  );
 
   const listHeader = (
     <View>
       <View style={styles.tipContainer}>
         <Text style={styles.tipTitle}>💡 טיפ שימושי:</Text>
         <Text style={styles.tipText}>
-          • <Text style={styles.boldText}>סימון כנקנה:</Text> החלק שמאלה.
-          {'\n'}• <Text style={styles.boldText}>מחיקת מוצר:</Text> החלק ימינה.
+          • <Text style={styles.boldText}>סימון כנקנה:</Text> לחיצה על העיגול.
+          {'\n'}• <Text style={styles.boldText}>מחיקת מוצר:</Text> לחיצה על הפח.
+          {'\n'}• <Text style={styles.boldText}>עריכה:</Text> לחיצה על שם המוצר.
         </Text>
       </View>
 
@@ -893,16 +911,23 @@ const ShoppingListScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        <Text style={styles.mainTitle} numberOfLines={1}>
-          {listName || 'רשימת קניות'}
-        </Text>
-        <Text style={styles.headerSubtitle}>
-          {unpurchasedItems.length > 0
-            ? `${unpurchasedItems.length} מוצרים לקנייה`
-            : visibleItems.length > 0
-            ? 'כל המוצרים נקנו 🎉'
-            : 'הרשימה עדיין ריקה'}
-        </Text>
+        {/* טבעת ההתקדמות לצד שם הרשימה: כמה נקנו מתוך כל המוצרים */}
+        <View style={styles.headerMain}>
+          <ProgressRing
+            done={purchasedItems.length}
+            total={visibleItems.length}
+          />
+          <View style={styles.headerTexts}>
+            <Text style={styles.mainTitle} numberOfLines={1}>
+              {listName || 'רשימת קניות'}
+            </Text>
+            <Text testID="list_subtitle" style={styles.headerSubtitle}>
+              {departmentCount > 0
+                ? `${subtitle} · ${departmentsLabel}`
+                : subtitle}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* תיבת ההוספה נשארת קבועה כדי שתמיד יהיה אפשר להוסיף מוצרים */}
@@ -955,7 +980,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       </View>
 
       {categoryMode ? (
-        // במצב מחלקות אין גרירה: רשימה רגילה עם כותרת לכל מחלקה
+        // במצב מחלקות אין גרירה: מסלול של מחלקות עם כרטיס "עכשיו במחלקה"
         <ScrollView
           testID="category_list"
           contentContainerStyle={styles.listContent}
@@ -969,40 +994,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
           }
         >
           {listHeader}
-          {groups.map(group => (
-            <View key={group.key}>
-              <View
-                style={styles.categoryHeader}
-                testID={`category_header_${group.key}`}
-              >
-                <View
-                  style={[
-                    styles.categoryHeaderDot,
-                    { backgroundColor: group.color },
-                  ]}
-                />
-                <Text style={styles.categoryHeaderText}>
-                  {group.name} ({group.items.length})
-                </Text>
-              </View>
-              {group.items.map(item => (
-                <ShoppingListItem
-                  key={item.id}
-                  item={item}
-                  onTogglePurchased={() => handleTogglePurchased(item)}
-                  onEdit={() => openEditModal(item)}
-                  onDelete={() => handleDeleteItem(item.id)}
-                  onUpdateAmount={newAmount =>
-                    handleUpdateAmount(item, newAmount)
-                  }
-                  isActive={false}
-                  showAddedBy={memberCount > 1}
-                  currentUsername={currentUsername}
-                  disabled={isOffline}
-                />
-              ))}
-            </View>
-          ))}
+          <DepartmentRoute
+            plan={departmentPlan}
+            renderItem={renderRouteRow}
+          />
           {purchasedFooter}
         </ScrollView>
       ) : (

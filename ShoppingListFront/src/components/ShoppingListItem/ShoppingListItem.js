@@ -17,9 +17,12 @@ const ShoppingListItem = ({
   showAddedBy = false,
   currentUsername = null,
   disabled = false,
+  // 'focus': שורה גדולה בכרטיס "עכשיו במחלקה" (טקסט לבן על הצבע הראשי)
+  variant,
 }) => {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
+  const focus = variant === 'focus';
   const lineAnim = useRef(new Animated.Value(item.purchased ? 1 : 0)).current;
   const [nameWidth, setNameWidth] = useState(0);
 
@@ -56,9 +59,10 @@ const ShoppingListItem = ({
         styles.container,
         item.purchased && styles.purchasedContainer,
         isActive && styles.activeItem,
+        focus && styles.focusContainer,
       ]}
     >
-      {item.categoryColor && (
+      {item.categoryColor && !focus && (
         <View
           style={[styles.categoryDot, { backgroundColor: item.categoryColor }]}
         />
@@ -98,7 +102,11 @@ const ShoppingListItem = ({
           .join(', ')}
         accessibilityState={{ checked: !!item.purchased }}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={[styles.checkCircle, item.purchased && styles.checkCircleDone]}
+        style={[
+          styles.checkCircle,
+          focus && styles.checkCircleFocus,
+          item.purchased && styles.checkCircleDone,
+        ]}
       >
         {item.purchased && (
           <Icon name="check" size={16} color={colors.navy} />
@@ -121,6 +129,7 @@ const ShoppingListItem = ({
             style={[
               styles.itemName,
               item.purchased && styles.purchasedTextColor,
+              focus && styles.focusName,
             ]}
           >
             {item.name}
@@ -128,12 +137,20 @@ const ShoppingListItem = ({
           <Animated.View style={[styles.strikeLine, { width: strikeWidth }]} />
         </View>
         {!!item.note && (
-          <Text testID="item_note" numberOfLines={2} style={styles.itemMeta}>
+          <Text
+            testID="item_note"
+            numberOfLines={2}
+            style={[styles.itemMeta, focus && styles.focusMeta]}
+          >
             {item.note}
           </Text>
         )}
         {showAdder && (
-          <Text testID="item_added_by" numberOfLines={1} style={styles.itemMeta}>
+          <Text
+            testID="item_added_by"
+            numberOfLines={1}
+            style={[styles.itemMeta, focus && styles.focusMeta]}
+          >
             {'נוסף ע״י '}
             {item.added_by}
           </Text>
@@ -180,7 +197,11 @@ const ShoppingListItem = ({
         style={styles.actionButton}
         android_ripple={ripple(18)}
       >
-        <Icon name="trash-can-outline" size={20} color={colors.dangerText} />
+        <Icon
+          name="trash-can-outline"
+          size={focus ? 22 : 20}
+          color={focus ? colors.text.inverse : colors.dangerText}
+        />
       </Pressable>
     </View>
   );

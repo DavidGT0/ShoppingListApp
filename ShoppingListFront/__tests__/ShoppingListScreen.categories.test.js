@@ -270,16 +270,20 @@ test('category mode shows headers in aisle order: built-ins, customs, other', as
   expect(headerKeys(tree)).toEqual([
     'produce',
     'dairy',
+    'bakery',
     'care',
     'custom:6',
     'other',
   ]);
 });
 
-test('purchased items do not create a header', async () => {
+// החלטה 2: מוצר שנקנה נספר במחלקה שלו, ומחלקה שהכל בה נקנה מתכווצת לשורה אחת
+test('a department with only bought items collapses to one line', async () => {
   await AsyncStorage.setItem('@sort_mode_7', 'category');
   const tree = await mount(ITEMS);
-  expect(has(tree, 'category_header_bakery')).toBe(false);
+  expect(has(tree, 'category_header_bakery')).toBe(true);
+  expect(has(tree, 'department_done_bakery')).toBe(true);
+  expect(has(tree, 'department_done_dairy')).toBe(false);
 });
 
 test('items get the dot color of their resolved category', async () => {
@@ -487,6 +491,7 @@ test('the current username is re-read on focus (after a rename in settings)', as
   expect(byId(tree, 'row_2').props.currentUsername).toBe('robert');
 });
 
+// שם המחלקה והמונה, כפי שקורא המסך מקריא את כותרת המחלקה
 const headerTexts = tree =>
   tree.root
     .findAll(
@@ -495,12 +500,7 @@ const headerTexts = tree =>
         n.props.testID.startsWith('category_header_') &&
         typeof n.type === 'string',
     )
-    .map(n =>
-      n
-        .findAll(c => c.type === 'Text')
-        .map(c => [].concat(c.props.children).join(''))
-        .join(''),
-    );
+    .map(n => n.props.accessibilityLabel);
 
 const LAYOUT = [
   { key: 'custom:6', name: 'חיות מחמד', icon: '🐶', position: 0 },
@@ -512,8 +512,18 @@ test('the new {custom, layout} answer drives group order and names', async () =>
   getListCategories.mockResolvedValue({ custom: customs, layout: LAYOUT });
   await AsyncStorage.setItem('@sort_mode_7', 'category');
   const tree = await mount(ITEMS);
-  expect(headerKeys(tree)).toEqual(['custom:6', 'dairy', 'produce', 'care', 'other']);
-  expect(headerTexts(tree).slice(0, 2)).toEqual(['חיות מחמד (1)', 'חלבי (1)']);
+  expect(headerKeys(tree)).toEqual([
+    'custom:6',
+    'dairy',
+    'produce',
+    'bakery',
+    'care',
+    'other',
+  ]);
+  expect(headerTexts(tree).slice(0, 2)).toEqual([
+    'חיות מחמד, נקנו 0 מתוך 1',
+    'חלבי, נקנו 0 מתוך 1',
+  ]);
   expect(tree.root.findByType(EditItemModal).props.layout).toEqual(LAYOUT);
   expect(tree.root.findByType(EditItemModal).props.categories).toEqual(customs);
 });
@@ -539,5 +549,5 @@ test('the live refresh brings a layout saved by another member', async () => {
   getListCategories.mockResolvedValue({ custom: customs, layout: LAYOUT });
   await act(async () => global.__live.refresh());
   expect(headerKeys(tree)[0]).toBe('custom:6');
-  expect(headerTexts(tree)[1]).toBe('חלבי (1)');
+  expect(headerTexts(tree)[1]).toBe('חלבי, נקנו 0 מתוך 1');
 });

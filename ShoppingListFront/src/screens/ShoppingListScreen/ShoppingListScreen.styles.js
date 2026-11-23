@@ -77,6 +77,16 @@ export const makeStyles = colors => StyleSheet.create({
     marginBottom: 4,
     letterSpacing: 0.3,
   },
+  // טבעת ההתקדמות בצד ימין ולצידה שם הרשימה והשורה שמתחתיו
+  headerMain: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 12,
+  },
+  headerTexts: {
+    flex: 1,
+  },
   mainTitle: {
     fontSize: 28,
     fontWeight: '800',
@@ -149,24 +159,6 @@ export const makeStyles = colors => StyleSheet.create({
   },
   sortSegmentTextActive: {
     color: colors.text.inverse,
-  },
-  categoryHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  categoryHeaderDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginLeft: 8,
-  },
-  categoryHeaderText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text.secondary,
-    textAlign: 'right',
   },
   listContent: {
     paddingHorizontal: 20,
