@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearAllCaches } from './offlineCache';
 
 export const API_BASE_URL = 'https://shoppinglistapp-7dj5.onrender.com';
 
@@ -116,6 +117,7 @@ export const apiFetch = async (path, options = {}) => {
 
   if (response.status === 401) {
     await AsyncStorage.removeMany(['access_token', 'username']); // AsyncStorage v3 (אין multiRemove)
+    await clearAllCaches();
     if (token && token !== lastExpiredToken) {
       lastExpiredToken = token;
       onSessionExpired?.();

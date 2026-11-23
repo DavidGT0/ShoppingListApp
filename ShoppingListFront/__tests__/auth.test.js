@@ -1,5 +1,5 @@
 /* global jest, describe, beforeEach, afterEach, test, expect */
-import { requestPasswordReset } from '../src/services/auth';
+import { requestPasswordReset, logout, deleteAccount } from '../src/services/auth';
 import { API_BASE_URL } from '../src/services/http';
 
 describe('requestPasswordReset', () => {
@@ -119,5 +119,31 @@ describe('register and login input and errors', () => {
     await expect(login('bob', 'pw-1234')).rejects.toThrow(
       'ההתחברות נכשלה. נסה שוב בעוד רגע.',
     );
+  });
+});
+
+describe('cache clearing', () => {
+  const AsyncStorage =
+    require('@react-native-async-storage/async-storage').default;
+
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    await AsyncStorage.setItem('@cache_lists', '[1]');
+    await AsyncStorage.setItem('@cache_items_2', '[2]');
+    await AsyncStorage.setItem('access_token', 'T');
+  });
+
+  test('logout clears the token and every cache', async () => {
+    await logout();
+    expect(await AsyncStorage.getItem('access_token')).toBeNull();
+    expect(await AsyncStorage.getItem('@cache_lists')).toBeNull();
+    expect(await AsyncStorage.getItem('@cache_items_2')).toBeNull();
+  });
+
+  test('deleteAccount clears every cache on success', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200 }));
+    await deleteAccount('pw');
+    expect(await AsyncStorage.getItem('@cache_lists')).toBeNull();
+    expect(await AsyncStorage.getItem('@cache_items_2')).toBeNull();
   });
 });
