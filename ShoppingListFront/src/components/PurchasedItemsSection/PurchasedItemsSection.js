@@ -13,6 +13,7 @@ const PurchasedItemsSection = ({
   onClearAll,
   showAddedBy = false,
   currentUsername = null,
+  disabled = false,
 }) => {
   // אם אין מוצרים שנקנו, לא מרנדרים כלום
   if (!items || items.length === 0) return null;
@@ -67,6 +68,7 @@ const PurchasedItemsSection = ({
           onUpdateAmount={newAmount => onUpdateAmount(item, newAmount)}
           showAddedBy={showAddedBy}
           currentUsername={currentUsername}
+          disabled={disabled}
         />
       ))}
     </View>

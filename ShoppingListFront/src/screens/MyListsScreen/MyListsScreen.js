@@ -23,6 +23,10 @@ import {
 import ListActionsMenu from '../../components/ListActionsMenu/ListActionsMenu';
 import { buildListShareText } from '../../services/shareText';
 import JoinListModal from '../../components/JoinListModal/JoinListModal';
+import OfflineBanner, {
+  showOfflineBlockedAlert,
+} from '../../components/OfflineBanner/OfflineBanner';
+import { loadWithCache, cacheKeys } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './MyListsScreen.styles';
 import { colors } from '../../theme/colors';
@@ -45,6 +49,27 @@ const MyListsScreen = ({ navigation }) => {
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // מצב לא מקוון: מוצגת הגרסה השמורה ואי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
+  const [isOffline, setIsOffline] = useState(false);
+  const isOfflineRef = useRef(false);
+  const setOffline = value => {
+    isOfflineRef.current = value;
+    setIsOffline(value);
+  };
+  // true אם במצב לא מקוון (ואז מציג את ההודעה). חייב לרוץ לפני כל בקשת שינוי
+  const blockIfOffline = () => {
+    if (!isOfflineRef.current) return false;
+    showOfflineBlockedAlert();
+    return true;
+  };
+  // שגיאת רשת בבקשת שינוי: עוברים למצב לא מקוון ומציגים את ההודעה במקום שגיאה כללית
+  const failedOffline = error => {
+    if (!error?.network) return false;
+    setOffline(true);
+    showOfflineBlockedAlert();
+    return true;
+  };
+
   // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
   const mutationVersion = useRef(0);
   // מספר פעולות שלי שעדיין בדרך - רענון שחוזר בזמן הזה נזרק
@@ -60,17 +85,22 @@ const MyListsScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadLists();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // רענון שקט: מחליף את הרשימות בלי מסך טעינה. שגיאות מושתקות - ננסה שוב בפעם הבאה
   const refreshLists = useCallback(async () => {
     const version = mutationVersion.current;
-    const data = await getShoppingLists();
+    const { data, fromCache } = await loadWithCache(
+      getShoppingLists,
+      cacheKeys.lists,
+    );
     // פעולה שלי בדרך, או שבוצע שינוי שלי בינתיים - התשובה ישנה
     if (pendingMutations.current > 0 || version !== mutationVersion.current) {
       return;
     }
     setLists(data || []);
+    setOffline(fromCache);
   }, []);
 
   useLiveRefresh(refreshLists, 15000);
@@ -100,8 +130,12 @@ const MyListsScreen = ({ navigation }) => {
   const loadLists = async () => {
     try {
       setLoading(true);
-      const data = await getShoppingLists();
+      const { data, fromCache } = await loadWithCache(
+        getShoppingLists,
+        cacheKeys.lists,
+      );
       setLists(data || []);
+      setOffline(fromCache);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את הרשימות שלך.');
@@ -111,6 +145,7 @@ const MyListsScreen = ({ navigation }) => {
   };
 
   const handleCreateList = async () => {
+    if (blockIfOffline()) return;
     if (!newListName.trim()) {
       Alert.alert('שגיאה', 'אנא הזן שם לרשימה החדשה');
       return;
@@ -123,6 +158,7 @@ const MyListsScreen = ({ navigation }) => {
       setNewListName(''); // מנקה את האינבוקס אחרי ההוספה
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', 'לא הצלחנו ליצור רשימה חדשה');
     } finally {
       endMutation();
@@ -130,12 +166,14 @@ const MyListsScreen = ({ navigation }) => {
   };
 
   const handleDeleteList = listId => {
+    if (blockIfOffline()) return;
     Alert.alert('מחיקת רשימה', 'האם אתה בטוח שברצונך למחוק רשימה זו?', [
       { text: 'ביטול', style: 'cancel' },
       {
         text: 'מחק',
         style: 'destructive',
         onPress: async () => {
+          if (blockIfOffline()) return;
           startMutation();
           try {
             await deleteShoppingList(listId);
@@ -143,6 +181,7 @@ const MyListsScreen = ({ navigation }) => {
             setLists(prev => prev.filter(l => l.id !== listId));
           } catch (error) {
             if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+            if (failedOffline(error)) return;
             Alert.alert('שגיאה', 'לא הצלחנו למחוק את הרשימה');
           } finally {
             endMutation();
@@ -154,12 +193,14 @@ const MyListsScreen = ({ navigation }) => {
 
   const handleDuplicateList = async list => {
     setMenuList(null);
+    if (blockIfOffline()) return;
     startMutation();
     try {
       const copy = await duplicateList(list.id);
       setLists(prev => (prev.some(l => l.id === copy.id) ? prev : [...prev, copy]));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', error.message || 'לא הצלחנו לשכפל את הרשימה');
     } finally {
       endMutation();
@@ -187,6 +228,7 @@ const MyListsScreen = ({ navigation }) => {
   };
 
   const openRenameModal = list => {
+    if (blockIfOffline()) return;
     setEditingList(list);
     setNewNameValue(list.name);
     setRenameModalVisible(true);
@@ -194,6 +236,7 @@ const MyListsScreen = ({ navigation }) => {
 
   const handleRenameList = async () => {
     if (!editingList || !newNameValue.trim()) return;
+    if (blockIfOffline()) return;
 
     startMutation();
     try {
@@ -211,6 +254,7 @@ const MyListsScreen = ({ navigation }) => {
       setEditingList(null);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את שם הרשימה');
     } finally {
       endMutation();
@@ -260,9 +304,14 @@ const MyListsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      <OfflineBanner visible={isOffline} />
+
       <TouchableOpacity
         style={styles.joinLink}
-        onPress={() => setJoinModalVisible(true)}
+        onPress={() => {
+          if (blockIfOffline()) return;
+          setJoinModalVisible(true);
+        }}
         testID="join_list_link"
         accessibilityLabel="join_list_link"
       >
@@ -309,7 +358,10 @@ const MyListsScreen = ({ navigation }) => {
               </View>
             )}
             <TouchableOpacity
-              onPress={() => setMenuList(item)}
+              onPress={() => {
+                if (blockIfOffline()) return;
+                setMenuList(item);
+              }}
               style={styles.actionIconBtn}
               testID={`list_menu_${item.id}`}
               accessibilityLabel="list_menu_button"

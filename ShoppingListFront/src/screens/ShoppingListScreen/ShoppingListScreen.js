@@ -20,6 +20,9 @@ import AddItemInput from '../../components/AddItemInput/AddItemInput';
 import EditItemModal from '../../components/EditItemModal/EditItemModal';
 import MembersModal from '../../components/MembersModal/MembersModal';
 import UndoBar from '../../components/UndoBar/UndoBar';
+import OfflineBanner, {
+  showOfflineBlockedAlert,
+} from '../../components/OfflineBanner/OfflineBanner';
 
 // שירותים ועיצובים
 import {
@@ -36,6 +39,7 @@ import {
   deleteListCategory,
 } from '../../services/api';
 import { resolveCategory, customKey } from '../../services/categories';
+import { loadWithCache, cacheKeys } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
@@ -65,6 +69,28 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [customCategories, setCustomCategories] = useState([]);
   // 'manual' (גרירה) או 'category' (מקובץ לפי מחלקות)
   const [sortMode, setSortMode] = useState('manual');
+  // מצב לא מקוון: מוצגת הגרסה השמורה ואי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
+  const [isOffline, setIsOffline] = useState(false);
+  const isOfflineRef = useRef(false);
+  const setOffline = value => {
+    isOfflineRef.current = value;
+    setIsOffline(value);
+  };
+  // true אם במצב לא מקוון (ואז מציג את ההודעה). חייב לרוץ לפני כל בקשת שינוי
+  const blockIfOffline = () => {
+    if (!isOfflineRef.current) return false;
+    showOfflineBlockedAlert();
+    return true;
+  };
+  // שגיאת רשת בבקשת שינוי: עוברים למצב לא מקוון ומציגים את ההודעה במקום שגיאה כללית
+  const failedOffline = error => {
+    if (!error?.network) return false;
+    setOffline(true);
+    showOfflineBlockedAlert();
+    return true;
+  };
+  // גרירה שהתחילה במצב לא מקוון נחסמה - בסיומה אין מה לשמור
+  const dragBlocked = useRef(false);
   const currentListId = listId;
   // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
   const mutationVersion = useRef(0);
@@ -107,6 +133,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
     clearTimeout(pending.timer);
     hideBar();
     try {
+      if (isOfflineRef.current) {
+        // הרשת נפלה בזמן ההמתנה - לא שולחים, והמוצר חוזר
+        const offlineError = new Error('offline');
+        offlineError.network = true;
+        throw offlineError;
+      }
       await deleteItem(pending.item.id);
       setItems(prev => prev.filter(i => i.id !== pending.item.id));
     } catch (error) {
@@ -116,6 +148,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
       } else if (error.status === 403) {
         // אבדה הגישה לרשימה - הודעה אחת וחזרה (מוגן מפני כפילות)
         handleLostAccess();
+      } else if (failedOffline(error)) {
+        // המוצר חוזר (ב-finally) והמסך עובר למצב צפייה
       } else if (!error.sessionExpired) {
         Alert.alert('שגיאה', 'לא הצלחנו למחוק את המוצר');
       }
@@ -168,8 +202,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   const loadCategories = async () => {
     try {
-      const data = await getListCategories(listId);
+      const { data, fromCache } = await loadWithCache(
+        () => getListCategories(listId),
+        cacheKeys.categories(listId),
+      );
       if (Array.isArray(data)) setCustomCategories(data);
+      if (fromCache) setOffline(true);
     } catch (error) {
       // שקט - נשארות המחלקות המובנות
     }
@@ -240,8 +278,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const loadListItems = async id => {
     try {
       setLoading(true);
-      const data = await getShoppingList(id);
+      const { data, fromCache } = await loadWithCache(
+        () => getShoppingList(id),
+        cacheKeys.items(id),
+      );
       setItems(sortByPosition(data));
+      setOffline(fromCache);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
       if (error.status === 403 || error.status === 404) {
@@ -259,16 +301,21 @@ const ShoppingListScreen = ({ route, navigation }) => {
     if (!listId) return;
     const version = mutationVersion.current;
     try {
-      const [data, cats] = await Promise.all([
-        getShoppingList(listId),
-        Promise.resolve(getListCategories(listId)).catch(() => null),
+      const [itemsResult, catsResult] = await Promise.all([
+        loadWithCache(() => getShoppingList(listId), cacheKeys.items(listId)),
+        loadWithCache(
+          () => getListCategories(listId),
+          cacheKeys.categories(listId),
+        ).catch(() => null),
       ]);
       // פעולה שלי בדרך, או שבוצע שינוי שלי בינתיים - התשובה ישנה
       if (pendingMutations.current > 0 || version !== mutationVersion.current) {
         return;
       }
-      setItems(sortByPosition(data));
-      if (Array.isArray(cats)) setCustomCategories(cats);
+      setItems(sortByPosition(itemsResult.data));
+      if (Array.isArray(catsResult?.data)) setCustomCategories(catsResult.data);
+      // חוזרים למצב מקוון רק כשהמוצרים הגיעו מהשרת
+      setOffline(itemsResult.fromCache || !!catsResult?.fromCache);
     } catch (error) {
       if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה
       if (error.status === 403 || error.status === 404) {
@@ -290,6 +337,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleAddItem = async name => {
+    if (blockIfOffline()) return;
     if (!currentListId) {
       Alert.alert('שגיאה', 'לא נבחרה רשימה פעילה');
       return;
@@ -332,6 +380,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       });
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', 'לא הצלחנו להוסיף את המוצר');
     } finally {
       endMutation();
@@ -340,6 +389,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   // ביטול סימון: שולח את הערך ההפוך, בתוך משמר השינויים
   const undoToggle = async (itemId, previousPurchased) => {
+    if (blockIfOffline()) return;
     actionSeq.current++;
     hideBar();
     startMutation();
@@ -350,6 +400,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setItems(prev => prev.map(i => (i.id === itemId ? updated : i)));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', 'לא הצלחנו לבטל את הפעולה');
     } finally {
       endMutation();
@@ -357,6 +408,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleTogglePurchased = async item => {
+    if (blockIfOffline()) return;
     commitPendingDelete();
     hideBar();
     const seq = ++actionSeq.current;
@@ -372,6 +424,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       }
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את המוצר');
     } finally {
       endMutation();
@@ -379,6 +432,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleUpdateAmount = async (item, newAmount) => {
+    if (blockIfOffline()) return;
     commitPendingDelete();
     actionSeq.current++;
     startMutation();
@@ -387,6 +441,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setItems(prev => prev.map(i => (i.id === item.id ? updated : i)));
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', 'לא הצלחנו לעדכן את הכמות');
     } finally {
       endMutation();
@@ -395,6 +450,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   const handleEditItem = async ({ name: newName, category, unit, note }) => {
     if (!editingItem || !newName?.trim()) return;
+    if (blockIfOffline()) return;
     commitPendingDelete();
     actionSeq.current++;
     startMutation();
@@ -421,6 +477,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setModalVisible(false);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       if (error.status === 400 && error.message) {
         // למשל מחלקה שנמחקה בינתיים: מציגים את הודעת השרת וטוענים מחדש את
         // המחלקות, כדי שהחלון לא ימשיך להציע אותה
@@ -436,6 +493,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   // יצירת מחלקה מותאמת. מחזיר את המחלקה שנוצרה (או undefined בכישלון)
   const handleCreateCategory = async name => {
+    if (blockIfOffline()) return undefined;
     commitPendingDelete();
     actionSeq.current++;
     startMutation();
@@ -445,6 +503,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       return created;
     } catch (error) {
       if (error.sessionExpired) return undefined;
+      if (failedOffline(error)) return undefined;
       if (error.status === 403 || error.status === 404) {
         handleLostAccess();
         return undefined;
@@ -458,6 +517,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   // מחזיר true רק כשהמחלקה נמחקה
   const handleDeleteCategory = async category => {
+    if (blockIfOffline()) return false;
     commitPendingDelete();
     actionSeq.current++;
     startMutation();
@@ -467,6 +527,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       // 404 - כבר נמחקה (למשל על ידי בן משפחה): נחשב הצלחה
       if (error.status !== 404) {
         if (error.sessionExpired) return false;
+        if (failedOffline(error)) return false;
         if (error.status === 403) {
           handleLostAccess();
           return false;
@@ -488,6 +549,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   // פעולה על כל המוצרים שנקנו: מאשרת מחיקה ממתינה, ועוברת במשמר השינויים
   const runPurchasedBulk = async (request, applyLocally) => {
+    if (blockIfOffline()) return;
     // המחיקה הממתינה מסתיימת לפני הבקשה הקבוצתית, כדי שלא יהיה מרוץ ביניהן
     await commitPendingDelete();
     actionSeq.current++;
@@ -498,6 +560,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setItems(applyLocally);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (failedOffline(error)) return;
       Alert.alert('שגיאה', error.message || 'לא הצלחנו לעדכן את הרשימה');
     } finally {
       endMutation();
@@ -513,6 +576,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     runPurchasedBulk(clearPurchased, prev => prev.filter(i => !i.purchased));
 
   const handleDeleteItem = itemId => {
+    if (blockIfOffline()) return;
     const item = items.find(i => i.id === itemId);
     if (!item) return;
     // כבר ממתין למחיקה (למשל החלקה וגם כפתור) - לא רושמים שוב
@@ -539,6 +603,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleDragBegin = () => {
+    dragBlocked.current = blockIfOffline();
+    if (dragBlocked.current) return;
     commitPendingDelete();
     actionSeq.current++;
     startMutation(); // גרירה נחשבת תחילת שינוי - רענון שבדרך נזרק
@@ -546,7 +612,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const handleDragEnd = async ({ data }) => {
+    if (dragBlocked.current) {
+      // נחסמה בתחילתה: הסדר לא משתנה ושום דבר לא נשלח
+      dragBlocked.current = false;
+      return;
+    }
     setIsDragging(false);
+    if (blockIfOffline()) {
+      // הרשת נפלה באמצע הגרירה: לא מחילים את הסדר החדש
+      endMutation();
+      return;
+    }
     // מוצר מוסתר (מחיקה בדרך) נשאר במצב, כדי שיוצג שוב אם המחיקה תיכשל
     setItems(prev => [
       ...data,
@@ -559,6 +635,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     try {
       await reorderItems(reorderedData);
     } catch (error) {
+      failedOffline(error);
       console.log('Failed to save order to server');
     } finally {
       endMutation();
@@ -566,6 +643,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   const openEditModal = item => {
+    if (blockIfOffline()) return;
     commitPendingDelete();
     setEditingItem(item);
     setModalVisible(true);
@@ -644,6 +722,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       onClearAll={handleClearAll}
       showAddedBy={memberCount > 1}
       currentUsername={currentUsername}
+      disabled={isOffline}
     />
   );
 
@@ -672,7 +751,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
           </TouchableOpacity>
           <Text style={styles.headerEyebrow}>ניהול מוצרים ברשימה</Text>
           <TouchableOpacity
-            onPress={() => setMembersVisible(true)}
+            onPress={() => {
+              if (blockIfOffline()) return;
+              setMembersVisible(true);
+            }}
             style={styles.membersButton}
             activeOpacity={0.8}
             testID="members_button"
@@ -699,8 +781,14 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       {/* תיבת ההוספה נשארת קבועה כדי שתמיד יהיה אפשר להוסיף מוצרים */}
       <View style={styles.addCard}>
-        <AddItemInput onAdd={handleAddItem} listId={currentListId} />
+        <AddItemInput
+          onAdd={handleAddItem}
+          listId={currentListId}
+          editable={!isOffline}
+        />
       </View>
+
+      <OfflineBanner visible={isOffline} />
 
       <TouchableOpacity
         testID="sort_mode_toggle"
@@ -767,6 +855,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
                   isActive={false}
                   showAddedBy={memberCount > 1}
                   currentUsername={currentUsername}
+                  disabled={isOffline}
                 />
               ))}
             </View>
@@ -790,10 +879,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
               onEdit={() => openEditModal(item)}
               onDelete={() => handleDeleteItem(item.id)}
               onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
-              onDrag={drag}
+              onDrag={isOffline ? undefined : drag}
               isActive={isActive}
               showAddedBy={memberCount > 1}
               currentUsername={currentUsername}
+              disabled={isOffline}
             />
           )}
           ListFooterComponent={purchasedFooter}

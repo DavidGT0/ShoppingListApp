@@ -83,6 +83,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
+  amountDisabled: {
+    opacity: 0.4,
+  },
   amountButton: {
     width: 28,
     height: 28,
