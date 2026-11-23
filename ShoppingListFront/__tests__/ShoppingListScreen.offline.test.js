@@ -541,3 +541,57 @@ describe('initial load grace period', () => {
     expect(alertSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('grace period never overwrites newer data', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  const hang = mock => {
+    let resolve;
+    const promise = new Promise(res => {
+      resolve = res;
+    });
+    mock.mockReturnValueOnce(promise);
+    return { resolve };
+  };
+
+  test('a late initial response does not replace data from a later refresh or my change', async () => {
+    await seed();
+    const initial = hang(getShoppingList);
+    const tree = await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(banner(tree)).toBeDefined();
+    getShoppingList.mockResolvedValue([milk, eggs, bread]);
+    await act(async () => refresh()());
+    expect(banner(tree)).toBeUndefined();
+    updateItem.mockResolvedValue({ ...milk, purchased: true });
+    await act(async () => row(tree, 1).props.onTogglePurchased());
+    await act(async () => initial.resolve([milk]));
+    expect(names(tree).sort()).toEqual(['ביצים', 'חלב', 'לחם']);
+    expect(row(tree, 1).props.item.purchased).toBe(true);
+    expect(banner(tree)).toBeUndefined();
+  });
+
+  test('the grace does not go offline when server data is already on screen', async () => {
+    await seed();
+    hang(getShoppingList);
+    const tree = await renderScreen();
+    getShoppingList.mockResolvedValue([milk]);
+    await act(async () => refresh()());
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(banner(tree)).toBeUndefined();
+    expect(names(tree)).toEqual(['חלב']);
+  });
+
+  test('cached categories appear during the early offline view', async () => {
+    await seed();
+    await saveCache(cacheKeys.categories(7), [{ id: 5, name: 'חדשה' }]);
+    hang(getShoppingList);
+    hang(getListCategories);
+    const tree = await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(tree.root.findByType(EditItemModal).props.categories).toEqual([
+      { id: 5, name: 'חדשה' },
+    ]);
+  });
+});

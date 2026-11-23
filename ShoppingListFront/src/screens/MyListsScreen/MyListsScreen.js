@@ -54,6 +54,8 @@ const MyListsScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   // יש כבר רשימות על המסך - מטמון לא דורס אותן, הוא רק מעביר למצב לא מקוון
   const hasLists = useRef(false);
+  // רענון חי כבר הביא נתוני שרת - תשובה מאוחרת של הטעינה הראשונה כבר ישנה
+  const liveApplied = useRef(false);
   // מבטל את טיימר ההמתנה של הטעינה הראשונה ביציאה מהמסך
   const loadAbort = useRef(new AbortController());
 
@@ -118,6 +120,7 @@ const MyListsScreen = ({ navigation }) => {
     }
     setLists(data || []);
     hasLists.current = true;
+    if (!fromCache) liveApplied.current = true;
     setOffline(fromCache);
   }, []);
 
@@ -148,6 +151,8 @@ const MyListsScreen = ({ navigation }) => {
   const loadLists = async () => {
     try {
       setLoading(true);
+      const version = mutationVersion.current;
+      let shownEarly = false;
       const { data, fromCache, alreadyShown } = await loadWithCache(
         getShoppingLists,
         cacheKeys.lists,
@@ -156,15 +161,27 @@ const MyListsScreen = ({ navigation }) => {
           signal: loadAbort.current.signal,
           // הבקשה איטית: מציגים את הגרסה השמורה והבקשה ממשיכה ברקע
           onEarlyCache: cached => {
+            shownEarly = true;
+            setLoading(false);
+            // כבר יש נתוני שרת על המסך - לא מחליפים ולא עוברים למצב לא מקוון
+            if (hasLists.current) return;
             setLists(cached || []);
             hasLists.current = true;
             setOffline(true);
-            setLoading(false);
           },
         },
       );
       // המטמון כבר מוצג והבקשה נכשלה ברשת - נשארים כמו שזה
       if (alreadyShown) return;
+      // המטמון הוצג מוקדם ובינתיים הגיעו נתונים חדשים יותר (רענון או שינוי שלי) - התשובה ישנה
+      if (
+        shownEarly &&
+        (liveApplied.current ||
+          pendingMutations.current > 0 ||
+          version !== mutationVersion.current)
+      ) {
+        return;
+      }
       setLists(data || []);
       hasLists.current = true;
       setOffline(fromCache);

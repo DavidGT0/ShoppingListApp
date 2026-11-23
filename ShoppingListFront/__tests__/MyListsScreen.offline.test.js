@@ -332,3 +332,41 @@ describe('initial load grace period', () => {
     expect(listNames()).toEqual(['שלי']);
   });
 });
+
+describe('grace period never overwrites newer data', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  const hang = () => {
+    let resolve;
+    const promise = new Promise(res => {
+      resolve = res;
+    });
+    getShoppingLists.mockReturnValueOnce(promise);
+    return { resolve };
+  };
+
+  test('a late initial response does not replace data from a later refresh', async () => {
+    await saveCache(cacheKeys.lists, LISTS);
+    const initial = hang();
+    await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(banner()).toBeDefined();
+    getShoppingLists.mockResolvedValue([LISTS[0], { id: 9, name: 'חדשה' }]);
+    await act(async () => refresh()());
+    await act(async () => initial.resolve([LISTS[0]]));
+    expect(listNames()).toEqual(['שלי', 'חדשה']);
+    expect(banner()).toBeUndefined();
+  });
+
+  test('the grace does not go offline when server data is already on screen', async () => {
+    await saveCache(cacheKeys.lists, LISTS);
+    hang();
+    await renderScreen();
+    getShoppingLists.mockResolvedValue([LISTS[0]]);
+    await act(async () => refresh()());
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(banner()).toBeUndefined();
+    expect(listNames()).toEqual(['שלי']);
+  });
+});

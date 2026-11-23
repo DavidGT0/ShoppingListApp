@@ -100,6 +100,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   // יש כבר מוצרים/מחלקות על המסך - מטמון לא דורס אותם, הוא רק מעביר למצב לא מקוון
   const hasItems = useRef(false);
   const hasCategories = useRef(false);
+  // רענון חי כבר הביא נתוני שרת - תשובה מאוחרת של הטעינה הראשונה כבר ישנה
+  const liveApplied = useRef(false);
   // מבטל את טיימר ההמתנה של הטעינה הראשונה ביציאה מהמסך
   const loadAbort = useRef(new AbortController());
   const currentListId = listId;
@@ -215,10 +217,21 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   const loadCategories = async () => {
     try {
-      const { data, fromCache } = await loadWithCache(
+      const { data, fromCache, alreadyShown } = await loadWithCache(
         () => getListCategories(listId),
         cacheKeys.categories(listId),
+        {
+          graceMs: INITIAL_LOAD_GRACE_MS,
+          signal: loadAbort.current.signal,
+          onEarlyCache: cached => {
+            if (Array.isArray(cached) && !hasCategories.current) {
+              setCustomCategories(cached);
+              hasCategories.current = true;
+            }
+          },
+        },
       );
+      if (alreadyShown) return;
       if (Array.isArray(data) && !(fromCache && hasCategories.current)) {
         setCustomCategories(data);
         hasCategories.current = true;
@@ -294,6 +307,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const loadListItems = async id => {
     try {
       setLoading(true);
+      const version = mutationVersion.current;
+      let shownEarly = false;
       const { data, fromCache, alreadyShown } = await loadWithCache(
         () => getShoppingList(id),
         cacheKeys.items(id),
@@ -302,15 +317,27 @@ const ShoppingListScreen = ({ route, navigation }) => {
           signal: loadAbort.current.signal,
           // הבקשה איטית: מציגים את הגרסה השמורה והבקשה ממשיכה ברקע
           onEarlyCache: cached => {
+            shownEarly = true;
+            setLoading(false);
+            // כבר יש נתוני שרת על המסך - לא מחליפים ולא עוברים למצב לא מקוון
+            if (hasItems.current) return;
             setItems(sortByPosition(cached));
             hasItems.current = true;
             setOffline(true);
-            setLoading(false);
           },
         },
       );
       // המטמון כבר מוצג והבקשה נכשלה ברשת - נשארים כמו שזה
       if (alreadyShown) return;
+      // המטמון הוצג מוקדם ובינתיים הגיעו נתונים חדשים יותר (רענון או שינוי שלי) - התשובה ישנה
+      if (
+        shownEarly &&
+        (liveApplied.current ||
+          pendingMutations.current > 0 ||
+          version !== mutationVersion.current)
+      ) {
+        return;
+      }
       setItems(sortByPosition(data));
       hasItems.current = true;
       setOffline(fromCache);
@@ -349,6 +376,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       }
       setItems(sortByPosition(itemsResult.data));
       hasItems.current = true;
+      if (!itemsResult.fromCache) liveApplied.current = true;
       if (
         Array.isArray(catsResult?.data) &&
         !(catsResult.fromCache && hasCategories.current)
