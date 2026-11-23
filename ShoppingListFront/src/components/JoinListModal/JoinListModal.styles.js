@@ -1,7 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -58,7 +57,7 @@ export const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 16,
-    color: 'white',
+    color: colors.text.inverse,
     fontWeight: 'bold',
   },
 });

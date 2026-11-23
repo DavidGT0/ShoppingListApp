@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { styles } from './SettingsScreen.styles';
+import { makeStyles } from './SettingsScreen.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 import {
   logout,
   getCurrentUser,
@@ -20,6 +21,8 @@ import {
 import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
 const SettingsScreen = ({ onLogout }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
 
@@ -202,7 +205,7 @@ const SettingsScreen = ({ onLogout }) => {
                 testID="username_input_settings"
                 style={styles.input}
                 placeholder="שם משתמש חדש"
-                placeholderTextColor="#888"
+                placeholderTextColor={colors.placeholder}
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={newUsername}
@@ -219,7 +222,7 @@ const SettingsScreen = ({ onLogout }) => {
                   accessibilityLabel="שמירת שם המשתמש"
                 >
                   {isSavingUsername ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={colors.text.inverse} size="small" />
                   ) : (
                     <Text style={styles.saveButtonText}>שמור</Text>
                   )}
@@ -264,7 +267,7 @@ const SettingsScreen = ({ onLogout }) => {
             <TextInput
               style={styles.input}
               placeholder="סיסמה נוכחית"
-              placeholderTextColor="#888"
+              placeholderTextColor={colors.placeholder}
               secureTextEntry
               value={currentPassword}
               onChangeText={setCurrentPassword}
@@ -272,7 +275,7 @@ const SettingsScreen = ({ onLogout }) => {
             <TextInput
               style={styles.input}
               placeholder="סיסמה חדשה"
-              placeholderTextColor="#888"
+              placeholderTextColor={colors.placeholder}
               secureTextEntry
               value={newPassword}
               onChangeText={setNewPassword}
@@ -280,7 +283,7 @@ const SettingsScreen = ({ onLogout }) => {
             <TextInput
               style={styles.input}
               placeholder="אימות סיסמה חדשה"
-              placeholderTextColor="#888"
+              placeholderTextColor={colors.placeholder}
               secureTextEntry
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -295,7 +298,7 @@ const SettingsScreen = ({ onLogout }) => {
                 accessibilityLabel="שמירת הסיסמה"
               >
                 {isChangingPassword ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.text.inverse} size="small" />
                 ) : (
                   <Text style={styles.saveButtonText}>שמור סיסמה</Text>
                 )}
@@ -351,7 +354,7 @@ const SettingsScreen = ({ onLogout }) => {
             <TextInput
               style={styles.input}
               placeholder="הזן את הסיסמה שלך לאישור"
-              placeholderTextColor="#888"
+              placeholderTextColor={colors.placeholder}
               secureTextEntry
               value={deletePassword}
               onChangeText={setDeletePassword}
@@ -367,7 +370,7 @@ const SettingsScreen = ({ onLogout }) => {
                 accessibilityLabel="מחיקת החשבון לצמיתות"
               >
                 {isDeleting ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.text.inverse} size="small" />
                 ) : (
                   <Text style={styles.saveButtonText}>מחק לצמיתות</Text>
                 )}

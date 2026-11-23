@@ -12,12 +12,14 @@ import {
   Modal,
   Image,
 } from 'react-native';
-import { styles } from './LoginScreen.styles';
-import { colors } from '../../theme/colors';
+import { makeStyles } from './LoginScreen.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 import { login, register, requestPasswordReset } from '../../services/auth';
 import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
 const LoginScreen = ({ onLoginSuccess }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');

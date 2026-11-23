@@ -1,7 +1,6 @@
 ﻿import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
 
-export const styles = StyleSheet.create({
+export const makeStyles = colors => StyleSheet.create({
   addContainer: {
     flexDirection: 'row',
     marginBottom: 20,
@@ -45,7 +44,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
   },
   addButtonText: {
-    color: 'white',
+    color: colors.text.inverse,
     fontSize: 30,
     fontWeight: 'bold',
     lineHeight: 35,

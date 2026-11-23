@@ -1,12 +1,14 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { View, TextInput, TouchableOpacity, Text, Alert } from 'react-native';
 import { getSuggestions } from '../../services/api';
-import { styles } from './AddItemInput.styles';
+import { makeStyles } from './AddItemInput.styles';
+import { useStyles } from '../../theme/ThemeContext';
 
 const DEBOUNCE_MS = 250;
 const MAX_CHIPS = 5;
 
 const AddItemInput = ({ onAdd, listId, editable = true }) => {
+  const styles = useStyles(makeStyles);
   const [name, setName] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   // מספר השאילתה האחרונה - תשובה של שאילתה ישנה יותר נזרקת

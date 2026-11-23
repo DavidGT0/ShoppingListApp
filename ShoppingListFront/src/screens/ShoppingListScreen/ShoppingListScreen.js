@@ -45,8 +45,8 @@ import {
   INITIAL_LOAD_GRACE_MS,
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
-import { styles } from './ShoppingListScreen.styles';
-import { colors } from '../../theme/colors';
+import { makeStyles } from './ShoppingListScreen.styles';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
@@ -64,6 +64,8 @@ const sortByPosition = data =>
   (data || []).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
 const ShoppingListScreen = ({ route, navigation }) => {
+  const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { listId, listName, isOwner = true } = route.params || {};
   const [items, setItems] = useState([]);

@@ -9,9 +9,11 @@ import {
 } from 'react-native';
 import { joinListByCode } from '../../services/api';
 import { extractInviteCode } from '../../services/inviteCode';
-import { styles } from './JoinListModal.styles';
+import { makeStyles } from './JoinListModal.styles';
+import { useStyles } from '../../theme/ThemeContext';
 
 const JoinListModal = ({ visible, onClose, onJoined }) => {
+  const styles = useStyles(makeStyles);
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
 

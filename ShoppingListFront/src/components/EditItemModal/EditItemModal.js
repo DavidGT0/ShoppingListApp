@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { styles } from './EditItemModal.styles';
+import { makeStyles } from './EditItemModal.styles';
+import { useStyles } from '../../theme/ThemeContext';
 import { BUILTIN_CATEGORIES, customKey } from '../../services/categories';
 
 const MAX_CATEGORY_NAME = 30;
@@ -35,6 +36,7 @@ const EditItemModal = ({
   onCreateCategory,
   onDeleteCategory,
 }) => {
+  const styles = useStyles(makeStyles);
   const [editName, setEditName] = useState('');
   // null = אוטומטי; אחרת מפתח מובנה או custom:<id>
   const [selected, setSelected] = useState(null);
