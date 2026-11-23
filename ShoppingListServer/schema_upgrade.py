@@ -8,6 +8,7 @@ REQUIRED_COLUMNS = [
     ("items", "category", "VARCHAR(40)"),
     ("items", "added_by_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
     ("item_history", "category", "VARCHAR(40)"),
+    ("custom_categories", "icon", "VARCHAR(16)"),
 ]
 
 
