@@ -233,6 +233,14 @@ test('manual mode passes a gesture-handler RefreshControl that refreshes', async
   expect(getShoppingList).toHaveBeenCalledTimes(1);
 });
 
+test('manual mode limits the drag gesture to the handle strip so a pull can refresh', async () => {
+  const { I18nManager } = require('react-native');
+  await mount(ITEMS);
+  const { dragHitSlop } = global.__dragProps;
+  const side = I18nManager.isRTL ? 'right' : 'left';
+  expect(dragHitSlop).toEqual({ [side]: 0, width: 100 });
+});
+
 test('category mode passes a gesture-handler RefreshControl that refreshes', async () => {
   await AsyncStorage.setItem('@sort_mode_7', 'category');
   const tree = await mount(ITEMS);

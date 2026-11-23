@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   AppState,
+  I18nManager,
 } from 'react-native';
 import { ScrollView, RefreshControl } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -49,6 +50,10 @@ import { colors } from '../../theme/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
+// מחוות הגרירה של הרשימה תופסת כל תנועה אנכית ובולעת את המשיכה לריענון.
+// מגבילים את תחילת המחווה לרצועה של ידית הגרירה (בצד ההתחלה של השורה),
+// כך שמשיכה מכל מקום אחר מגיעה לרכיב הריענון
+const DRAG_HIT_SLOP = { [I18nManager.isRTL ? 'right' : 'left']: 0, width: 100 };
 // כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
 export const UNDO_MS = 5000;
 
@@ -978,6 +983,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
           contentContainerStyle={styles.listContent}
           onDragBegin={handleDragBegin}
           onDragEnd={handleDragEnd}
+          dragHitSlop={DRAG_HIT_SLOP}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
