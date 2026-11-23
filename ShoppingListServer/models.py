@@ -56,6 +56,11 @@ class ShoppingList(Base):
         "CustomCategory", back_populates="shopping_list",
         cascade="all, delete-orphan", order_by="CustomCategory.id"
     )
+    # סידור/שמות/אייקונים של המחלקות (נמחקים יחד עם הרשימה)
+    category_settings = relationship(
+        "ListCategorySetting", back_populates="shopping_list",
+        cascade="all, delete-orphan", order_by="ListCategorySetting.position"
+    )
 
 
 class ShoppingItem(Base):
@@ -87,8 +92,24 @@ class CustomCategory(Base):
     name = Column(String(30), nullable=False)
     color = Column(String(9), nullable=False)
     created_at = Column(DateTime, nullable=False)  # UTC
+    icon = Column(String(16), nullable=True)  # אימוג'י; עמודה שנוספה בסבב 7 (schema_upgrade)
 
     shopping_list = relationship("ShoppingList", back_populates="custom_categories")
+
+
+class ListCategorySetting(Base):
+    """סידור, שם ואייקון של מחלקה ברשימה (מובנית או custom:<id>), משותף לכל משתתפי הרשימה"""
+    __tablename__ = "list_category_settings"
+    __table_args__ = (UniqueConstraint("list_id", "key", name="uq_list_category_setting_key"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    list_id = Column(Integer, ForeignKey('shopping_lists.id', ondelete='CASCADE'), nullable=False, index=True)
+    key = Column(String(40), nullable=False)
+    name = Column(String(30), nullable=True)
+    icon = Column(String(16), nullable=True)
+    position = Column(Integer, nullable=False, default=0)
+
+    shopping_list = relationship("ShoppingList", back_populates="category_settings")
 
 
 class ItemHistory(Base):

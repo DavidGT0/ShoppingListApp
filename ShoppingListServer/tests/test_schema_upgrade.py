@@ -119,3 +119,19 @@ def test_custom_category_list_fk_cascades_on_delete(client):
     assert len(fk) == 1
     assert fk[0]["referred_table"] == "shopping_lists"
     assert fk[0].get("options", {}).get("ondelete") == "CASCADE"
+
+
+def test_adds_icon_to_existing_custom_categories():
+    engine, path = make_old_engine()
+    try:
+        with engine.begin() as c:
+            c.execute(text("CREATE TABLE custom_categories (id INTEGER PRIMARY KEY, list_id INTEGER NOT NULL REFERENCES shopping_lists(id), name VARCHAR(30) NOT NULL, color VARCHAR(9) NOT NULL, created_at DATETIME NOT NULL)"))
+            c.execute(text("INSERT INTO custom_categories VALUES (1, 1, 'Pets', '#8E44AD', '2026-01-01 00:00:00')"))
+        assert ensure_columns(engine) == EXPECTED + ["custom_categories.icon"]
+        assert "icon" in {col["name"] for col in inspect(engine).get_columns("custom_categories")}
+        with engine.connect() as c:
+            assert c.execute(text("SELECT name, icon FROM custom_categories")).fetchall() == [("Pets", None)]
+        assert ensure_columns(engine) == []
+    finally:
+        engine.dispose()
+        os.remove(path)
