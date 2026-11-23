@@ -79,6 +79,9 @@ jest.mock('../src/services/api', () => ({
   leaveList: jest.fn(),
   restorePurchased: jest.fn(),
   clearPurchased: jest.fn(),
+  getListCategories: jest.fn(() => Promise.resolve([])),
+  createListCategory: jest.fn(),
+  deleteListCategory: jest.fn(),
 }));
 
 const { act } = ReactTestRenderer;
