@@ -67,6 +67,7 @@ function MainTabNavigator({ onLogout }) {
         component={ListsStackNavigator}
         options={{
           tabBarLabel: 'הדף הראשי',
+          tabBarAccessibilityLabel: 'הדף הראשי',
           tabBarIcon: ({ color, size }) => (
             <Icon name="format-list-checks" color={color} size={size ?? 22} />
           ),
@@ -76,6 +77,7 @@ function MainTabNavigator({ onLogout }) {
         name="Settings"
         options={{
           tabBarLabel: 'הגדרות',
+          tabBarAccessibilityLabel: 'הגדרות',
           tabBarIcon: ({ color, size }) => (
             <Icon name="cog" color={color} size={size ?? 22} />
           ),

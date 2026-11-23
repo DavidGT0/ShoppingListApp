@@ -61,12 +61,14 @@ const JoinListModal = ({ visible, onClose, onJoined }) => {
             autoCorrect={false}
             autoFocus
             testID="join_code_input"
-            accessibilityLabel="join_code_input"
+            accessibilityLabel="קוד הזמנה"
           />
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={[styles.modalButton, styles.cancelButton]}
               onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="ביטול"
             >
               <Text style={styles.cancelButtonText}>ביטול</Text>
             </TouchableOpacity>
@@ -74,7 +76,8 @@ const JoinListModal = ({ visible, onClose, onJoined }) => {
               style={[styles.modalButton, styles.saveButton]}
               onPress={handleJoin}
               testID="join_submit_button"
-              accessibilityLabel="join_submit_button"
+              accessibilityLabel="הצטרפות לרשימה"
+              accessibilityRole="button"
             >
               <Text style={styles.saveButtonText}>הצטרף</Text>
             </TouchableOpacity>

@@ -174,7 +174,9 @@ const MembersModal = ({
                     onPress={() => handleRemove(member)}
                     disabled={busy}
                     testID={`remove_member_${member.id}`}
-                    accessibilityLabel={`remove_member_${member.id}`}
+                    accessibilityLabel={`הסר את ${member.username}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: busy }}
                   >
                     <Text style={styles.removeButtonText}>הסר</Text>
                   </TouchableOpacity>
@@ -191,7 +193,9 @@ const MembersModal = ({
                   onPress={handleInvite}
                   disabled={busy}
                   testID="invite_button"
-                  accessibilityLabel="invite_button"
+                  accessibilityLabel="הזמן בני משפחה"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: busy }}
                 >
                   {busy ? (
                     <ActivityIndicator color="#fff" />
@@ -204,7 +208,9 @@ const MembersModal = ({
                   onPress={handleResetCode}
                   disabled={busy}
                   testID="reset_code_button"
-                  accessibilityLabel="reset_code_button"
+                  accessibilityLabel="צור קוד הזמנה חדש"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: busy }}
                 >
                   <Text style={styles.secondaryButtonText}>צור קוד חדש</Text>
                 </TouchableOpacity>
@@ -215,7 +221,9 @@ const MembersModal = ({
                 onPress={handleLeave}
                 disabled={busy}
                 testID="leave_list_button"
-                accessibilityLabel="leave_list_button"
+                accessibilityLabel="עזיבת הרשימה"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busy }}
               >
                 <Text style={styles.dangerButtonText}>עזוב רשימה</Text>
               </TouchableOpacity>
@@ -223,6 +231,8 @@ const MembersModal = ({
             <TouchableOpacity
               style={[styles.modalButton, styles.secondaryButton]}
               onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="סגירה"
             >
               <Text style={styles.secondaryButtonText}>סגור</Text>
             </TouchableOpacity>

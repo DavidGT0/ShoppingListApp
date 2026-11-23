@@ -12,7 +12,12 @@ export const showOfflineBlockedAlert = () =>
 const OfflineBanner = ({ visible }) => {
   if (!visible) return null;
   return (
-    <View style={styles.banner} testID="offline_banner">
+    <View
+      style={styles.banner}
+      testID="offline_banner"
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+    >
       <Text style={styles.text}>{OFFLINE_BANNER_TEXT}</Text>
     </View>
   );

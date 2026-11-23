@@ -63,13 +63,15 @@ const AddItemInput = ({ onAdd, listId, editable = true }) => {
         onChangeText={setName}
         onSubmitEditing={handleAdd}
         testID="add_item_input" // <-- מזהה עבור שדה ההקלדה
-        accessibilityLabel="add_item_input"
+        accessibilityLabel="שם המוצר להוספה"
       />
       <TouchableOpacity
         style={styles.addButton}
         onPress={handleAdd}
         testID="add_item_button" // <-- מזהה עבור כפתור ההוספה
-        accessibilityLabel="add_item_button"
+        accessibilityLabel="הוספת מוצר"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !editable }}
       >
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
@@ -82,7 +84,8 @@ const AddItemInput = ({ onAdd, listId, editable = true }) => {
               style={styles.chip}
               onPress={() => handleChip(chip)}
               testID={`suggestion_chip_${index}`}
-              accessibilityLabel={chip}
+              accessibilityLabel={`הוסף ${chip}`}
+              accessibilityRole="button"
             >
               <Text style={styles.chipText}>{chip}</Text>
             </TouchableOpacity>

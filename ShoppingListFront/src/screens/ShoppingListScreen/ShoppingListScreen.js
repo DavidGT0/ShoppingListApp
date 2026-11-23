@@ -822,6 +822,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
             style={styles.backButton}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="חזרה לרשימות"
           >
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
@@ -834,7 +836,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
             style={styles.membersButton}
             activeOpacity={0.8}
             testID="members_button"
-            accessibilityLabel="members_button"
+            accessibilityLabel="משתתפים ברשימה"
+            accessibilityRole="button"
           >
             <Icon
               name="account-group"
@@ -873,6 +876,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       <TouchableOpacity
         testID="sort_mode_toggle"
         accessibilityLabel="מיון: ידני או לפי מחלקות"
+        accessibilityRole="button"
         style={styles.sortToggle}
         onPress={toggleSortMode}
         activeOpacity={0.8}

@@ -20,7 +20,8 @@ const ListActionsMenu = ({
       style={styles.option}
       onPress={() => handler(list)}
       testID={testID}
-      accessibilityLabel={testID}
+      accessibilityLabel={label}
+      accessibilityRole="button"
     >
       <Text style={[styles.optionText, destructive && styles.destructiveText]}>
         {label}
@@ -40,6 +41,8 @@ const ListActionsMenu = ({
         activeOpacity={1}
         onPress={onClose}
         testID="list_menu_overlay"
+        accessibilityRole="button"
+        accessibilityLabel="סגור תפריט"
       >
         <View style={styles.sheet}>
           <Text style={styles.title} numberOfLines={1}>
