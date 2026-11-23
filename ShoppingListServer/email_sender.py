@@ -19,7 +19,7 @@ def send_email(to: str, subject: str, html: str) -> bool:
     """שולח מייל. מחזיר True אם נשלח; False אם לא מוגדר מפתח או שהשליחה נכשלה (בלי לקרוס)."""
     api_key = os.getenv("RESEND_API_KEY")
     if not api_key:
-        logger.warning("RESEND_API_KEY is not set - email to %s was not sent", to)
+        logger.warning("RESEND_API_KEY is not set - email was not sent")
         return False
 
     payload = {
@@ -38,5 +38,5 @@ def send_email(to: str, subject: str, html: str) -> bool:
         with urllib.request.urlopen(request, timeout=10) as response:
             return 200 <= response.status < 300
     except Exception:
-        logger.exception("Failed to send email to %s", to)
+        logger.exception("Failed to send email")
         return False
