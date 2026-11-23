@@ -122,7 +122,7 @@ describe('AddItemInput suggestions', () => {
         byId(tree, 'suggestion_chip_0').map(n => n.props.accessibilityLabel),
       ),
     ];
-    expect(labels).toEqual(['חלבה']);
+    expect(labels).toEqual(['הוסף חלבה']);
     expect(chipIds(tree)).toEqual(['suggestion_chip_0']);
   });
 });

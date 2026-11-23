@@ -49,7 +49,8 @@ const PurchasedItemsSection = ({
           style={styles.actionButton}
           onPress={confirmRestore}
           testID="restore_all_button"
-          accessibilityLabel="restore_all_button"
+          accessibilityLabel="החזרת כל המוצרים שנקנו לרשימה"
+          accessibilityRole="button"
         >
           <Text style={styles.actionText}>החזר הכל לרשימה</Text>
         </TouchableOpacity>
@@ -57,7 +58,8 @@ const PurchasedItemsSection = ({
           style={styles.actionButton}
           onPress={confirmClear}
           testID="clear_purchased_button"
-          accessibilityLabel="clear_purchased_button"
+          accessibilityLabel="מחיקת כל המוצרים שנקנו"
+          accessibilityRole="button"
         >
           <Text style={[styles.actionText, styles.actionTextDanger]}>
             מחק את מה שנקנה

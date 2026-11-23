@@ -69,7 +69,7 @@ export const styles = StyleSheet.create({
   },
   chipActive: {
     borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary,
   },
   chipNew: {
     borderStyle: 'dashed',

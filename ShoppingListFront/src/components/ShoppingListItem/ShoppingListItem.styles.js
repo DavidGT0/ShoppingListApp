@@ -26,7 +26,7 @@ export const styles = StyleSheet.create({
     // הוסרה השקיפות (opacity) שהייתה כאן!
   },
   activeItem: {
-    backgroundColor: colors.surfaceHighlight || '#f0f4f8',
+    backgroundColor: colors.surfaceHighlight,
     borderColor: colors.primary,
     elevation: 10,
     shadowOpacity: 0.2,
@@ -117,9 +117,9 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
   },
   swipeActionPurchase: {
-    backgroundColor: colors.success || '#22c55e',
+    backgroundColor: colors.success,
   },
   swipeActionDelete: {
-    backgroundColor: colors.danger || '#ef4444',
+    backgroundColor: colors.danger,
   },
 });

@@ -127,3 +127,18 @@ describe('LoginScreen - registration password length', () => {
     alertSpy.mockRestore();
   });
 });
+
+describe('LoginScreen - branding', () => {
+  test('shows the logo image, brand title and subtitle, without the cart emoji', async () => {
+    const { tree, byTestId } = await renderLogin();
+    const logo = byTestId('login_logo');
+    expect(logo).toBeDefined();
+    expect(logo.props.resizeMode).toBe('contain');
+    const texts = tree.root
+      .findAll(n => typeof n.props.children === 'string')
+      .map(n => n.props.children);
+    expect(texts).toContain('ShopLi');
+    expect(texts).toContain('רשימת הקניות המשפחתית');
+    expect(texts.some(t => t.includes('🛒'))).toBe(false);
+  });
+});

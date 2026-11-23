@@ -137,19 +137,21 @@ export const styles = StyleSheet.create({
   },
   listCardContent: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cardIcon: {
+    opacity: 0.9,
   },
   listNameText: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text.primary,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
+    flexShrink: 1,
   },
   sharedBadge: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -162,11 +164,6 @@ export const styles = StyleSheet.create({
   actionIconBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-  },
-  menuIcon: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: colors.text.secondary,
   },
   emptyText: {
     textAlign: 'center',

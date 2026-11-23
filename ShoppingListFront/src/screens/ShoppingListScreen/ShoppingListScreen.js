@@ -47,6 +47,7 @@ import {
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
 // כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
@@ -821,6 +822,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
             style={styles.backButton}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="חזרה לרשימות"
           >
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
@@ -833,9 +836,19 @@ const ShoppingListScreen = ({ route, navigation }) => {
             style={styles.membersButton}
             activeOpacity={0.8}
             testID="members_button"
-            accessibilityLabel="members_button"
+            accessibilityLabel="משתתפים ברשימה"
+            accessibilityValue={
+              memberCount !== null
+                ? { text: `${memberCount} משתתפים` }
+                : undefined
+            }
+            accessibilityRole="button"
           >
-            <Text style={styles.membersButtonText}>👥</Text>
+            <Icon
+              name="account-group"
+              size={22}
+              color={colors.text.inverse}
+            />
             {memberCount !== null && (
               <Text style={styles.membersButtonText}>{memberCount}</Text>
             )}
@@ -867,7 +880,9 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       <TouchableOpacity
         testID="sort_mode_toggle"
-        accessibilityLabel="מיון: ידני או לפי מחלקות"
+        accessibilityLabel={`מיון: ${categoryMode ? 'לפי מחלקות' : 'סדר ידני'}`}
+        accessibilityHint="לחיצה כפולה להחלפת מצב המיון"
+        accessibilityRole="button"
         style={styles.sortToggle}
         onPress={toggleSortMode}
         activeOpacity={0.8}

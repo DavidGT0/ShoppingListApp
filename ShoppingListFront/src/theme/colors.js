@@ -3,14 +3,17 @@
   background: '#F8F9FA',
   surface: '#FFFFFF',
   surfaceHover: '#F1F3F5',
+  surfaceHighlight: '#F0F4F8',
 
   // צבעים עיקריים
-  primary: '#5B8DEE',
-  primaryLight: '#7BA5F4',
-  primaryDark: '#4A7BCF',
+  primary: '#1E6FE8',
+  primaryLight: '#4C8DF0',
+  primaryDark: '#1557BF',
+  secondary: '#1FC9A3',
+  navy: '#0F172A',
 
   // צבעי סטטוס
-  success: '#4CAF50',
+  success: '#1FC9A3',
   successLight: '#81C784',
   danger: '#F44336',
   dangerLight: '#EF5350',

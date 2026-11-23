@@ -37,7 +37,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center', // מרכוז אופקי של החץ בתוך הכפתור
   },
   backButtonText: {
-    color: '#FFFFFF',
+    color: colors.text.inverse,
     fontSize: 28, // הגדלנו את החץ
     fontWeight: 'bold',
     textAlign: 'center',
@@ -53,7 +53,7 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
   },
   membersButtonText: {
-    color: '#FFFFFF',
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -223,7 +223,7 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tipContainer: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 14,
     marginHorizontal: 16,
@@ -235,7 +235,7 @@ export const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.navy,
     marginBottom: 4,
     textAlign: 'right',
   },

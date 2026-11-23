@@ -135,6 +135,9 @@ const EditItemModal = ({
           setTouched(true);
         }}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={`מחלקה ${label}`}
+        accessibilityState={{ selected: active }}
         {...extra}
       >
         {color ? (
@@ -199,6 +202,8 @@ const EditItemModal = ({
                 )}
                 <TouchableOpacity
                   testID="category_chip_new"
+                  accessibilityRole="button"
+                  accessibilityLabel="הוספת מחלקה חדשה"
                   style={[styles.chip, styles.chipNew]}
                   onPress={() => setAdding(true)}
                   activeOpacity={0.8}
@@ -219,6 +224,8 @@ const EditItemModal = ({
                   />
                   <TouchableOpacity
                     testID="new_category_save"
+                    accessibilityRole="button"
+                    accessibilityLabel="שמירת מחלקה חדשה"
                     style={[styles.modalButton, styles.saveButton]}
                     onPress={handleCreate}
                   >
@@ -236,6 +243,9 @@ const EditItemModal = ({
                   <TouchableOpacity
                     key={u || 'none'}
                     testID={`unit_chip_${u || 'none'}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={u ? `יחידה ${u}` : 'ללא יחידה'}
+                    accessibilityState={{ selected: active }}
                     style={[styles.chip, active && styles.chipActive]}
                     onPress={() => {
                       setUnit(u);
@@ -270,11 +280,15 @@ const EditItemModal = ({
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={onClose}
+                accessibilityRole="button"
+                accessibilityLabel="ביטול"
               >
                 <Text style={styles.cancelButtonText}>ביטול</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 testID="edit_save_button"
+                accessibilityRole="button"
+                accessibilityLabel="שמירת השינויים"
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={() =>
                   onSave({

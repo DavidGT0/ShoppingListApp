@@ -69,6 +69,11 @@ const ShoppingListItem = ({
     return (
       <TouchableOpacity
         style={[styles.swipeAction, styles.swipeActionPurchase]}
+        accessibilityRole="button"
+        accessibilityLabel={
+          item.purchased ? `החזר ${item.name} לרשימה` : `סמן ${item.name} כנקנה`
+        }
+        accessibilityHint={disabled ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
         onPress={() => {
           swipeableRef.current?.close();
           onTogglePurchased();
@@ -83,6 +88,9 @@ const ShoppingListItem = ({
     return (
       <TouchableOpacity
         style={[styles.swipeAction, styles.swipeActionDelete]}
+        accessibilityRole="button"
+        accessibilityLabel={`מחק את ${item.name}`}
+        accessibilityHint={disabled ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
         onPress={() => {
           swipeableRef.current?.close();
           onDelete();
@@ -114,7 +122,12 @@ const ShoppingListItem = ({
       friction={2}
       enabled={!isActive && !disabled}
     >
-      <Pressable onPressIn={handleCardPressIn} onPressOut={handleCardPressOut}>
+      <Pressable
+        onPressIn={handleCardPressIn}
+        onPressOut={handleCardPressOut}
+        accessible={false}
+        accessibilityRole="none"
+      >
         <Animated.View
           style={[
             styles.container,
@@ -139,6 +152,10 @@ const ShoppingListItem = ({
               delayLongPress={150}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.dragHandle}
+              accessibilityRole="button"
+              accessibilityLabel="גרור לסידור מחדש"
+              accessibilityState={{ disabled: !!isActive }}
+              accessibilityHint="לחיצה כפולה והחזקה כדי לגרור"
             >
               <Icon
                 name="drag-vertical"
@@ -149,7 +166,21 @@ const ShoppingListItem = ({
             </GHTouchableOpacity>
           )}
 
-          <View style={styles.nameContainer}>
+          <View
+            style={styles.nameContainer}
+            accessible
+            accessibilityRole="checkbox"
+            accessibilityLabel={[
+              item.name,
+              item.note,
+              showAdder ? `נוסף ע״י ${item.added_by}` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            accessibilityState={{ checked: !!item.purchased }}
+            accessibilityActions={[{ name: 'activate' }]}
+            onAccessibilityAction={() => onTogglePurchased()}
+          >
             <View
               onLayout={e => setNameWidth(e.nativeEvent.layout.width)}
               style={styles.nameInner}
@@ -199,6 +230,10 @@ const ShoppingListItem = ({
                 borderless: true,
               }}
               disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel="הפחת כמות"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(Math.max(1, item.amount - 1))}
             >
               <Icon name="minus" size={16} color={colors.primary} />
@@ -214,6 +249,10 @@ const ShoppingListItem = ({
                 borderless: true,
               }}
               disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel="הוסף כמות"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(item.amount + 1)}
             >
               <Icon name="plus" size={16} color={colors.primary} />
@@ -222,6 +261,8 @@ const ShoppingListItem = ({
 
           <Pressable
             onPress={onEdit}
+            accessibilityRole="button"
+            accessibilityLabel={`ערוך את ${item.name}`}
             style={styles.actionButton}
             android_ripple={{
               color: colors.borderLight,

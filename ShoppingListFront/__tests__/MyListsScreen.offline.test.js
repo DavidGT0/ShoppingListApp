@@ -175,6 +175,22 @@ describe('view-only while offline', () => {
     expect(byTestId('menu_duplicate')).toBeUndefined();
   });
 
+  // דרך רכיב ה-host: accessibilityState.disabled היה חוסם את הלחיצה האמיתית
+  test('the menu and create buttons answer a real press with the alert', async () => {
+    await goOffline();
+    const host = id =>
+      tree.root.find(n => typeof n.type === 'string' && n.props.testID === id);
+    const menu = host('list_menu_1');
+    expect(menu.props.onStartShouldSetResponder()).toBe(true);
+    await act(async () => menu.props.onClick({ stopPropagation: () => {} }));
+    expectBlocked();
+    alertSpy.mockClear();
+    const create = host('create_list_button');
+    expect(create.props.onStartShouldSetResponder()).toBe(true);
+    await act(async () => create.props.onClick({ stopPropagation: () => {} }));
+    expectBlocked();
+  });
+
   test('join shows the alert and does not open the modal', async () => {
     await goOffline();
     await act(async () => byTestId('join_list_link').props.onPress());

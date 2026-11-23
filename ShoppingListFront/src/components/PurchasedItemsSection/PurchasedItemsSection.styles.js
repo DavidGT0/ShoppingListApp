@@ -33,6 +33,6 @@ export const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   actionTextDanger: {
-    color: '#c0392b',
+    color: colors.danger,
   },
 });

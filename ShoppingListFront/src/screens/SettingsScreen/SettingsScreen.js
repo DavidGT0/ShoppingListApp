@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { styles } from './SettingsScreen.styles';
 import {
   logout,
@@ -18,6 +19,7 @@ import {
 import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
 const SettingsScreen = ({ onLogout }) => {
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
 
   // States עבור שינוי סיסמה
@@ -134,7 +136,10 @@ const SettingsScreen = ({ onLogout }) => {
   return (
     <ScrollView style={styles.container}>
       {/* ההגדרות הן לשונית בתפריט התחתון - אין צורך בכפתור "חזור" */}
-      <View style={styles.header}>
+      <View
+        style={[styles.header, { paddingTop: insets.top + 24 }]}
+        testID="settings_header"
+      >
         <Text style={styles.title}>הגדרות</Text>
       </View>
 
@@ -160,6 +165,7 @@ const SettingsScreen = ({ onLogout }) => {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => setShowPasswordForm(true)}
+            accessibilityRole="button"
           >
             <Text style={styles.actionButtonText}>שנה סיסמה</Text>
           </TouchableOpacity>
@@ -195,6 +201,8 @@ const SettingsScreen = ({ onLogout }) => {
                 style={styles.saveButton}
                 onPress={handleSubmitPasswordChange}
                 disabled={isChangingPassword}
+                accessibilityRole="button"
+                accessibilityLabel="שמירת הסיסמה"
               >
                 {isChangingPassword ? (
                   <ActivityIndicator color="#fff" size="small" />
@@ -212,6 +220,8 @@ const SettingsScreen = ({ onLogout }) => {
                   setConfirmPassword('');
                 }}
                 disabled={isChangingPassword}
+                accessibilityRole="button"
+                accessibilityLabel="ביטול שינוי הסיסמה"
               >
                 <Text style={styles.cancelButtonText}>ביטול</Text>
               </TouchableOpacity>
@@ -220,7 +230,11 @@ const SettingsScreen = ({ onLogout }) => {
         )}
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        accessibilityRole="button"
+      >
         <Text style={styles.logoutButtonText}>התנתק</Text>
       </TouchableOpacity>
 
@@ -237,7 +251,8 @@ const SettingsScreen = ({ onLogout }) => {
             style={styles.deleteAccountButton}
             onPress={() => setShowDeleteForm(true)}
             testID="delete_account_button"
-            accessibilityLabel="delete_account_button"
+            accessibilityLabel="מחיקת החשבון שלי"
+            accessibilityRole="button"
           >
             <Text style={styles.deleteAccountButtonText}>מחק את החשבון שלי</Text>
           </TouchableOpacity>
@@ -251,13 +266,15 @@ const SettingsScreen = ({ onLogout }) => {
               value={deletePassword}
               onChangeText={setDeletePassword}
               testID="delete_account_password"
-              accessibilityLabel="delete_account_password"
+              accessibilityLabel="סיסמה לאישור מחיקת החשבון"
             />
             <View style={styles.formButtonsRow}>
               <TouchableOpacity
                 style={styles.deleteConfirmButton}
                 onPress={handleDeleteAccount}
                 disabled={isDeleting}
+                accessibilityRole="button"
+                accessibilityLabel="מחיקת החשבון לצמיתות"
               >
                 {isDeleting ? (
                   <ActivityIndicator color="#fff" size="small" />
@@ -269,6 +286,8 @@ const SettingsScreen = ({ onLogout }) => {
                 style={styles.cancelButton}
                 onPress={closeDeleteForm}
                 disabled={isDeleting}
+                accessibilityRole="button"
+                accessibilityLabel="ביטול מחיקת החשבון"
               >
                 <Text style={styles.cancelButtonText}>ביטול</Text>
               </TouchableOpacity>

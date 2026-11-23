@@ -7,16 +7,24 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: 20,
   },
+  // אותה כותרת כחולה ומעוגלת כמו במסכי הרשימות (פורשת על כל רוחב המסך)
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: colors.primary,
+    marginHorizontal: -20,
+    marginTop: -20,
     marginBottom: 30,
-    marginTop: 10,
+    paddingTop: 40,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
   userSection: {
     backgroundColor: colors.surface,

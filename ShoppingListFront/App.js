@@ -4,7 +4,6 @@ import {
   useColorScheme,
   ActivityIndicator,
   View,
-  Text,
   Alert,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -21,6 +20,7 @@ import LoginScreen from './src/screens/LoginScreen/LoginScreen';
 
 import { isAuthenticated } from './src/services/auth';
 import { setSessionExpiredHandler, wakeUpServer } from './src/services/http';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors } from './src/theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -66,10 +66,9 @@ function MainTabNavigator({ onLogout }) {
         component={ListsStackNavigator}
         options={{
           tabBarLabel: 'הדף הראשי',
-          tabBarIcon: ({ color }) => (
-            <View style={{ opacity: color === colors.primary ? 1 : 0.6 }}>
-              <Text style={{ fontSize: 20 }}>📋</Text>
-            </View>
+          tabBarAccessibilityLabel: 'הדף הראשי',
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="format-list-checks" color={color} size={size ?? 22} />
           ),
         }}
       />
@@ -77,10 +76,9 @@ function MainTabNavigator({ onLogout }) {
         name="Settings"
         options={{
           tabBarLabel: 'הגדרות',
-          tabBarIcon: ({ color }) => (
-            <View style={{ opacity: color === colors.primary ? 1 : 0.6 }}>
-              <Text style={{ fontSize: 20 }}>⚙️</Text>
-            </View>
+          tabBarAccessibilityLabel: 'הגדרות',
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="cog" color={color} size={size ?? 22} />
           ),
         }}
       >

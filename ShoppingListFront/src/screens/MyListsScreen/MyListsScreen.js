@@ -34,6 +34,7 @@ import {
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './MyListsScreen.styles';
 import { colors } from '../../theme/colors';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const MyListsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -341,14 +342,16 @@ const MyListsScreen = ({ navigation }) => {
           onChangeText={setNewListName}
           placeholderTextColor={colors.text.secondary}
           testID="new_list_input" // <-- מזהה לשדה יצירת רשימה
-          accessibilityLabel="new_list_input"
+          accessibilityLabel="שם הרשימה החדשה"
         />
         <TouchableOpacity
           style={styles.createButton}
           onPress={handleCreateList}
           activeOpacity={0.85}
           testID="create_list_button" // <-- מזהה לכפתור יצירת רשימה
-          accessibilityLabel="create_list_button"
+          accessibilityLabel="יצירת רשימה"
+          accessibilityRole="button"
+          accessibilityHint={isOffline ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
         >
           <Text style={styles.createButtonText}>+</Text>
         </TouchableOpacity>
@@ -363,7 +366,8 @@ const MyListsScreen = ({ navigation }) => {
           setJoinModalVisible(true);
         }}
         testID="join_list_link"
-        accessibilityLabel="join_list_link"
+        accessibilityLabel="הצטרפות לרשימה עם קוד הזמנה"
+        accessibilityRole="button"
       >
         <Text style={styles.joinLinkText}>יש לך קוד הזמנה? הצטרפות לרשימה</Text>
       </TouchableOpacity>
@@ -396,8 +400,15 @@ const MyListsScreen = ({ navigation }) => {
                 })
               }
               testID="list_card" // <-- מזהה לכרטיס רשימה כדי ללחוץ עליה
-              accessibilityLabel="list_card"
+              accessibilityLabel={`רשימה ${item.name}`}
+              accessibilityRole="button"
             >
+              <Icon
+                name="cart-outline"
+                size={22}
+                color={colors.primary}
+                style={styles.cardIcon}
+              />
               <Text style={styles.listNameText}>{item.name}</Text>
             </TouchableOpacity>
 
@@ -414,9 +425,16 @@ const MyListsScreen = ({ navigation }) => {
               }}
               style={styles.actionIconBtn}
               testID={`list_menu_${item.id}`}
-              accessibilityLabel="list_menu_button"
+              accessibilityLabel={`פעולות לרשימה ${item.name}`}
+              accessibilityRole="button"
+              accessibilityHint={isOffline ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={styles.menuIcon}>⋮</Text>
+              <Icon
+                name="dots-vertical"
+                size={24}
+                color={colors.text.secondary}
+              />
             </TouchableOpacity>
           </View>
         )}
@@ -469,6 +487,8 @@ const MyListsScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setRenameModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="ביטול"
               >
                 <Text style={styles.cancelButtonText}>ביטול</Text>
               </TouchableOpacity>
@@ -476,6 +496,8 @@ const MyListsScreen = ({ navigation }) => {
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={handleRenameList}
                 testID="rename_save_button"
+                accessibilityRole="button"
+                accessibilityLabel="שמירת השם החדש"
               >
                 <Text style={styles.saveButtonText}>שמור</Text>
               </TouchableOpacity>

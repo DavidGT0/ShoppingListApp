@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { styles } from './LoginScreen.styles';
 import { colors } from '../../theme/colors';
@@ -113,9 +114,14 @@ const LoginScreen = ({ onLoginSuccess }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.logoContainer}>
-          <Text style={styles.logoEmoji}>🛒</Text>
-          <Text style={styles.logoText}>רשימת הקניות שלי</Text>
-          <Text style={styles.subtitle}>נהל את הקניות בצורה חכמה</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+            testID="login_logo"
+          />
+          <Text style={styles.logoText}>ShopLi</Text>
+          <Text style={styles.subtitle}>רשימת הקניות המשפחתית</Text>
         </View>
 
         <View style={styles.formContainer}>
@@ -131,7 +137,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
               autoCapitalize="none"
               autoCorrect={false}
               testID="username_input" // <-- נוסף מזהה
-              accessibilityLabel="username_input"
+              accessibilityLabel="שם משתמש"
             />
           </View>
 
@@ -147,7 +153,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
                 keyboardType="email-address"
                 autoCorrect={false}
                 testID="email_input" // <-- נוסף מזהה
-                accessibilityLabel="email_input"
+                accessibilityLabel="כתובת אימייל"
               />
             </View>
           )}
@@ -163,7 +169,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
               autoCapitalize="none"
               autoCorrect={false}
               testID="password_input" // <-- נוסף מזהה
-              accessibilityLabel="password_input"
+              accessibilityLabel="סיסמה"
             />
           </View>
 
@@ -172,7 +178,9 @@ const LoginScreen = ({ onLoginSuccess }) => {
             onPress={handleSubmit}
             disabled={loading}
             testID="login_button" // <-- נוסף מזהה
-            accessibilityLabel="login_button"
+            accessibilityLabel={isLogin ? 'כפתור התחברות' : 'כפתור הרשמה'}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: loading, busy: loading }}
           >
             {loading ? (
               <ActivityIndicator color={colors.text.inverse} />
@@ -194,7 +202,8 @@ const LoginScreen = ({ onLoginSuccess }) => {
               style={styles.forgotButton}
               onPress={() => setShowForgot(true)}
               testID="forgot_password_link"
-              accessibilityLabel="forgot_password_link"
+              accessibilityLabel="שכחתי סיסמה"
+              accessibilityRole="button"
             >
               <Text style={styles.forgotButtonText}>שכחתי סיסמה</Text>
             </TouchableOpacity>
@@ -204,6 +213,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             style={styles.switchButton}
             onPress={() => setIsLogin(!isLogin)}
             testID="switch_mode_button" // <-- נוסף מזהה
+            accessibilityRole="button"
           >
             <Text style={styles.switchButtonText}>
               {isLogin
@@ -241,13 +251,15 @@ const LoginScreen = ({ onLoginSuccess }) => {
               autoCorrect={false}
               autoFocus
               testID="forgot_email_input"
-              accessibilityLabel="forgot_email_input"
+              accessibilityLabel="כתובת אימייל לאיפוס סיסמה"
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalCancelButton]}
                 onPress={closeForgot}
                 disabled={sendingReset}
+                accessibilityRole="button"
+                accessibilityLabel="ביטול"
               >
                 <Text style={styles.modalCancelText}>ביטול</Text>
               </TouchableOpacity>
@@ -256,7 +268,9 @@ const LoginScreen = ({ onLoginSuccess }) => {
                 onPress={handleSendReset}
                 disabled={sendingReset}
                 testID="forgot_send_button"
-                accessibilityLabel="forgot_send_button"
+                accessibilityLabel="שליחת קישור לאיפוס סיסמה"
+                accessibilityRole="button"
+                accessibilityState={{ disabled: sendingReset, busy: sendingReset }}
               >
                 {sendingReset ? (
                   <ActivityIndicator color={colors.text.inverse} />

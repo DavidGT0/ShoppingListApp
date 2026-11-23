@@ -352,6 +352,18 @@ test('header shows the member count', async () => {
   expect(countText(tree)).toContain('2');
 });
 
+test('members button shows the account-group icon, not the emoji', async () => {
+  getShoppingList.mockReset();
+  getShoppingList.mockResolvedValue([milk]);
+  getListMembers.mockResolvedValue(TWO_MEMBERS);
+  const tree = await renderScreen();
+  const button = byTestId(tree, 'members_button');
+  expect(button.findAll(n => n.type === 'Icon')[0].props.name).toBe(
+    'account-group',
+  );
+  expect(countText(tree)).not.toContain('👥');
+});
+
 test('closing the dialog reloads the count', async () => {
   getShoppingList.mockReset();
   getShoppingList.mockResolvedValue([milk]);
