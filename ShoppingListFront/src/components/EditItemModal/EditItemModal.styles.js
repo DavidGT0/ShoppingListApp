@@ -79,6 +79,10 @@ export const makeStyles = colors => StyleSheet.create({
     borderRadius: 5,
     marginLeft: 6,
   },
+  chipIcon: {
+    fontSize: 14,
+    marginLeft: 4,
+  },
   chipText: {
     fontSize: 14,
     color: colors.text.primary,

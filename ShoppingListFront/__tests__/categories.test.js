@@ -3,6 +3,8 @@ import {
   BUILTIN_CATEGORIES,
   categorize,
   resolveCategory,
+  orderedDepartments,
+  normalizeCategories,
 } from '../src/services/categories';
 
 const EXAMPLES = {
@@ -138,5 +140,84 @@ describe('resolveCategory', () => {
     expect(order('care')).toBeLessThan(order('custom:4'));
     expect(order('custom:4')).toBeLessThan(order('custom:9'));
     expect(order('custom:9')).toBeLessThan(order('other'));
+  });
+});
+
+describe('department layout', () => {
+  const customs = [
+    { id: 4, name: 'מתנות', color: '#111111', icon: '🎁' },
+    { id: 9, name: 'חיות', color: '#222222' },
+  ];
+  const layout = [
+    { key: 'custom:9', name: 'חיות מחמד', icon: '🐶', position: 0 },
+    { key: 'dairy', name: 'חלבי', icon: '🧀', position: 1 },
+    { key: 'produce', name: null, icon: null, position: 2 },
+    { key: 'other', name: 'שונות', icon: null, position: 3 },
+  ];
+
+  test('every built-in has a default icon', () => {
+    BUILTIN_CATEGORIES.forEach(c => expect(typeof c.icon).toBe('string'));
+    expect(BUILTIN_CATEGORIES.find(c => c.key === 'produce').icon).toBe('🥦');
+  });
+
+  test('a missing layout falls back to the defaults', () => {
+    const list = orderedDepartments(customs);
+    expect(list.map(d => d.key)).toEqual([
+      ...BUILTIN_CATEGORIES.filter(c => c.key !== 'other').map(c => c.key),
+      'custom:4',
+      'custom:9',
+      'other',
+    ]);
+    expect(list.find(d => d.key === 'custom:4').icon).toBe('🎁');
+    expect(list.find(d => d.key === 'custom:9').icon).toBe('🛒');
+    expect(orderedDepartments(customs, [])).toEqual(list);
+    expect(orderedDepartments(undefined, null).length).toBe(11);
+  });
+
+  test('overrides apply to name, icon and order', () => {
+    const list = orderedDepartments(customs, layout);
+    expect(list.slice(0, 3).map(d => d.key)).toEqual([
+      'custom:9',
+      'dairy',
+      'produce',
+    ]);
+    expect(list[0]).toMatchObject({ name: 'חיות מחמד', icon: '🐶' });
+    expect(list[1]).toMatchObject({ name: 'חלבי', icon: '🧀' });
+    expect(list[2]).toMatchObject({ name: 'פירות וירקות', icon: '🥦' });
+    // מחלקות שחסרות בפריסה נוספות בסוף לפי ברירת המחדל, ואחר אחרונה
+    expect(list[3].key).toBe('bakery');
+    expect(list[list.length - 1]).toMatchObject({ key: 'other', name: 'שונות' });
+    expect(list.map(d => d.order)).toEqual(list.map((d, i) => i));
+  });
+
+  test('other stays last and unknown keys are ignored', () => {
+    const list = orderedDepartments(customs, [
+      { key: 'other', position: 0 },
+      { key: 'gone', position: 1 },
+      { key: 'meat', position: 2 },
+    ]);
+    expect(list[0].key).toBe('meat');
+    expect(list[list.length - 1].key).toBe('other');
+    expect(list.some(d => d.key === 'gone')).toBe(false);
+  });
+
+  test('resolveCategory uses the overrides', () => {
+    const r = resolveCategory({ name: 'חלב', category: null }, customs, layout);
+    expect(r).toMatchObject({ key: 'dairy', name: 'חלבי', icon: '🧀', order: 1 });
+    const c = resolveCategory({ name: 'x', category: 'custom:9' }, customs, layout);
+    expect(c).toMatchObject({ name: 'חיות מחמד', icon: '🐶', order: 0 });
+    const plain = resolveCategory({ name: 'חלב', category: null }, customs);
+    expect(plain).toMatchObject({ key: 'dairy', name: 'מוצרי חלב וביצים' });
+    expect(plain.icon).toBe('🥛');
+  });
+
+  test('normalizeCategories accepts the old array and the new shape', () => {
+    expect(normalizeCategories(customs)).toEqual({ custom: customs, layout: [] });
+    expect(normalizeCategories({ custom: customs, layout })).toEqual({
+      custom: customs,
+      layout,
+    });
+    expect(normalizeCategories(null)).toEqual({ custom: [], layout: [] });
+    expect(normalizeCategories({})).toEqual({ custom: [], layout: [] });
   });
 });

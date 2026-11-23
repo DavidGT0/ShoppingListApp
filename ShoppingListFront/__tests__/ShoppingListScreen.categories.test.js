@@ -486,3 +486,58 @@ test('the current username is re-read on focus (after a rename in settings)', as
   await act(async () => global.__focus());
   expect(byId(tree, 'row_2').props.currentUsername).toBe('robert');
 });
+
+const headerTexts = tree =>
+  tree.root
+    .findAll(
+      n =>
+        typeof n.props.testID === 'string' &&
+        n.props.testID.startsWith('category_header_') &&
+        typeof n.type === 'string',
+    )
+    .map(n =>
+      n
+        .findAll(c => c.type === 'Text')
+        .map(c => [].concat(c.props.children).join(''))
+        .join(''),
+    );
+
+const LAYOUT = [
+  { key: 'custom:6', name: 'חיות מחמד', icon: '🐶', position: 0 },
+  { key: 'dairy', name: 'חלבי', icon: '🧀', position: 1 },
+  { key: 'produce', name: null, icon: null, position: 2 },
+];
+
+test('the new {custom, layout} answer drives group order and names', async () => {
+  getListCategories.mockResolvedValue({ custom: customs, layout: LAYOUT });
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  expect(headerKeys(tree)).toEqual(['custom:6', 'dairy', 'produce', 'care', 'other']);
+  expect(headerTexts(tree).slice(0, 2)).toEqual(['חיות מחמד (1)', 'חלבי (1)']);
+  expect(tree.root.findByType(EditItemModal).props.layout).toEqual(LAYOUT);
+  expect(tree.root.findByType(EditItemModal).props.categories).toEqual(customs);
+});
+
+test('an old cached array is read as {custom, layout: []} without crashing', async () => {
+  getListCategories.mockRejectedValue(
+    Object.assign(new Error('network'), { network: true }),
+  );
+  await AsyncStorage.setItem(
+    '@cache_categories_7',
+    JSON.stringify(customs),
+  );
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  expect(headerKeys(tree)).toContain('custom:6');
+  expect(tree.root.findByType(EditItemModal).props.layout).toEqual([]);
+});
+
+test('the live refresh brings a layout saved by another member', async () => {
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  expect(headerKeys(tree)[0]).toBe('produce');
+  getListCategories.mockResolvedValue({ custom: customs, layout: LAYOUT });
+  await act(async () => global.__live.refresh());
+  expect(headerKeys(tree)[0]).toBe('custom:6');
+  expect(headerTexts(tree)[1]).toBe('חלבי (1)');
+});
