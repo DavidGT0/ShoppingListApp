@@ -178,7 +178,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             onPress={handleSubmit}
             disabled={loading}
             testID="login_button" // <-- נוסף מזהה
-            accessibilityLabel="כפתור התחברות"
+            accessibilityLabel={isLogin ? 'כפתור התחברות' : 'כפתור הרשמה'}
             accessibilityRole="button"
             accessibilityState={{ disabled: loading, busy: loading }}
           >

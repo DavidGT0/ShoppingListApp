@@ -351,7 +351,7 @@ const MyListsScreen = ({ navigation }) => {
           testID="create_list_button" // <-- מזהה לכפתור יצירת רשימה
           accessibilityLabel="יצירת רשימה"
           accessibilityRole="button"
-          accessibilityState={{ disabled: isOffline }}
+          accessibilityHint={isOffline ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
         >
           <Text style={styles.createButtonText}>+</Text>
         </TouchableOpacity>
@@ -427,7 +427,8 @@ const MyListsScreen = ({ navigation }) => {
               testID={`list_menu_${item.id}`}
               accessibilityLabel={`פעולות לרשימה ${item.name}`}
               accessibilityRole="button"
-              accessibilityState={{ disabled: isOffline }}
+              accessibilityHint={isOffline ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Icon
                 name="dots-vertical"

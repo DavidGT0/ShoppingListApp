@@ -73,7 +73,7 @@ const ShoppingListItem = ({
         accessibilityLabel={
           item.purchased ? `החזר ${item.name} לרשימה` : `סמן ${item.name} כנקנה`
         }
-        accessibilityState={{ disabled }}
+        accessibilityHint={disabled ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
         onPress={() => {
           swipeableRef.current?.close();
           onTogglePurchased();
@@ -90,7 +90,7 @@ const ShoppingListItem = ({
         style={[styles.swipeAction, styles.swipeActionDelete]}
         accessibilityRole="button"
         accessibilityLabel={`מחק את ${item.name}`}
-        accessibilityState={{ disabled }}
+        accessibilityHint={disabled ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
         onPress={() => {
           swipeableRef.current?.close();
           onDelete();
@@ -154,7 +154,8 @@ const ShoppingListItem = ({
               style={styles.dragHandle}
               accessibilityRole="button"
               accessibilityLabel="גרור לסידור מחדש"
-              accessibilityState={{ disabled: disabled || !!isActive }}
+              accessibilityState={{ disabled: !!isActive }}
+              accessibilityHint="לחיצה כפולה והחזקה כדי לגרור"
             >
               <Icon
                 name="drag-vertical"
@@ -169,12 +170,16 @@ const ShoppingListItem = ({
             style={styles.nameContainer}
             accessible
             accessibilityRole="checkbox"
-            accessibilityLabel={`סמן ${item.name} כנקנה`}
-            accessibilityState={{ checked: !!item.purchased, disabled }}
+            accessibilityLabel={[
+              item.name,
+              item.note,
+              showAdder ? `נוסף ע״י ${item.added_by}` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            accessibilityState={{ checked: !!item.purchased }}
             accessibilityActions={[{ name: 'activate' }]}
-            onAccessibilityAction={() => {
-              if (!disabled) onTogglePurchased();
-            }}
+            onAccessibilityAction={() => onTogglePurchased()}
           >
             <View
               onLayout={e => setNameWidth(e.nativeEvent.layout.width)}
@@ -227,6 +232,7 @@ const ShoppingListItem = ({
               disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel="הפחת כמות"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(Math.max(1, item.amount - 1))}
             >
@@ -245,6 +251,7 @@ const ShoppingListItem = ({
               disabled={disabled}
               accessibilityRole="button"
               accessibilityLabel="הוסף כמות"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(item.amount + 1)}
             >

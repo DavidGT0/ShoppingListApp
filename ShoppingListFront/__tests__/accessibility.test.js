@@ -3,7 +3,7 @@ import React from 'react';
 import fs from 'fs';
 import path from 'path';
 import ReactTestRenderer from 'react-test-renderer';
-import { Alert, Pressable, TouchableOpacity } from 'react-native';
+import { Alert, AccessibilityInfo, Pressable, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import LoginScreen from '../src/screens/LoginScreen/LoginScreen';
@@ -129,6 +129,7 @@ const render = async element => {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
 });
 afterEach(async () => {
   await act(async () => {
@@ -212,17 +213,32 @@ describe('labels, roles and states', () => {
     );
   });
 
-  test('add button exposes disabled when not editable', async () => {
+  test('add button hints it is unavailable when not editable', async () => {
     const off = await render(
       <AddItemInput onAdd={jest.fn()} listId={1} editable={false} />,
     );
-    expect(
-      byTestId(off, 'add_item_button').props.accessibilityState.disabled,
-    ).toBe(true);
+    expect(byTestId(off, 'add_item_button').props.accessibilityHint).toBe(
+      'לא זמין ללא חיבור לאינטרנט',
+    );
     const on = await render(<AddItemInput onAdd={jest.fn()} listId={1} />);
     expect(
-      byTestId(on, 'add_item_button').props.accessibilityState?.disabled,
-    ).toBeFalsy();
+      byTestId(on, 'add_item_button').props.accessibilityHint,
+    ).toBeUndefined();
+  });
+
+  // לוחצים דרך רכיב ה-host (כמו המערכת), לא דרך props.onPress -
+  // accessibilityState.disabled היה מנטרל את הלחיצה בלי שהבדיקות ירגישו
+  test('add button stays pressable through the host element when not editable', async () => {
+    const onAdd = jest.fn();
+    const tree = await render(
+      <AddItemInput onAdd={onAdd} listId={1} editable={false} />,
+    );
+    const host = tree.root.find(
+      n => typeof n.type === 'string' && n.props.testID === 'add_item_button',
+    );
+    expect(host.props.onStartShouldSetResponder()).toBe(true);
+    await act(async () => host.props.onClick({ stopPropagation: () => {} }));
+    expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
   test('list menu button and card', async () => {
@@ -308,7 +324,47 @@ describe('labels, roles and states', () => {
       t.root.findAll(n => n.props.accessibilityRole === 'checkbox')[0];
     expect(box(open).props.accessibilityState.checked).toBe(false);
     expect(box(done).props.accessibilityState.checked).toBe(true);
-    expect(box(open).props.accessibilityLabel).toBe('סמן חלב כנקנה');
+    expect(box(open).props.accessibilityLabel).toBe('חלב');
+  });
+
+  test('checkbox label carries name, note and adder', async () => {
+    const tree = await render(
+      <ShoppingListItem
+        item={{ id: 1, name: 'חלב', note: '3%', added_by: 'dana', amount: 1, purchased: false }}
+        showAddedBy
+        currentUsername="bob"
+        onTogglePurchased={jest.fn()}
+        onEdit={jest.fn()}
+        onDelete={jest.fn()}
+        onUpdateAmount={jest.fn()}
+      />,
+    );
+    const box = tree.root.findAll(n => n.props.accessibilityRole === 'checkbox')[0];
+    expect(box.props.accessibilityLabel).toBe('חלב, 3%, נוסף ע״י dana');
+  });
+
+  test('the checkbox activate action toggles purchased, even when disabled', async () => {
+    const onToggle = jest.fn();
+    const tree = await render(
+      <ShoppingListItem
+        item={{ id: 1, name: 'חלב', amount: 1, purchased: false }}
+        onTogglePurchased={onToggle}
+        onEdit={jest.fn()}
+        onDelete={jest.fn()}
+        onUpdateAmount={jest.fn()}
+        disabled
+      />,
+    );
+    const box = tree.root.findAll(n => n.props.accessibilityRole === 'checkbox')[0];
+    expect(box.props.accessibilityState.disabled).toBeUndefined();
+    await act(async () => box.props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  test('register mode relabels the submit button', async () => {
+    const tree = await render(<LoginScreen onLoginSuccess={jest.fn()} />);
+    await act(async () => byTestId(tree, 'switch_mode_button').props.onPress());
+    expect(byTestId(tree, 'login_button').props.accessibilityLabel).toBe('כפתור הרשמה');
   });
 
   test('item controls are disabled for screen readers when offline', async () => {
@@ -338,6 +394,7 @@ describe('labels, roles and states', () => {
 
   test('offline banner is an alert live region', async () => {
     const tree = await render(<OfflineBanner visible />);
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledTimes(1);
     const banner = byTestId(tree, 'offline_banner');
     expect(banner.props.accessibilityRole).toBe('alert');
     expect(banner.props.accessibilityLiveRegion).toBe('polite');

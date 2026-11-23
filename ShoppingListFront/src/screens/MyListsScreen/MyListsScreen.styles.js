@@ -151,7 +151,7 @@ export const styles = StyleSheet.create({
     flexShrink: 1,
   },
   sharedBadge: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,

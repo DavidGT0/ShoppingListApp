@@ -4,7 +4,6 @@ import {
   useColorScheme,
   ActivityIndicator,
   View,
-  Text,
   Alert,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

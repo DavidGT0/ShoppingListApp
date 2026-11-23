@@ -71,7 +71,7 @@ const AddItemInput = ({ onAdd, listId, editable = true }) => {
         testID="add_item_button" // <-- מזהה עבור כפתור ההוספה
         accessibilityLabel="הוספת מוצר"
         accessibilityRole="button"
-        accessibilityState={{ disabled: !editable }}
+        accessibilityHint={editable ? undefined : 'לא זמין ללא חיבור לאינטרנט'}
       >
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>

@@ -244,7 +244,7 @@ const EditItemModal = ({
                     key={u || 'none'}
                     testID={`unit_chip_${u || 'none'}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`יחידה ${u || 'ללא'}`}
+                    accessibilityLabel={u ? `יחידה ${u}` : 'ללא יחידה'}
                     accessibilityState={{ selected: active }}
                     style={[styles.chip, active && styles.chipActive]}
                     onPress={() => {

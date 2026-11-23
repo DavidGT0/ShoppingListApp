@@ -837,6 +837,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
             activeOpacity={0.8}
             testID="members_button"
             accessibilityLabel="משתתפים ברשימה"
+            accessibilityValue={
+              memberCount !== null
+                ? { text: `${memberCount} משתתפים` }
+                : undefined
+            }
             accessibilityRole="button"
           >
             <Icon
@@ -875,7 +880,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       <TouchableOpacity
         testID="sort_mode_toggle"
-        accessibilityLabel="מיון: ידני או לפי מחלקות"
+        accessibilityLabel={`מיון: ${categoryMode ? 'לפי מחלקות' : 'סדר ידני'}`}
+        accessibilityHint="לחיצה כפולה להחלפת מצב המיון"
         accessibilityRole="button"
         style={styles.sortToggle}
         onPress={toggleSortMode}

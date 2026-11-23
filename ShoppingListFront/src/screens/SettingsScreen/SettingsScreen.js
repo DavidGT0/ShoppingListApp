@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { styles } from './SettingsScreen.styles';
 import {
   logout,
@@ -18,6 +19,7 @@ import {
 import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
 const SettingsScreen = ({ onLogout }) => {
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
 
   // States עבור שינוי סיסמה
@@ -134,7 +136,10 @@ const SettingsScreen = ({ onLogout }) => {
   return (
     <ScrollView style={styles.container}>
       {/* ההגדרות הן לשונית בתפריט התחתון - אין צורך בכפתור "חזור" */}
-      <View style={styles.header} testID="settings_header">
+      <View
+        style={[styles.header, { paddingTop: insets.top + 24 }]}
+        testID="settings_header"
+      >
         <Text style={styles.title}>הגדרות</Text>
       </View>
 

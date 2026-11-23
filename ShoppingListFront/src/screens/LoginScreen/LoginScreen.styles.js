@@ -18,6 +18,7 @@ export const styles = StyleSheet.create({
   logoImage: {
     width: 120,
     height: 120,
+    borderRadius: 24,
     marginBottom: 16,
   },
   logoText: {
