@@ -36,6 +36,8 @@ const EditItemModal = ({
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [creating, setCreating] = useState(false);
+  // בלי נגיעה בצ'יפ המחלקה לא נשלחת, כך שעריכת שם בלבד לא דורסת בחירה ידנית
+  const [touched, setTouched] = useState(false);
 
   // בכל פתיחה של החלון - טוענים מחדש את השם והמחלקה השמורים של המוצר
   // (גם כשפותחים שוב את אותו מוצר אחרי ביטול, כדי שלא יוצג טקסט שלא נשמר)
@@ -43,6 +45,7 @@ const EditItemModal = ({
     if (visible && item) {
       setEditName(item.name);
       setSelected(initialSelection(item, categories));
+      setTouched(false);
       setAdding(false);
       setNewName('');
     }
@@ -57,6 +60,7 @@ const EditItemModal = ({
       const created = await onCreateCategory(name);
       if (created && created.id != null) {
         setSelected(customKey(created.id));
+        setTouched(true);
         setAdding(false);
         setNewName('');
       }
@@ -75,10 +79,13 @@ const EditItemModal = ({
           text: 'מחק',
           style: 'destructive',
           onPress: async () => {
-            await onDeleteCategory?.(category);
-            setSelected(prev =>
-              prev === customKey(category.id) ? null : prev,
-            );
+            const ok = await onDeleteCategory?.(category);
+            // רק אחרי מחיקה מוצלחת הבחירה מתאפסת
+            if (ok) {
+              setSelected(prev =>
+                prev === customKey(category.id) ? null : prev,
+              );
+            }
           },
         },
       ],
@@ -92,7 +99,10 @@ const EditItemModal = ({
         key={id}
         testID={`category_chip_${id}`}
         style={[styles.chip, active && styles.chipActive]}
-        onPress={() => setSelected(value)}
+        onPress={() => {
+          setSelected(value);
+          setTouched(true);
+        }}
         activeOpacity={0.8}
         {...extra}
       >
@@ -176,7 +186,12 @@ const EditItemModal = ({
             <TouchableOpacity
               testID="edit_save_button"
               style={[styles.modalButton, styles.saveButton]}
-              onPress={() => onSave({ name: editName, category: selected })}
+              onPress={() =>
+                onSave({
+                  name: editName,
+                  category: touched ? selected : undefined,
+                })
+              }
             >
               <Text style={styles.saveButtonText}>שמור</Text>
             </TouchableOpacity>

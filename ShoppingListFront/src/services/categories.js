@@ -67,6 +67,7 @@ const KEYWORDS = {
     'שמנת',
     'חמאה',
     'ביצים',
+    'ביצי',
     'ביצה',
     'לבן',
     'לאבנה',
@@ -146,6 +147,8 @@ const KEYWORDS = {
     'חומוס',
     'טחינה',
     'שימורים',
+    'זיתים',
+    'אפונה',
     'טונה',
     'תירס',
     'עדשים',
@@ -173,6 +176,7 @@ const KEYWORDS = {
     'קפואה',
     'גלידה',
     'פיצה קפואה',
+    'פיצה',
     'ירקות קפואים',
     'שלגון',
     'בצק עלים',
@@ -269,6 +273,9 @@ const KEYWORDS = {
     'דאודורנט',
     'חיתולים',
     'מגבונים לחים',
+    'מגבונים',
+    'טישו',
+    'סבון ידיים',
     'קרם',
     'קרם ידיים',
     'גילוח',
@@ -289,17 +296,24 @@ const KEYWORDS = {
 
 const PREFIXES = ['ה', 'ו', 'ב', 'ל', 'מ', 'כ', 'ש', 'וה', 'לה', 'מה', 'בה'];
 
+const FINAL_FOLD = { ך: 'כ', ם: 'מ', ן: 'נ', ף: 'פ', ץ: 'צ' };
+
 const normalize = text =>
   String(text || '')
     .toLowerCase()
     .replace(/["'״׳]/g, '')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    // אותיות סופיות לצורה רגילה, כדי שגזירת ריבוי (מלפפונים -> מלפפונ) תתאים למילת המפתח
+    .replace(/[ךםןףץ]/g, ch => FINAL_FOLD[ch]);
 
-// מילון מוכן: [{kw, key}] כשהמילים מנורמלות
-const ENTRIES = Object.entries(KEYWORDS).flatMap(([key, words]) =>
-  words.map(word => ({ kw: normalize(word), key })),
+// מילון מוכן פעם אחת: [{kw, words, key}] כשהמילים מנורמלות
+const ENTRIES = Object.entries(KEYWORDS).flatMap(([key, list]) =>
+  list.map(word => {
+    const kw = normalize(word);
+    return { kw, words: kw.split(' '), key };
+  }),
 );
 
 // מילה במוצר מתאימה למילת מפתח: זהה, או מתחילה בה (ריבוי/סיומת), גם אחרי תחילית כמו ה/ב/ל.
@@ -309,7 +323,7 @@ const tokenMatches = (token, kw) => {
   // ריבוי: בננות -> בננה, פיתות -> פיתה, ביצים -> ביצ
   if (token.endsWith('ות')) {
     bases.push(token.slice(0, -2) + 'ה', token.slice(0, -2));
-  } else if (token.endsWith('ים')) {
+  } else if (token.endsWith('ימ')) {
     bases.push(token.slice(0, -2));
   }
   const candidates = bases.flatMap(base => [
@@ -324,13 +338,17 @@ const tokenMatches = (token, kw) => {
 // ההתאמה הארוכה גוברת. מילה ראשונה בשם היא לרוב העיקר (מיץ תפוזים), לכן מקבלת בונוס
 const FIRST_WORD_BONUS = 3;
 
-export const categorize = name => {
+const cache = new Map();
+const CACHE_LIMIT = 2000;
+
+const computeCategory = name => {
   const text = normalize(name);
   if (!text) return 'other';
   const tokens = text.split(' ');
+  // מילה שמתחילה ב"קפוא" גוברת: ברוקולי קפוא הוא קפוא ולא ירק
+  if (tokens.some(t => t.startsWith('קפוא'))) return 'frozen';
   let best = null;
-  for (const { kw, key } of ENTRIES) {
-    const words = kw.split(' ');
+  for (const { kw, words, key } of ENTRIES) {
     let score = 0;
     for (let i = 0; i + words.length <= tokens.length; i++) {
       if (words.every((w, j) => tokenMatches(tokens[i + j], w))) {
@@ -343,6 +361,18 @@ export const categorize = name => {
     }
   }
   return best ? best.key : 'other';
+};
+
+// זיכרון לפי השם המנורמל - המסך מציג מחדש לעתים קרובות
+export const categorize = name => {
+  const text = normalize(name);
+  let key = cache.get(text);
+  if (key === undefined) {
+    key = computeCategory(text);
+    if (cache.size >= CACHE_LIMIT) cache.clear();
+    cache.set(text, key);
+  }
+  return key;
 };
 
 const OTHER_ORDER = 1000;

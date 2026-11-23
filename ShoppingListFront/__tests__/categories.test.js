@@ -39,6 +39,35 @@ describe('categorize', () => {
     expect(categorize('דג')).toBe('meat');
   });
 
+  test('plurals of keywords that end in a final letter', () => {
+    expect(categorize('מלפפונים')).toBe('produce');
+    expect(categorize('לימונים')).toBe('produce');
+    expect(categorize('שזיפים')).toBe('produce');
+    expect(categorize('עופות')).toBe('meat');
+    expect(categorize('מיצים')).toBe('drinks');
+  });
+
+  test('a frozen word wins over the first-word bonus', () => {
+    expect(categorize('ברוקולי קפוא')).toBe('frozen');
+    expect(categorize('תירס קפוא')).toBe('frozen');
+  });
+
+  test('construct form and newly added words', () => {
+    expect(categorize('ביצי חופש')).toBe('dairy');
+    expect(categorize('פיצה')).toBe('frozen');
+    expect(categorize('זיתים')).toBe('pantry');
+    expect(categorize('אפונה')).toBe('pantry');
+    expect(categorize('סבון ידיים')).toBe('care');
+    expect(categorize('מגבונים')).toBe('care');
+    expect(categorize('טישו')).toBe('care');
+  });
+
+  test('repeated calls give the same answer (memoized)', () => {
+    expect(categorize('חלב')).toBe('dairy');
+    expect(categorize('חלב')).toBe('dairy');
+    expect(categorize('  חלב ')).toBe('dairy');
+  });
+
   test('defaults to other', () => {
     expect(categorize('משהו לא מוכר')).toBe('other');
     expect(categorize('')).toBe('other');

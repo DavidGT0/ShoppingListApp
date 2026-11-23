@@ -56,23 +56,60 @@ test('"אוטומטי" sends category null', async () => {
   expect(props.onSave).toHaveBeenCalledWith({ name: 'חלב', category: null });
 });
 
-test('opens with the current manual category selected', async () => {
+test('opens with the current manual category selected and is not resent', async () => {
   const { props, byId } = await setup({
     item: { id: 1, name: 'חלב', category: 'custom:5' },
   });
   await act(async () => byId('edit_save_button').props.onPress());
   expect(props.onSave).toHaveBeenCalledWith({
     name: 'חלב',
-    category: 'custom:5',
+    category: undefined,
   });
 });
 
-test('a dangling custom reference opens as automatic', async () => {
+test('a dangling custom reference opens as automatic but is not sent unless touched', async () => {
   const { props, byId } = await setup({
     item: { id: 1, name: 'חלב', category: 'custom:99' },
   });
   await act(async () => byId('edit_save_button').props.onPress());
-  expect(props.onSave).toHaveBeenCalledWith({ name: 'חלב', category: null });
+  expect(props.onSave).toHaveBeenCalledWith({
+    name: 'חלב',
+    category: undefined,
+  });
+});
+
+test('a name-only edit never touches the category (custom:5 while categories are not loaded)', async () => {
+  const { props, tree, byId } = await setup({
+    item: { id: 1, name: 'חלב', category: 'custom:5' },
+    categories: [],
+  });
+  await act(async () =>
+    tree.root.findAllByType(TextInput)[0].props.onChangeText('חלב עיזים'),
+  );
+  await act(async () => byId('edit_save_button').props.onPress());
+  const sent = props.onSave.mock.calls[0][0];
+  expect(sent.name).toBe('חלב עיזים');
+  expect(sent.category).toBeUndefined();
+});
+
+test('a failed delete keeps the selection', async () => {
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const { props, byId } = await setup({
+    item: { id: 1, name: 'חלב', category: 'custom:5' },
+    onDeleteCategory: jest.fn().mockResolvedValue(false),
+  });
+  await act(async () => byId('category_chip_custom:5').props.onLongPress());
+  const destructive = alertSpy.mock.calls[0][2].find(
+    b => b.style === 'destructive',
+  );
+  await act(async () => destructive.onPress());
+  await act(async () => byId('category_chip_custom:5').props.onPress());
+  await act(async () => byId('edit_save_button').props.onPress());
+  expect(props.onSave).toHaveBeenCalledWith({
+    name: 'חלב',
+    category: 'custom:5',
+  });
+  alertSpy.mockRestore();
 });
 
 test('creating a new category creates it, then selects it', async () => {
@@ -104,20 +141,24 @@ test('a blank new category name is not sent', async () => {
   expect(props.onCreateCategory).not.toHaveBeenCalled();
 });
 
-test('a failed create keeps the selection', async () => {
+test('a failed create sends no category change', async () => {
   const onCreateCategory = jest.fn().mockResolvedValue(undefined);
   const { props, byId } = await setup({ onCreateCategory });
   await act(async () => byId('category_chip_new').props.onPress());
   await act(async () => byId('new_category_input').props.onChangeText('חיות'));
   await act(async () => byId('new_category_save').props.onPress());
   await act(async () => byId('edit_save_button').props.onPress());
-  expect(props.onSave).toHaveBeenCalledWith({ name: 'חלב', category: null });
+  expect(props.onSave).toHaveBeenCalledWith({
+    name: 'חלב',
+    category: undefined,
+  });
 });
 
 test('long-press on a custom chip confirms, then deletes', async () => {
   const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   const { props, byId } = await setup({
     item: { id: 1, name: 'חלב', category: 'custom:5' },
+    onDeleteCategory: jest.fn().mockResolvedValue(true),
   });
   await act(async () => byId('category_chip_custom:5').props.onLongPress());
   expect(alertSpy).toHaveBeenCalledTimes(1);
@@ -126,6 +167,7 @@ test('long-press on a custom chip confirms, then deletes', async () => {
   const destructive = buttons.find(b => b.style === 'destructive');
   await act(async () => destructive.onPress());
   expect(props.onDeleteCategory).toHaveBeenCalledWith(customs[0]);
+  await act(async () => byId('category_chip_auto').props.onPress());
   await act(async () => byId('edit_save_button').props.onPress());
   expect(props.onSave).toHaveBeenCalledWith({ name: 'חלב', category: null });
   alertSpy.mockRestore();
@@ -144,6 +186,6 @@ test('name editing still works', async () => {
   await act(async () => byId('edit_save_button').props.onPress());
   expect(props.onSave).toHaveBeenCalledWith({
     name: 'חלב עיזים',
-    category: null,
+    category: undefined,
   });
 });

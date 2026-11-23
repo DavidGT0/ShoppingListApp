@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   ActivityIndicator,
@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   Alert,
   AppState,
-  ScrollView,
   RefreshControl,
 } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -385,7 +385,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
     try {
       const updates = { name: newName };
       // מחלקה נשלחת רק כשהשתנתה, כדי לא לדרוס בחירה של בן משפחה
-      if ((category ?? null) !== (editingItem.category ?? null)) {
+      // undefined = המשתמש לא נגע במחלקה
+      if (
+        category !== undefined &&
+        category !== (editingItem.category ?? null)
+      ) {
         updates.category = category ?? null;
       }
       const updated = await updateItem(editingItem.id, updates);
@@ -422,6 +426,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     }
   };
 
+  // מחזיר true רק כשהמחלקה נמחקה
   const handleDeleteCategory = async category => {
     commitPendingDelete();
     actionSeq.current++;
@@ -431,13 +436,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
     } catch (error) {
       // 404 - כבר נמחקה (למשל על ידי בן משפחה): נחשב הצלחה
       if (error.status !== 404) {
-        if (error.sessionExpired) return;
+        if (error.sessionExpired) return false;
         if (error.status === 403) {
           handleLostAccess();
-          return;
+          return false;
         }
         Alert.alert('שגיאה', 'לא הצלחנו למחוק את המחלקה');
-        return;
+        return false;
       }
     } finally {
       endMutation();
@@ -448,6 +453,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     setItems(prev =>
       prev.map(i => (i.category === key ? { ...i, category: null } : i)),
     );
+    return true;
   };
 
   // פעולה על כל המוצרים שנקנו: מאשרת מחיקה ממתינה, ועוברת במשמר השינויים
@@ -537,6 +543,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
     setModalVisible(true);
   };
 
+  // המחלקה והצבע של כל מוצר מחושבים רק כשהמוצרים או המחלקות משתנים (לא בכל ציור מחדש).
+  // הנקודה הצבעונית מוזנת לשורת המוצר דרך categoryColor
+  const resolvedItems = useMemo(
+    () =>
+      items.map(item => {
+        const cat = resolveCategory(item, customCategories);
+        return { item: { ...item, categoryColor: cat.color }, cat };
+      }),
+    [items, customCategories],
+  );
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -546,14 +563,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
   }
 
   // מוצר שמחיקתו ממתינה מוסתר גם אם רענון חי החזיר אותו
-  // הנקודה הצבעונית של המחלקה מוזנת לשורת המוצר דרך categoryColor
-  const withColor = item => ({
-    ...item,
-    categoryColor: resolveCategory(item, customCategories).color,
-  });
-  const visibleItems = items
-    .filter(item => !hiddenIds.current.has(item.id))
-    .map(withColor);
+  const visibleResolved = resolvedItems.filter(
+    r => !hiddenIds.current.has(r.item.id),
+  );
+  const visibleItems = visibleResolved.map(r => r.item);
   const unpurchasedItems = visibleItems.filter(item => !item.purchased);
   const purchasedItems = visibleItems.filter(item => item.purchased);
   const categoryMode = sortMode === 'category';
@@ -562,16 +575,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const groups = [];
   if (categoryMode) {
     const byKey = new Map();
-    unpurchasedItems.forEach(item => {
-      const cat = resolveCategory(item, customCategories);
-      if (!byKey.has(cat.key)) {
-        const group = { ...cat, items: [] };
-        byKey.set(cat.key, group);
-        groups.push(group);
-      }
-      byKey.get(cat.key).items.push(item);
-    });
-    groups.sort((a, b) => a.order - b.order);
+    visibleResolved
+      .filter(r => !r.item.purchased)
+      .forEach(({ item, cat }) => {
+        if (!byKey.has(cat.key)) {
+          const group = { ...cat, items: [] };
+          byKey.set(cat.key, group);
+          groups.push(group);
+        }
+        byKey.get(cat.key).items.push(item);
+      });
+    groups.sort((x, y) => x.order - y.order);
   }
 
   const listHeader = (
@@ -660,7 +674,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       <TouchableOpacity
         testID="sort_mode_toggle"
-        accessibilityLabel="sort_mode_toggle"
+        accessibilityLabel="מיון: ידני או לפי מחלקות"
         style={styles.sortToggle}
         onPress={toggleSortMode}
         activeOpacity={0.8}

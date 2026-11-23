@@ -123,20 +123,22 @@ const ShoppingListItem = ({
             />
           )}
 
-          <GHTouchableOpacity
-            onLongPress={onDrag}
-            disabled={isActive}
-            delayLongPress={150}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={styles.dragHandle}
-          >
-            <Icon
-              name="drag-vertical"
-              size={20}
-              color={colors.text.secondary}
-              style={{ opacity: 0.5 }}
-            />
-          </GHTouchableOpacity>
+          {onDrag && (
+            <GHTouchableOpacity
+              onLongPress={onDrag}
+              disabled={isActive}
+              delayLongPress={150}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.dragHandle}
+            >
+              <Icon
+                name="drag-vertical"
+                size={20}
+                color={colors.text.secondary}
+                style={{ opacity: 0.5 }}
+              />
+            </GHTouchableOpacity>
+          )}
 
           <View style={styles.nameContainer}>
             <View

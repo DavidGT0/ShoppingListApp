@@ -3,6 +3,7 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import EditItemModal from '../src/components/EditItemModal/EditItemModal';
 import {
@@ -12,6 +13,12 @@ import {
   createListCategory,
   deleteListCategory,
 } from '../src/services/api';
+
+// ScrollView של gesture-handler דורש Reanimated מלא; כאן מספיק ה-ScrollView הרגיל
+jest.mock('react-native-gesture-handler', () => ({
+  ...jest.requireActual('react-native-gesture-handler'),
+  ScrollView: require('react-native').ScrollView,
+}));
 
 // גרירה לא נבדקת כאן: הרשימה הנגררת מוחלפת ברכיב פשוט שרושם שהוא רונדר
 jest.mock('react-native-draggable-flatlist', () => {
@@ -106,10 +113,12 @@ const mount = async items => {
   let tree;
   await act(async () => {
     tree = ReactTestRenderer.create(
-      <ShoppingListScreen
-        route={{ params: { listId: 7, listName: 'רשימה' } }}
-        navigation={{ goBack: jest.fn() }}
-      />,
+      <GestureHandlerRootView>
+        <ShoppingListScreen
+          route={{ params: { listId: 7, listName: 'רשימה' } }}
+          navigation={{ goBack: jest.fn() }}
+        />
+      </GestureHandlerRootView>,
     );
   });
   trees.push(tree);
@@ -245,6 +254,19 @@ test('an unchanged category is not sent (does not overwrite a family edit)', asy
     modal.props.onSave({ name: 'חלב עיזים', category: null }),
   );
   expect(updateItem).toHaveBeenCalledWith(2, { name: 'חלב עיזים' });
+});
+
+test('a name-only edit of a custom-category item sends no category key', async () => {
+  getListCategories.mockResolvedValue([]);
+  const tree = await mount(ITEMS);
+  updateItem.mockResolvedValue({ ...ITEMS[3], name: 'מתנה חדשה' });
+  const modal = await openEdit(tree, 4);
+  await act(async () =>
+    modal.props.onSave({ name: 'מתנה חדשה', category: undefined }),
+  );
+  expect(updateItem).toHaveBeenCalledTimes(1);
+  expect(updateItem.mock.calls[0][1]).toEqual({ name: 'מתנה חדשה' });
+  expect('category' in updateItem.mock.calls[0][1]).toBe(false);
 });
 
 test('resetting to automatic sends an explicit null', async () => {
