@@ -65,7 +65,7 @@ class ShoppingItem(Base):
     unit = Column(String(10), nullable=True)
     note = Column(String(100), nullable=True)
     category = Column(String(40), nullable=True)
-    added_by_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    added_by_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
 
     shopping_list = relationship("ShoppingList", back_populates="items")
     added_by = relationship("User", foreign_keys=[added_by_id])

@@ -6,7 +6,7 @@ REQUIRED_COLUMNS = [
     ("items", "unit", "VARCHAR(10)"),
     ("items", "note", "VARCHAR(100)"),
     ("items", "category", "VARCHAR(40)"),
-    ("items", "added_by_id", "INTEGER REFERENCES users(id)"),
+    ("items", "added_by_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
     ("item_history", "category", "VARCHAR(40)"),
 ]
 
@@ -17,6 +17,9 @@ def ensure_columns(engine):
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
     with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            # נעילה תקועה תכשיל את ההפעלה במקום להיתקע
+            conn.execute(text("SET LOCAL lock_timeout = '10s'"))
         for table, column, ddl in REQUIRED_COLUMNS:
             if table not in existing_tables:
                 continue  # create_all יוצר אותה במלואה

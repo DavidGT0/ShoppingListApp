@@ -27,7 +27,9 @@ load_dotenv()
 # יצירת הטבלאות ב-DB
 models.Base.metadata.create_all(bind=engine)
 # הוספת עמודות חדשות לטבלאות קיימות (בטוח להרצה חוזרת)
-ensure_columns(engine)
+added_columns = ensure_columns(engine)
+if added_columns:
+    print("schema upgrade added:", added_columns)
 
 app = FastAPI()
 

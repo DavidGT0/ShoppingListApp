@@ -49,6 +49,43 @@ def test_upgrades_old_schema_and_keeps_data():
         os.remove(path)
 
 
+def assert_added_by_fk(engine):
+    fks = inspect(engine).get_foreign_keys("items")
+    fk = [f for f in fks if f["constrained_columns"] == ["added_by_id"]]
+    assert len(fk) == 1
+    assert fk[0]["referred_table"] == "users"
+    assert fk[0].get("options", {}).get("ondelete") == "SET NULL"
+
+
+def test_added_by_fk_on_delete_set_null_after_upgrade():
+    engine, path = make_old_engine()
+    try:
+        ensure_columns(engine)
+        # SQLAlchemy לא מפרש הגדרת FK inline של ADD COLUMN ב-SQLite, לכן בודקים ב-PRAGMA
+        with engine.connect() as c:
+            rows = c.execute(text("PRAGMA foreign_key_list(items)")).all()
+        fk = [r for r in rows if r[3] == "added_by_id"]
+        assert len(fk) == 1
+        assert fk[0][2] == "users"
+        assert fk[0][6] == "SET NULL"  # on_delete
+    finally:
+        engine.dispose()
+        os.remove(path)
+
+
+def test_added_by_fk_on_delete_set_null_after_create_all():
+    import models
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    engine = create_engine(f"sqlite:///{path}")
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        assert_added_by_fk(engine)
+    finally:
+        engine.dispose()
+        os.remove(path)
+
+
 def test_second_call_is_noop():
     engine, path = make_old_engine()
     try:
