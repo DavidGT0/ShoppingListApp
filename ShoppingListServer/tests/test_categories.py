@@ -34,7 +34,7 @@ def test_color_cycles_after_palette_is_used(client, register):
     lid = _make_list(client, alice)
     colors = [_cat(client, alice, lid, f"c{i}")["color"] for i in range(9)]
     assert colors[:8] == PALETTE
-    assert colors[8] in PALETTE
+    assert colors[8] == PALETTE[0]
 
 
 def test_duplicate_name_is_400(client, register):
@@ -174,3 +174,30 @@ def test_delete_category_nulls_items_and_history(client, register, db):
     assert items[item["id"]]["category"] is None
     assert items[kept["id"]]["category"] == f"custom:{keep['id']}"
     assert [c["id"] for c in client.get(f"/lists/{lid}/categories", headers=alice).json()] == [keep["id"]]
+
+
+def test_non_canonical_custom_ids_rejected(client, register):
+    alice = register("alice")
+    lid = _make_list(client, alice)
+    cat = _cat(client, alice, lid, "Pets")
+    for bad in (f"custom:0{cat['id']}", "custom:" + "1" * 25, "custom:-1", "custom:+1", "custom: 1"):
+        r = _add(client, alice, lid, "Bad", category=bad)
+        assert r.status_code == 400, bad
+        assert r.json()["detail"] == "מחלקה לא תקינה"
+    item = _add(client, alice, lid, "Ok", category=f"custom:{cat['id']}").json()
+    r = client.put(f"/items/{item['id']}", json={"category": f"custom:0{cat['id']}"}, headers=alice)
+    assert r.status_code == 400
+
+
+def test_delete_category_matches_exactly(client, register):
+    alice = register("alice")
+    lid = _make_list(client, alice)
+    cats = [_cat(client, alice, lid, f"c{i}") for i in range(12)]
+    first, twelfth = cats[0], cats[11]
+    assert (first["id"], twelfth["id"]) == (first["id"], first["id"] + 11)
+    one = _add(client, alice, lid, "One", category=f"custom:{first['id']}").json()
+    other = _add(client, alice, lid, "Other", category=f"custom:{twelfth['id']}").json()
+    client.delete(f"/lists/{lid}/categories/{first['id']}", headers=alice)
+    items = {i["id"]: i["category"] for i in client.get("/items", params={"list_id": lid}, headers=alice).json()}
+    assert items[one["id"]] is None
+    assert items[other["id"]] == f"custom:{twelfth['id']}"

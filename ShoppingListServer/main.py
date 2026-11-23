@@ -572,7 +572,8 @@ def _is_valid_category(db: Session, list_id: int, value) -> bool:
     if value is None or value in BUILTIN_CATEGORIES:
         return True
     prefix, _, raw_id = value.partition(":")
-    if prefix != "custom" or not raw_id.isascii() or not raw_id.isdigit():
+    # רק צורה קנונית (בלי אפסים מובילים, עד 9 ספרות), כדי שההתאמה במחיקה/שכפול תהיה מדויקת
+    if prefix != "custom" or not raw_id.isascii() or not raw_id.isdigit() or len(raw_id) > 9 or raw_id != str(int(raw_id)):
         return False
     return db.query(models.CustomCategory).filter(
         models.CustomCategory.id == int(raw_id),
