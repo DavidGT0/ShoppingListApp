@@ -333,3 +333,40 @@ export const duplicateList = async listId => {
   }
   return await response.json();
 };
+
+/**
+ * מחלקות מותאמות של הרשימה (לפי סדר היצירה)
+ */
+export const getListCategories = async listId => {
+  const response = await apiFetch(`/lists/${listId}/categories`);
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו להביא את המחלקות');
+  }
+  return await response.json();
+};
+
+/**
+ * יצירת מחלקה מותאמת ברשימה. מחזיר {id, name, color}
+ */
+export const createListCategory = async (listId, name) => {
+  const response = await apiFetch(`/lists/${listId}/categories`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו ליצור את המחלקה');
+  }
+  return await response.json();
+};
+
+/**
+ * מחיקת מחלקה מותאמת. מוצרים שבה חוזרים לסיווג אוטומטי
+ */
+export const deleteListCategory = async (listId, catId) => {
+  const response = await apiFetch(`/lists/${listId}/categories/${catId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו למחוק את המחלקה');
+  }
+};

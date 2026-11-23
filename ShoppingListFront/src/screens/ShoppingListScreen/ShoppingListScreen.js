@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   ActivityIndicator,
@@ -6,7 +6,10 @@ import {
   TouchableOpacity,
   Alert,
   AppState,
+  RefreshControl,
 } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,7 +31,11 @@ import {
   getListMembers,
   restorePurchased,
   clearPurchased,
+  getListCategories,
+  createListCategory,
+  deleteListCategory,
 } from '../../services/api';
+import { resolveCategory, customKey } from '../../services/categories';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
@@ -36,6 +43,8 @@ import { colors } from '../../theme/colors';
 const LIVE_REFRESH_MS = 3000;
 // כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
 export const UNDO_MS = 5000;
+
+export const sortModeKey = listId => `@sort_mode_${listId}`;
 
 // מיון המוצרים לפי שדה ה-position כדי לשמור על הסדר הנכון מהשרת
 const sortByPosition = data =>
@@ -52,6 +61,9 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [membersVisible, setMembersVisible] = useState(false);
   const [memberCount, setMemberCount] = useState(null);
+  const [customCategories, setCustomCategories] = useState([]);
+  // 'manual' (גרירה) או 'category' (מקובץ לפי מחלקות)
+  const [sortMode, setSortMode] = useState('manual');
   const currentListId = listId;
   // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
   const mutationVersion = useRef(0);
@@ -138,6 +150,43 @@ const ShoppingListScreen = ({ route, navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listId]);
 
+  // מצב המיון נשמר לכל רשימה
+  useEffect(() => {
+    if (!listId) return undefined;
+    let cancelled = false;
+    Promise.resolve(AsyncStorage.getItem(sortModeKey(listId)))
+      .then(value => {
+        if (!cancelled)
+          setSortMode(value === 'category' ? 'category' : 'manual');
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [listId]);
+
+  const loadCategories = async () => {
+    try {
+      const data = await getListCategories(listId);
+      if (Array.isArray(data)) setCustomCategories(data);
+    } catch (error) {
+      // שקט - נשארות המחלקות המובנות
+    }
+  };
+
+  useEffect(() => {
+    if (listId) loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listId]);
+
+  const toggleSortMode = () => {
+    const next = sortMode === 'category' ? 'manual' : 'category';
+    setSortMode(next);
+    Promise.resolve(AsyncStorage.setItem(sortModeKey(listId), next)).catch(
+      () => {},
+    );
+  };
+
   // מספר המשתתפים מוצג על כפתור הכותרת
   const loadMemberCount = async () => {
     if (!listId) return;
@@ -196,12 +245,16 @@ const ShoppingListScreen = ({ route, navigation }) => {
     if (!listId) return;
     const version = mutationVersion.current;
     try {
-      const data = await getShoppingList(listId);
+      const [data, cats] = await Promise.all([
+        getShoppingList(listId),
+        Promise.resolve(getListCategories(listId)).catch(() => null),
+      ]);
       // פעולה שלי בדרך, או שבוצע שינוי שלי בינתיים - התשובה ישנה
       if (pendingMutations.current > 0 || version !== mutationVersion.current) {
         return;
       }
       setItems(sortByPosition(data));
+      if (Array.isArray(cats)) setCustomCategories(cats);
     } catch (error) {
       if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה
       if (error.status === 403 || error.status === 404) {
@@ -324,13 +377,22 @@ const ShoppingListScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleEditItem = async newName => {
+  const handleEditItem = async ({ name: newName, category }) => {
     if (!editingItem || !newName?.trim()) return;
     commitPendingDelete();
     actionSeq.current++;
     startMutation();
     try {
-      const updated = await updateItem(editingItem.id, { name: newName });
+      const updates = { name: newName };
+      // מחלקה נשלחת רק כשהשתנתה, כדי לא לדרוס בחירה של בן משפחה
+      // undefined = המשתמש לא נגע במחלקה
+      if (
+        category !== undefined &&
+        category !== (editingItem.category ?? null)
+      ) {
+        updates.category = category ?? null;
+      }
+      const updated = await updateItem(editingItem.id, updates);
       setItems(prev => prev.map(i => (i.id === editingItem.id ? updated : i)));
       setEditingItem(null);
       setModalVisible(false);
@@ -340,6 +402,58 @@ const ShoppingListScreen = ({ route, navigation }) => {
     } finally {
       endMutation();
     }
+  };
+
+  // יצירת מחלקה מותאמת. מחזיר את המחלקה שנוצרה (או undefined בכישלון)
+  const handleCreateCategory = async name => {
+    commitPendingDelete();
+    actionSeq.current++;
+    startMutation();
+    try {
+      const created = await createListCategory(currentListId, name);
+      setCustomCategories(prev => [...prev, created]);
+      return created;
+    } catch (error) {
+      if (error.sessionExpired) return undefined;
+      if (error.status === 403 || error.status === 404) {
+        handleLostAccess();
+        return undefined;
+      }
+      Alert.alert('שגיאה', error.message || 'לא הצלחנו ליצור את המחלקה');
+      return undefined;
+    } finally {
+      endMutation();
+    }
+  };
+
+  // מחזיר true רק כשהמחלקה נמחקה
+  const handleDeleteCategory = async category => {
+    commitPendingDelete();
+    actionSeq.current++;
+    startMutation();
+    try {
+      await deleteListCategory(currentListId, category.id);
+    } catch (error) {
+      // 404 - כבר נמחקה (למשל על ידי בן משפחה): נחשב הצלחה
+      if (error.status !== 404) {
+        if (error.sessionExpired) return false;
+        if (error.status === 403) {
+          handleLostAccess();
+          return false;
+        }
+        Alert.alert('שגיאה', 'לא הצלחנו למחוק את המחלקה');
+        return false;
+      }
+    } finally {
+      endMutation();
+    }
+    const key = customKey(category.id);
+    setCustomCategories(prev => prev.filter(c => c.id !== category.id));
+    // המוצרים שבמחלקה חוזרים לסיווג אוטומטי (כמו בשרת)
+    setItems(prev =>
+      prev.map(i => (i.category === key ? { ...i, category: null } : i)),
+    );
+    return true;
   };
 
   // פעולה על כל המוצרים שנקנו: מאשרת מחיקה ממתינה, ועוברת במשמר השינויים
@@ -429,6 +543,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
     setModalVisible(true);
   };
 
+  // המחלקה והצבע של כל מוצר מחושבים רק כשהמוצרים או המחלקות משתנים (לא בכל ציור מחדש).
+  // הנקודה הצבעונית מוזנת לשורת המוצר דרך categoryColor
+  const resolvedItems = useMemo(
+    () =>
+      items.map(item => {
+        const cat = resolveCategory(item, customCategories);
+        return { item: { ...item, categoryColor: cat.color }, cat };
+      }),
+    [items, customCategories],
+  );
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -438,9 +563,59 @@ const ShoppingListScreen = ({ route, navigation }) => {
   }
 
   // מוצר שמחיקתו ממתינה מוסתר גם אם רענון חי החזיר אותו
-  const visibleItems = items.filter(item => !hiddenIds.current.has(item.id));
+  const visibleResolved = resolvedItems.filter(
+    r => !hiddenIds.current.has(r.item.id),
+  );
+  const visibleItems = visibleResolved.map(r => r.item);
   const unpurchasedItems = visibleItems.filter(item => !item.purchased);
   const purchasedItems = visibleItems.filter(item => item.purchased);
+  const categoryMode = sortMode === 'category';
+
+  // קבוצות לפי מחלקה, בסדר המעברים (מובנות, מותאמות, אחר)
+  const groups = [];
+  if (categoryMode) {
+    const byKey = new Map();
+    visibleResolved
+      .filter(r => !r.item.purchased)
+      .forEach(({ item, cat }) => {
+        if (!byKey.has(cat.key)) {
+          const group = { ...cat, items: [] };
+          byKey.set(cat.key, group);
+          groups.push(group);
+        }
+        byKey.get(cat.key).items.push(item);
+      });
+    groups.sort((x, y) => x.order - y.order);
+  }
+
+  const listHeader = (
+    <View>
+      <View style={styles.tipContainer}>
+        <Text style={styles.tipTitle}>💡 טיפ שימושי:</Text>
+        <Text style={styles.tipText}>
+          • <Text style={styles.boldText}>סימון כנקנה:</Text> החלק שמאלה.
+          {'\n'}• <Text style={styles.boldText}>מחיקת מוצר:</Text> החלק ימינה.
+        </Text>
+      </View>
+
+      {/* הכותרת המקורית של "מוצרים לקנייה" מופיעה מתחת לטיפ במידה ויש מוצרים */}
+      {unpurchasedItems.length > 0 && !categoryMode && (
+        <Text style={styles.sectionLabel}>מוצרים לקנייה</Text>
+      )}
+    </View>
+  );
+
+  const purchasedFooter = (
+    <PurchasedItemsSection
+      items={purchasedItems}
+      onTogglePurchased={handleTogglePurchased}
+      onEdit={openEditModal}
+      onDelete={handleDeleteItem}
+      onUpdateAmount={handleUpdateAmount}
+      onRestoreAll={handleRestoreAll}
+      onClearAll={handleClearAll}
+    />
+  );
 
   return (
     <View style={styles.container}>
@@ -497,54 +672,99 @@ const ShoppingListScreen = ({ route, navigation }) => {
         <AddItemInput onAdd={handleAddItem} listId={currentListId} />
       </View>
 
-      <DraggableFlatList
-        data={unpurchasedItems}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.listContent}
-        onDragBegin={handleDragBegin}
-        onDragEnd={handleDragEnd}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        ListHeaderComponent={
-          <View>
-            <View style={styles.tipContainer}>
-              <Text style={styles.tipTitle}>💡 טיפ שימושי:</Text>
-              <Text style={styles.tipText}>
-                • <Text style={styles.boldText}>סימון כנקנה:</Text> החלק שמאלה.
-                {'\n'}• <Text style={styles.boldText}>מחיקת מוצר:</Text> החלק
-                ימינה.
-              </Text>
-            </View>
+      <TouchableOpacity
+        testID="sort_mode_toggle"
+        accessibilityLabel="מיון: ידני או לפי מחלקות"
+        style={styles.sortToggle}
+        onPress={toggleSortMode}
+        activeOpacity={0.8}
+      >
+        <Text
+          style={[
+            styles.sortToggleText,
+            !categoryMode && styles.sortToggleActive,
+          ]}
+        >
+          סדר ידני
+        </Text>
+        <Text style={styles.sortToggleText}> / </Text>
+        <Text
+          style={[
+            styles.sortToggleText,
+            categoryMode && styles.sortToggleActive,
+          ]}
+        >
+          לפי מחלקות
+        </Text>
+      </TouchableOpacity>
 
-            {/* הכותרת המקורית של "מוצרים לקנייה" מופיעה מתחת לטיפ במידה ויש מוצרים */}
-            {unpurchasedItems.length > 0 && (
-              <Text style={styles.sectionLabel}>מוצרים לקנייה</Text>
-            )}
-          </View>
-        }
-        renderItem={({ item, drag, isActive }) => (
-          <ShoppingListItem
-            item={item}
-            onTogglePurchased={() => handleTogglePurchased(item)}
-            onEdit={() => openEditModal(item)}
-            onDelete={() => handleDeleteItem(item.id)}
-            onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
-            onDrag={drag}
-            isActive={isActive}
-          />
-        )}
-        ListFooterComponent={
-          <PurchasedItemsSection
-            items={purchasedItems}
-            onTogglePurchased={handleTogglePurchased}
-            onEdit={openEditModal}
-            onDelete={handleDeleteItem}
-            onUpdateAmount={handleUpdateAmount}
-            onRestoreAll={handleRestoreAll}
-            onClearAll={handleClearAll}
-          />
-        }
-      />
+      {categoryMode ? (
+        // במצב מחלקות אין גרירה: רשימה רגילה עם כותרת לכל מחלקה
+        <ScrollView
+          testID="category_list"
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          {listHeader}
+          {groups.map(group => (
+            <View key={group.key}>
+              <View
+                style={styles.categoryHeader}
+                testID={`category_header_${group.key}`}
+              >
+                <View
+                  style={[
+                    styles.categoryHeaderDot,
+                    { backgroundColor: group.color },
+                  ]}
+                />
+                <Text style={styles.categoryHeaderText}>
+                  {group.name} ({group.items.length})
+                </Text>
+              </View>
+              {group.items.map(item => (
+                <ShoppingListItem
+                  key={item.id}
+                  item={item}
+                  onTogglePurchased={() => handleTogglePurchased(item)}
+                  onEdit={() => openEditModal(item)}
+                  onDelete={() => handleDeleteItem(item.id)}
+                  onUpdateAmount={newAmount =>
+                    handleUpdateAmount(item, newAmount)
+                  }
+                  isActive={false}
+                />
+              ))}
+            </View>
+          ))}
+          {purchasedFooter}
+        </ScrollView>
+      ) : (
+        <DraggableFlatList
+          data={unpurchasedItems}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          onDragBegin={handleDragBegin}
+          onDragEnd={handleDragEnd}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          ListHeaderComponent={listHeader}
+          renderItem={({ item, drag, isActive }) => (
+            <ShoppingListItem
+              item={item}
+              onTogglePurchased={() => handleTogglePurchased(item)}
+              onEdit={() => openEditModal(item)}
+              onDelete={() => handleDeleteItem(item.id)}
+              onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
+              onDrag={drag}
+              isActive={isActive}
+            />
+          )}
+          ListFooterComponent={purchasedFooter}
+        />
+      )}
 
       <UndoBar
         visible={!!undoState}
@@ -556,6 +776,9 @@ const ShoppingListScreen = ({ route, navigation }) => {
         visible={modalVisible}
         item={editingItem}
         onSave={handleEditItem}
+        categories={customCategories}
+        onCreateCategory={handleCreateCategory}
+        onDeleteCategory={handleDeleteCategory}
         onClose={() => setModalVisible(false)}
       />
 
