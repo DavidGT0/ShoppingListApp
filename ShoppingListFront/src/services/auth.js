@@ -63,11 +63,47 @@ export const login = async (username, password) => {
 
     // שמירת ה-token ב-AsyncStorage
     await AsyncStorage.setItem('access_token', data.access_token);
-    await AsyncStorage.setItem('username', cleanUsername);
+    // השם הקנוני מהשרת (בהתחברות עם אימייל, cleanUsername הוא האימייל)
+    await AsyncStorage.setItem('username', data.username || cleanUsername);
 
     return data;
   } catch (error) {
     console.error('Login error:', error);
+    throw error;
+  }
+};
+
+/**
+ * שינוי שם משתמש. השרת מחזיר טוקן חדש (הישן מפסיק לעבוד מיד),
+ * ולכן הטוקן והשם נשמרים לפני שההבטחה מסתיימת. מחזיר את השם החדש.
+ */
+export const changeUsername = async newName => {
+  const clean = (newName || '').trim();
+  if (!clean) {
+    throw new Error('נא להזין שם משתמש');
+  }
+  if (clean.includes('@')) {
+    throw new Error('שם המשתמש לא יכול להכיל @');
+  }
+  try {
+    const response = await apiFetch('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify({ username: clean }),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await readErrorMessage(response, 'שינוי שם המשתמש נכשל. נסה שוב בעוד רגע.'),
+      );
+    }
+
+    const data = await response.json();
+    const username = data.username || clean;
+    await AsyncStorage.setItem('access_token', data.access_token);
+    await AsyncStorage.setItem('username', username);
+    return username;
+  } catch (error) {
+    console.error('Change username error:', error);
     throw error;
   }
 };

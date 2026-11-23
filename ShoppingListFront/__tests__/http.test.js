@@ -82,6 +82,22 @@ describe('apiFetch', () => {
     expect(onExpired).toHaveBeenCalledTimes(2);
   });
 
+  test('on 401 after the stored token was replaced (rename): no session expiry, token kept', async () => {
+    await AsyncStorage.setItem('access_token', 'T-old');
+    global.fetch = jest.fn(async () => {
+      // השרת עונה 401 לטוקן הישן, אחרי שהטוקן החדש כבר נשמר
+      await AsyncStorage.setItem('access_token', 'T-new');
+      return { status: 401, ok: false };
+    });
+
+    const result = await apiFetch('/items?list_id=1').catch(e => e);
+
+    expect(result).toBeInstanceOf(Error);
+    expect(result.sessionExpired).toBeUndefined();
+    expect(await AsyncStorage.getItem('access_token')).toBe('T-new');
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
   test('on 401 without a token: throws but does not notify', async () => {
     mockFetchStatus(401);
     await expect(apiFetch('/lists')).rejects.toMatchObject({

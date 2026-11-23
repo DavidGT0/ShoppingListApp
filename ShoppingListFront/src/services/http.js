@@ -116,6 +116,14 @@ export const apiFetch = async (path, options = {}) => {
   });
 
   if (response.status === 401) {
+    // שינוי שם משתמש מחליף את הטוקן באמצע בקשה (למשל רענון חי): 401 על הטוקן
+    // הישן אינו פקיעת התחברות, כי כבר נשמר טוקן חדש
+    const currentToken = await AsyncStorage.getItem('access_token');
+    if (token && currentToken && currentToken !== token) {
+      const staleError = new Error('ההתחברות התחדשה. נסה שוב.');
+      staleError.status = 401;
+      throw staleError;
+    }
     await AsyncStorage.removeMany(['access_token', 'username']); // AsyncStorage v3 (אין multiRemove)
     await clearAllCaches();
     if (token && token !== lastExpiredToken) {

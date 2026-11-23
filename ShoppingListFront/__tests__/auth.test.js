@@ -1,5 +1,11 @@
 /* global jest, describe, beforeEach, afterEach, test, expect */
-import { requestPasswordReset, logout, deleteAccount, login } from '../src/services/auth';
+import {
+  requestPasswordReset,
+  logout,
+  deleteAccount,
+  login,
+  changeUsername,
+} from '../src/services/auth';
 import { API_BASE_URL } from '../src/services/http';
 
 describe('requestPasswordReset', () => {
@@ -97,6 +103,26 @@ describe('register and login input and errors', () => {
     expect(await AsyncStorage.getItem('username')).toBe('bob');
   });
 
+  test('login with an email stores the real username from the server', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: 'T',
+        token_type: 'bearer',
+        username: 'bob',
+      }),
+    });
+
+    await login('Bob@Example.com', 'pw-1234');
+
+    expect(global.fetch.mock.calls[0][1].body).toContain(
+      'username=Bob%40Example.com&',
+    );
+    expect(await AsyncStorage.getItem('username')).toBe('bob');
+    expect(await AsyncStorage.getItem('access_token')).toBe('T');
+  });
+
   test('login shows the server message on wrong password', async () => {
     global.fetch.mockResolvedValue({
       ok: false,
@@ -181,5 +207,65 @@ describe('cache clearing', () => {
     console.error.mockRestore();
     expect(await AsyncStorage.getItem('@cache_lists')).toBeNull();
     expect(await AsyncStorage.getItem('@cache_items_2')).toBeNull();
+  });
+});
+
+describe('changeUsername', () => {
+  const AsyncStorage =
+    require('@react-native-async-storage/async-storage').default;
+
+  beforeEach(async () => {
+    global.fetch = jest.fn();
+    await AsyncStorage.clear();
+    await AsyncStorage.setItem('access_token', 'OLD');
+    await AsyncStorage.setItem('username', 'bob');
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    console.error.mockRestore();
+  });
+
+  test('patches /users/me and stores the new token and name before resolving', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: 'NEW',
+        token_type: 'bearer',
+        username: 'robert',
+      }),
+    });
+
+    const name = await changeUsername('  robert ');
+
+    expect(name).toBe('robert');
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}/users/me`);
+    expect(options.method).toBe('PATCH');
+    expect(options.headers.Authorization).toBe('Bearer OLD');
+    expect(JSON.parse(options.body)).toEqual({ username: 'robert' });
+    expect(await AsyncStorage.getItem('access_token')).toBe('NEW');
+    expect(await AsyncStorage.getItem('username')).toBe('robert');
+  });
+
+  test('shows the server Hebrew message and keeps the old session', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ detail: 'שם המשתמש כבר תפוס' }),
+    });
+
+    await expect(changeUsername('alice')).rejects.toThrow('שם המשתמש כבר תפוס');
+    expect(await AsyncStorage.getItem('access_token')).toBe('OLD');
+    expect(await AsyncStorage.getItem('username')).toBe('bob');
+  });
+
+  test('refuses an empty name or one with @ before calling the server', async () => {
+    await expect(changeUsername('   ')).rejects.toThrow('נא להזין שם משתמש');
+    await expect(changeUsername('a@b')).rejects.toThrow(
+      'שם המשתמש לא יכול להכיל @',
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
