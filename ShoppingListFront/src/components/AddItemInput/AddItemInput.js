@@ -39,6 +39,11 @@ const AddItemInput = ({ onAdd, listId, editable = true }) => {
   };
 
   const handleAdd = () => {
+    if (!editable) {
+      // במצב לא מקוון ההורה מציג את ההודעה (ולא "אנא הזן שם מוצר")
+      onAdd(name.trim());
+      return;
+    }
     if (!name.trim()) {
       Alert.alert('שגיאה', 'אנא הזן שם מוצר');
       return;

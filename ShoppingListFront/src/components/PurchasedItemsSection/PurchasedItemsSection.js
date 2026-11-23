@@ -14,17 +14,22 @@ const PurchasedItemsSection = ({
   showAddedBy = false,
   currentUsername = null,
   disabled = false,
+  blockIfOffline,
 }) => {
   // אם אין מוצרים שנקנו, לא מרנדרים כלום
   if (!items || items.length === 0) return null;
 
-  const confirmRestore = () =>
+  // במצב לא מקוון מציגים את הודעת החסימה במקום חלון האישור
+  const confirmRestore = () => {
+    if (blockIfOffline && blockIfOffline()) return;
     Alert.alert('החזר הכל לרשימה', 'להחזיר את כל המוצרים שנקנו לרשימה?', [
       { text: 'ביטול', style: 'cancel' },
       { text: 'החזר', onPress: () => onRestoreAll && onRestoreAll() },
     ]);
+  };
 
-  const confirmClear = () =>
+  const confirmClear = () => {
+    if (blockIfOffline && blockIfOffline()) return;
     Alert.alert('מחק את מה שנקנה', 'למחוק את כל המוצרים שנקנו?', [
       { text: 'ביטול', style: 'cancel' },
       {
@@ -33,6 +38,7 @@ const PurchasedItemsSection = ({
         onPress: () => onClearAll && onClearAll(),
       },
     ]);
+  };
 
   return (
     <View>

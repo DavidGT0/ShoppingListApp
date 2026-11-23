@@ -3,6 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // מטמון לצפייה במצב לא מקוון. הערכים הם ה-JSON של תשובות השרת.
 const CACHE_PREFIX = '@cache_';
 
+// עולה בכל ניקוי: תשובה שהתחילה לפני ניקוי (למשל משתמש קודם) לא נשמרת אחריו
+let generation = 0;
+
+// כמה זמן מחכים לטעינה הראשונית לפני שמציגים את המטמון (מצב לא מקוון)
+export const INITIAL_LOAD_GRACE_MS = 10000;
+
 export const cacheKeys = {
   lists: '@cache_lists',
   items: listId => `@cache_items_${listId}`,
@@ -33,6 +39,7 @@ export const readCache = async key => {
  * מחיקת כל מפתחות המטמון (התנתקות, פקיעת התחברות, מחיקת חשבון)
  */
 export const clearAllCaches = async () => {
+  generation++;
   try {
     const keys = await AsyncStorage.getAllKeys();
     const cacheKeysToRemove = keys.filter(key => key.startsWith(CACHE_PREFIX));
@@ -47,14 +54,39 @@ export const clearAllCaches = async () => {
 /**
  * טעינה עם גיבוי מהמטמון. רק שגיאת רשת (error.network) מחזירה נתונים שמורים;
  * כל שגיאה אחרת נזרקת הלאה בלי לגעת במטמון.
+ *
+ * options (לטעינה ראשונית בלבד): graceMs + onEarlyCache. אם הבקשה לא הסתיימה אחרי graceMs
+ * ויש מטמון - onEarlyCache(cached) נקרא והבקשה ממשיכה. אם אחר כך נכשלה ברשת מוחזר
+ * alreadyShown: true (המטמון כבר מוצג). signal (AbortSignal) מבטל את הטיימר.
  */
-export const loadWithCache = async (fetcher, key) => {
+export const loadWithCache = async (fetcher, key, options = {}) => {
+  const { graceMs, onEarlyCache, signal } = options;
+  const startGeneration = generation;
+  let settled = false;
+  let early = false;
+  let timer = null;
+  if (graceMs && onEarlyCache) {
+    timer = setTimeout(async () => {
+      timer = null;
+      const cached = await readCache(key);
+      if (settled || cached === null || signal?.aborted) return;
+      if (startGeneration !== generation) return;
+      early = true;
+      onEarlyCache(cached);
+    }, graceMs);
+    signal?.addEventListener?.('abort', () => clearTimeout(timer));
+  }
   try {
     const data = await fetcher();
-    await saveCache(key, data);
+    settled = true;
+    clearTimeout(timer);
+    if (startGeneration === generation) await saveCache(key, data);
     return { data, fromCache: false };
   } catch (error) {
+    settled = true;
+    clearTimeout(timer);
     if (error?.network) {
+      if (early) return { data: null, fromCache: true, alreadyShown: true };
       const cached = await readCache(key);
       if (cached !== null) {
         return { data: cached, fromCache: true };

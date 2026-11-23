@@ -41,7 +41,7 @@ describe('requestPasswordReset', () => {
 describe('register and login input and errors', () => {
   const AsyncStorage =
     require('@react-native-async-storage/async-storage').default;
-  const { register, login } = require('../src/services/auth');
+  const { register } = require('../src/services/auth');
 
   beforeEach(async () => {
     global.fetch = jest.fn();

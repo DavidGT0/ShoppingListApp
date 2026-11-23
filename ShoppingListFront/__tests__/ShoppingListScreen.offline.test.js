@@ -214,14 +214,25 @@ describe('loading', () => {
     expect(names(tree)).toEqual(['חלב']);
   });
 
-  test('a refresh that hits a network error shows the cache and the banner', async () => {
+  test('a refresh that hits a network error keeps the on-screen items and shows the banner', async () => {
     getShoppingList.mockResolvedValueOnce([milk]);
     const tree = await renderScreen();
     await saveCache(cacheKeys.items(7), [milk, eggs]);
     getShoppingList.mockRejectedValue(networkError());
     await act(async () => refresh()());
     expect(banner(tree)).toBeDefined();
-    expect(names(tree)).toEqual(['חלב', 'ביצים']);
+    expect(names(tree)).toEqual(['חלב']);
+  });
+
+  test('my own successful change survives a network-error refresh', async () => {
+    getShoppingList.mockResolvedValueOnce([milk, eggs]);
+    const tree = await renderScreen();
+    updateItem.mockResolvedValue({ ...milk, purchased: true });
+    await act(async () => row(tree, 1).props.onTogglePurchased());
+    getShoppingList.mockRejectedValue(networkError());
+    await act(async () => refresh()());
+    expect(banner(tree)).toBeDefined();
+    expect(row(tree, 1).props.item.purchased).toBe(true);
   });
 
   test('a successful refresh clears the banner and re-enables editing', async () => {
@@ -399,5 +410,134 @@ describe('a network error during a mutation', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('no sends after an async gap', () => {
+  test('add after a pending delete failed with a network error sends nothing and alerts once', async () => {
+    jest.useFakeTimers();
+    try {
+      getShoppingList.mockResolvedValue([milk, eggs]);
+      const tree = await renderScreen();
+      deleteItem.mockRejectedValue(networkError());
+      await act(async () => row(tree, 1).props.onDelete());
+      await act(async () =>
+        tree.root.findByType(AddItemInput).props.onAdd('לחם'),
+      );
+      expect(addItem).not.toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      expectBlocked();
+      expect(banner(tree)).toBeDefined();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('restore all after a pending delete failed with a network error sends nothing', async () => {
+    jest.useFakeTimers();
+    try {
+      getShoppingList.mockResolvedValue([milk, bread]);
+      const tree = await renderScreen();
+      deleteItem.mockRejectedValue(networkError());
+      await act(async () => row(tree, 1).props.onDelete());
+      await act(async () =>
+        tree.root.findByType(PurchasedItemsSection).props.onRestoreAll(),
+      );
+      expect(restorePurchased).not.toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('several mutations failing together show a single alert', async () => {
+    getShoppingList.mockResolvedValue([milk, eggs]);
+    const tree = await renderScreen();
+    updateItem.mockRejectedValue(networkError());
+    await act(async () => {
+      row(tree, 1).props.onTogglePurchased();
+      row(tree, 3).props.onTogglePurchased();
+      row(tree, 1).props.onUpdateAmount(4);
+    });
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('restore and clear receive the offline guard', async () => {
+    const tree = await offlineScreen();
+    const section = tree.root.findByType(PurchasedItemsSection);
+    expect(section.props.blockIfOffline()).toBe(true);
+    expectBlocked();
+  });
+});
+
+describe('initial load grace period', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  const hangingLoad = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    getShoppingList.mockReturnValueOnce(promise);
+    return { resolve, reject };
+  };
+
+  test('shows the cache offline after 10 seconds, then goes online when the request succeeds', async () => {
+    await seed();
+    const request = hangingLoad();
+    const tree = await renderScreen();
+    expect(names(tree)).toEqual([]);
+    expect(banner(tree)).toBeUndefined();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(names(tree)).toEqual(['חלב', 'ביצים']);
+    expect(banner(tree)).toBeDefined();
+    await act(async () => request.resolve([milk]));
+    expect(names(tree)).toEqual(['חלב']);
+    expect(banner(tree)).toBeUndefined();
+  });
+
+  test('a late network error keeps the cache and the banner', async () => {
+    await seed();
+    const request = hangingLoad();
+    const tree = await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    await act(async () => request.reject(networkError()));
+    expect(names(tree)).toEqual(['חלב', 'ביצים']);
+    expect(banner(tree)).toBeDefined();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  test('a late server error keeps the existing error alert', async () => {
+    await seed();
+    const request = hangingLoad();
+    await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    await act(async () => request.reject(serverError()));
+    expect(alertSpy).toHaveBeenCalledWith(
+      'שגיאה',
+      'לא הצלחנו לטעון את המוצרים לרשימה זו.',
+    );
+  });
+
+  test('no cache means no early fallback', async () => {
+    const request = hangingLoad();
+    const tree = await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(30000));
+    expect(banner(tree)).toBeUndefined();
+    expect(names(tree)).toEqual([]);
+    await act(async () => request.resolve([milk]));
+    expect(names(tree)).toEqual(['חלב']);
+  });
+
+  test('unmounting before 10 seconds cancels the fallback', async () => {
+    await seed();
+    hangingLoad();
+    const tree = await renderScreen();
+    await act(async () => tree.unmount());
+    await act(async () => jest.advanceTimersByTimeAsync(20000));
+    expect(alertSpy).not.toHaveBeenCalled();
   });
 });

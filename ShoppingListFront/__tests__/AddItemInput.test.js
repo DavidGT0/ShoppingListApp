@@ -149,4 +149,21 @@ describe('AddItemInput when not editable', () => {
     await act(async () => tree.unmount());
     jest.useRealTimers();
   });
+
+  test('the plus button hands over to the parent instead of the empty-name alert', async () => {
+    const { Alert } = require('react-native');
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const onAdd = jest.fn();
+    let tree;
+    await act(async () => {
+      tree = ReactTestRenderer.create(
+        <AddItemInput onAdd={onAdd} listId={7} editable={false} />,
+      );
+    });
+    await act(async () => byId(tree, 'add_item_button')[0].props.onPress());
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+    await act(async () => tree.unmount());
+  });
 });

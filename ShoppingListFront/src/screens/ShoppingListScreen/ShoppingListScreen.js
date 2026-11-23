@@ -39,7 +39,11 @@ import {
   deleteListCategory,
 } from '../../services/api';
 import { resolveCategory, customKey } from '../../services/categories';
-import { loadWithCache, cacheKeys } from '../../services/offlineCache';
+import {
+  loadWithCache,
+  cacheKeys,
+  INITIAL_LOAD_GRACE_MS,
+} from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
@@ -83,14 +87,21 @@ const ShoppingListScreen = ({ route, navigation }) => {
     return true;
   };
   // שגיאת רשת בבקשת שינוי: עוברים למצב לא מקוון ומציגים את ההודעה במקום שגיאה כללית
+  // ההודעה מוצגת רק במעבר למצב לא מקוון, כדי שכמה בקשות שנכשלו יחד לא יערמו הודעות
   const failedOffline = error => {
     if (!error?.network) return false;
+    const wasOffline = isOfflineRef.current;
     setOffline(true);
-    showOfflineBlockedAlert();
+    if (!wasOffline) showOfflineBlockedAlert();
     return true;
   };
   // גרירה שהתחילה במצב לא מקוון נחסמה - בסיומה אין מה לשמור
   const dragBlocked = useRef(false);
+  // יש כבר מוצרים/מחלקות על המסך - מטמון לא דורס אותם, הוא רק מעביר למצב לא מקוון
+  const hasItems = useRef(false);
+  const hasCategories = useRef(false);
+  // מבטל את טיימר ההמתנה של הטעינה הראשונה ביציאה מהמסך
+  const loadAbort = useRef(new AbortController());
   const currentListId = listId;
   // עולה בתחילת כל פעולה שלי ובסופה - רענון שהתחיל לפני שינוי שלי נזרק
   const mutationVersion = useRef(0);
@@ -166,6 +177,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   commitPendingDeleteRef.current = commitPendingDelete;
 
   useEffect(() => {
+    const controller = loadAbort.current;
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'background' || state === 'inactive') {
         commitPendingDeleteRef.current();
@@ -173,6 +185,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     });
     return () => {
       subscription?.remove?.();
+      controller.abort();
       clearTimeout(barTimer.current);
       commitPendingDeleteRef.current();
     };
@@ -206,7 +219,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
         () => getListCategories(listId),
         cacheKeys.categories(listId),
       );
-      if (Array.isArray(data)) setCustomCategories(data);
+      if (Array.isArray(data) && !(fromCache && hasCategories.current)) {
+        setCustomCategories(data);
+        hasCategories.current = true;
+      }
       if (fromCache) setOffline(true);
     } catch (error) {
       // שקט - נשארות המחלקות המובנות
@@ -278,11 +294,25 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const loadListItems = async id => {
     try {
       setLoading(true);
-      const { data, fromCache } = await loadWithCache(
+      const { data, fromCache, alreadyShown } = await loadWithCache(
         () => getShoppingList(id),
         cacheKeys.items(id),
+        {
+          graceMs: INITIAL_LOAD_GRACE_MS,
+          signal: loadAbort.current.signal,
+          // הבקשה איטית: מציגים את הגרסה השמורה והבקשה ממשיכה ברקע
+          onEarlyCache: cached => {
+            setItems(sortByPosition(cached));
+            hasItems.current = true;
+            setOffline(true);
+            setLoading(false);
+          },
+        },
       );
+      // המטמון כבר מוצג והבקשה נכשלה ברשת - נשארים כמו שזה
+      if (alreadyShown) return;
       setItems(sortByPosition(data));
+      hasItems.current = true;
       setOffline(fromCache);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
@@ -312,8 +342,20 @@ const ShoppingListScreen = ({ route, navigation }) => {
       if (pendingMutations.current > 0 || version !== mutationVersion.current) {
         return;
       }
+      // נפלה הרשת ויש כבר נתונים על המסך: לא מחליפים אותם בעותק שמור ישן יותר
+      if (itemsResult.fromCache && hasItems.current) {
+        setOffline(true);
+        return;
+      }
       setItems(sortByPosition(itemsResult.data));
-      if (Array.isArray(catsResult?.data)) setCustomCategories(catsResult.data);
+      hasItems.current = true;
+      if (
+        Array.isArray(catsResult?.data) &&
+        !(catsResult.fromCache && hasCategories.current)
+      ) {
+        setCustomCategories(catsResult.data);
+        hasCategories.current = true;
+      }
       // חוזרים למצב מקוון רק כשהמוצרים הגיעו מהשרת
       setOffline(itemsResult.fromCache || !!catsResult?.fromCache);
     } catch (error) {
@@ -353,6 +395,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
     // פעולה חדשה מאשרת מחיקה ממתינה ומסתירה פס ביטול קודם.
     // ממתינים לסיום המחיקה: אחרת השרת עלול להחיות בדיוק את המוצר שנמחק עכשיו
     await commitPendingDelete();
+    // המחיקה הממתינה נכשלה ברשת: כבר הוצגה הודעה ואין שולחים כלום
+    if (isOfflineRef.current) return;
     hideBar();
     actionSeq.current++;
 
@@ -552,6 +596,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
     if (blockIfOffline()) return;
     // המחיקה הממתינה מסתיימת לפני הבקשה הקבוצתית, כדי שלא יהיה מרוץ ביניהן
     await commitPendingDelete();
+    // המחיקה הממתינה נכשלה ברשת: כבר הוצגה הודעה ואין שולחים כלום
+    if (isOfflineRef.current) return;
     actionSeq.current++;
     hideBar();
     startMutation();
@@ -723,6 +769,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       showAddedBy={memberCount > 1}
       currentUsername={currentUsername}
       disabled={isOffline}
+      blockIfOffline={blockIfOffline}
     />
   );
 

@@ -131,6 +131,20 @@ describe('loading', () => {
     expect(listNames()).toEqual(['שלי']);
   });
 
+  test('a network-error refresh keeps the on-screen lists and shows the banner', async () => {
+    await renderScreen();
+    await saveCache(cacheKeys.lists, [LISTS[0]]);
+    getShoppingLists.mockRejectedValue(networkError());
+    await act(async () => refresh()());
+    expect(banner()).toBeDefined();
+    expect(listNames()).toEqual(['שלי', 'של אמא']);
+  });
+
+  test('the new-list input is not editable while offline', async () => {
+    await goOffline();
+    expect(byTestId('new_list_input').props.editable).toBe(false);
+  });
+
   test('a 500 refresh does not flip to offline', async () => {
     await renderScreen();
     await saveCache(cacheKeys.lists, [LISTS[0]]);
@@ -255,5 +269,66 @@ describe('a network error during a mutation', () => {
     expect(banner()).toBeDefined();
     expect(alertSpy).toHaveBeenCalledTimes(1);
     expectBlocked();
+  });
+});
+
+describe('initial load grace period', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  const hangingLoad = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    getShoppingLists.mockReturnValueOnce(promise);
+    return { resolve, reject };
+  };
+
+  test('shows the cache offline after 10 seconds, then goes online when the request succeeds', async () => {
+    await saveCache(cacheKeys.lists, LISTS);
+    const request = hangingLoad();
+    await renderScreen();
+    expect(banner()).toBeUndefined();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(listNames()).toEqual(['שלי', 'של אמא']);
+    expect(banner()).toBeDefined();
+    await act(async () => request.resolve([LISTS[0]]));
+    expect(listNames()).toEqual(['שלי']);
+    expect(banner()).toBeUndefined();
+  });
+
+  test('a late network error keeps the cache and the banner', async () => {
+    await saveCache(cacheKeys.lists, LISTS);
+    const request = hangingLoad();
+    await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    await act(async () => request.reject(networkError()));
+    expect(listNames()).toEqual(['שלי', 'של אמא']);
+    expect(banner()).toBeDefined();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  test('a late server error keeps the existing error alert', async () => {
+    await saveCache(cacheKeys.lists, LISTS);
+    const request = hangingLoad();
+    await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    await act(async () => request.reject(serverError()));
+    expect(alertSpy).toHaveBeenCalledWith(
+      'שגיאה',
+      'לא הצלחנו לטעון את הרשימות שלך.',
+    );
+  });
+
+  test('no cache means no early fallback', async () => {
+    const request = hangingLoad();
+    await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(30000));
+    expect(banner()).toBeUndefined();
+    await act(async () => request.resolve([LISTS[0]]));
+    expect(listNames()).toEqual(['שלי']);
   });
 });

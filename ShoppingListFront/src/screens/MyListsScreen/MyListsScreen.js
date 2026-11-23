@@ -26,7 +26,11 @@ import JoinListModal from '../../components/JoinListModal/JoinListModal';
 import OfflineBanner, {
   showOfflineBlockedAlert,
 } from '../../components/OfflineBanner/OfflineBanner';
-import { loadWithCache, cacheKeys } from '../../services/offlineCache';
+import {
+  loadWithCache,
+  cacheKeys,
+  INITIAL_LOAD_GRACE_MS,
+} from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './MyListsScreen.styles';
 import { colors } from '../../theme/colors';
@@ -48,6 +52,10 @@ const MyListsScreen = ({ navigation }) => {
   // מצבים לניהול חלון ההצטרפות עם קוד הזמנה
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // יש כבר רשימות על המסך - מטמון לא דורס אותן, הוא רק מעביר למצב לא מקוון
+  const hasLists = useRef(false);
+  // מבטל את טיימר ההמתנה של הטעינה הראשונה ביציאה מהמסך
+  const loadAbort = useRef(new AbortController());
 
   // מצב לא מקוון: מוצגת הגרסה השמורה ואי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
   const [isOffline, setIsOffline] = useState(false);
@@ -63,10 +71,12 @@ const MyListsScreen = ({ navigation }) => {
     return true;
   };
   // שגיאת רשת בבקשת שינוי: עוברים למצב לא מקוון ומציגים את ההודעה במקום שגיאה כללית
+  // ההודעה מוצגת רק במעבר למצב לא מקוון, כדי שכמה בקשות שנכשלו יחד לא יערמו הודעות
   const failedOffline = error => {
     if (!error?.network) return false;
+    const wasOffline = isOfflineRef.current;
     setOffline(true);
-    showOfflineBlockedAlert();
+    if (!wasOffline) showOfflineBlockedAlert();
     return true;
   };
 
@@ -84,7 +94,9 @@ const MyListsScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
+    const controller = loadAbort.current;
     loadLists();
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -99,7 +111,13 @@ const MyListsScreen = ({ navigation }) => {
     if (pendingMutations.current > 0 || version !== mutationVersion.current) {
       return;
     }
+    // נפלה הרשת ויש כבר רשימות על המסך: לא מחליפים אותן בעותק שמור ישן יותר
+    if (fromCache && hasLists.current) {
+      setOffline(true);
+      return;
+    }
     setLists(data || []);
+    hasLists.current = true;
     setOffline(fromCache);
   }, []);
 
@@ -130,11 +148,25 @@ const MyListsScreen = ({ navigation }) => {
   const loadLists = async () => {
     try {
       setLoading(true);
-      const { data, fromCache } = await loadWithCache(
+      const { data, fromCache, alreadyShown } = await loadWithCache(
         getShoppingLists,
         cacheKeys.lists,
+        {
+          graceMs: INITIAL_LOAD_GRACE_MS,
+          signal: loadAbort.current.signal,
+          // הבקשה איטית: מציגים את הגרסה השמורה והבקשה ממשיכה ברקע
+          onEarlyCache: cached => {
+            setLists(cached || []);
+            hasLists.current = true;
+            setOffline(true);
+            setLoading(false);
+          },
+        },
       );
+      // המטמון כבר מוצג והבקשה נכשלה ברשת - נשארים כמו שזה
+      if (alreadyShown) return;
       setLists(data || []);
+      hasLists.current = true;
       setOffline(fromCache);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
@@ -288,6 +320,7 @@ const MyListsScreen = ({ navigation }) => {
           style={styles.input}
           placeholder="שם רשימה חדשה..."
           value={newListName}
+          editable={!isOffline}
           onChangeText={setNewListName}
           placeholderTextColor={colors.text.secondary}
           testID="new_list_input" // <-- מזהה לשדה יצירת רשימה
