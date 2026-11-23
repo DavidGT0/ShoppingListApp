@@ -180,7 +180,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   modalContent: {
     width: '85%',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
     borderRadius: 16,
     padding: 20,
     shadowColor: colors.shadowBase,

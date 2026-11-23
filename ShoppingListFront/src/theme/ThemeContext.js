@@ -19,6 +19,7 @@ const fallback = {
   colors: light,
   isDark: false,
   setMode: () => {},
+  ready: true,
 };
 
 const ThemeContext = createContext(fallback);
@@ -26,6 +27,7 @@ const ThemeContext = createContext(fallback);
 export const ThemeProvider = ({ children }) => {
   const scheme = useColorScheme();
   const [mode, setModeState] = useState('system');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -33,7 +35,10 @@ export const ThemeProvider = ({ children }) => {
       .then(stored => {
         if (active && MODES.includes(stored)) setModeState(stored);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .then(() => {
+        if (active) setReady(true);
+      });
     return () => {
       active = false;
     };
@@ -47,8 +52,8 @@ export const ThemeProvider = ({ children }) => {
 
   const value = useMemo(() => {
     const isDark = mode === 'dark' || (mode === 'system' && scheme === 'dark');
-    return { mode, colors: isDark ? dark : light, isDark, setMode };
-  }, [mode, scheme, setMode]);
+    return { mode, colors: isDark ? dark : light, isDark, setMode, ready };
+  }, [mode, scheme, setMode, ready]);
 
   return (
     <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

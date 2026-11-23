@@ -8,7 +8,7 @@ export const makeStyles = colors => StyleSheet.create({
     alignItems: 'center',
   },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.sheet,
     width: '75%',
     borderRadius: 12,
     paddingVertical: 8,
@@ -32,6 +32,6 @@ export const makeStyles = colors => StyleSheet.create({
     textAlign: 'right',
   },
   destructiveText: {
-    color: colors.danger,
+    color: colors.dangerText,
   },
 });

@@ -136,6 +136,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             <TextInput
               style={styles.input}
               placeholder={isLogin ? 'שם משתמש או אימייל' : 'הזן שם משתמש'}
+              placeholderTextColor={colors.placeholder}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
@@ -151,6 +152,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
               <TextInput
                 style={styles.input}
                 placeholder="הזן כתובת אימייל"
+                placeholderTextColor={colors.placeholder}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -167,6 +169,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             <TextInput
               style={styles.input}
               placeholder="הזן סיסמא"
+              placeholderTextColor={colors.placeholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -248,6 +251,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
             <TextInput
               style={styles.input}
               placeholder="כתובת אימייל"
+              placeholderTextColor={colors.placeholder}
               value={forgotEmail}
               onChangeText={setForgotEmail}
               autoCapitalize="none"

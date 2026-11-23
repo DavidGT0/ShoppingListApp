@@ -8,7 +8,7 @@ export const makeStyles = colors => StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.sheet,
     width: '85%',
     borderRadius: 12,
     padding: 20,

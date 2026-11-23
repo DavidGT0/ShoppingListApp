@@ -9,7 +9,7 @@ export const makeStyles = colors => StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.text.primary,
+    backgroundColor: colors.snackbar,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -17,7 +17,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   message: {
     flex: 1,
-    color: colors.text.inverse,
+    color: colors.onSnackbar,
     fontSize: 15,
     textAlign: 'right',
   },
@@ -28,7 +28,7 @@ export const makeStyles = colors => StyleSheet.create({
     justifyContent: 'center',
   },
   undoText: {
-    color: colors.primaryLight,
+    color: colors.snackbarAction,
     fontSize: 15,
     fontWeight: 'bold',
   },

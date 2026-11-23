@@ -93,7 +93,7 @@ function MainTabNavigator({ onLogout }) {
 }
 
 function AppContent() {
-  const { colors, isDark: isDarkMode } = useTheme();
+  const { colors, isDark: isDarkMode, ready } = useTheme();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -134,7 +134,7 @@ function AppContent() {
   // כראוי במסכים מסוימים, במיוחד לאחר ניווט.
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {isLoading ? (
+      {isLoading || !ready ? (
         <View
           style={{
             flex: 1,
@@ -147,7 +147,10 @@ function AppContent() {
         </View>
       ) : (
         <SafeAreaProvider>
-          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <StatusBar
+            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+            backgroundColor={colors.background}
+          />
           {!isLoggedIn ? (
             <LoginScreen onLoginSuccess={() => setIsLoggedIn(true)} />
           ) : (

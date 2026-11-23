@@ -954,6 +954,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={[colors.primary]}
+              progressBackgroundColor={colors.raised}
             />
           }
         >
@@ -1007,6 +1008,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={[colors.primary]}
+              progressBackgroundColor={colors.raised}
             />
           }
           ListHeaderComponent={listHeader}

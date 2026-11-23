@@ -32,6 +32,6 @@ export const makeStyles = colors => StyleSheet.create({
     color: colors.text.primary,
   },
   actionTextDanger: {
-    color: colors.danger,
+    color: colors.dangerText,
   },
 });

@@ -51,3 +51,19 @@ describe('theme', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('placeholder colours', () => {
+  test('every TextInput with a placeholder sets placeholderTextColor', () => {
+    const offenders = walk(SRC)
+      .filter(f => /<TextInput[\s\S]*?\/>/.test(fs.readFileSync(f, 'utf8')))
+      .filter(f => {
+        const blocks =
+          fs.readFileSync(f, 'utf8').match(/<TextInput[\s\S]*?\/>/g) || [];
+        return blocks.some(
+          b => /placeholder=/.test(b) && !/placeholderTextColor=/.test(b),
+        );
+      })
+      .map(f => path.relative(SRC, f));
+    expect(offenders).toEqual([]);
+  });
+});

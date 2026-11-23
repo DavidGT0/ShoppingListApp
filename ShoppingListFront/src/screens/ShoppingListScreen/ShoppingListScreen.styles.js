@@ -181,7 +181,7 @@ export const makeStyles = colors => StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
     borderRadius: 16,
     padding: 24,
     width: '85%',
@@ -250,6 +250,7 @@ export const makeStyles = colors => StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 12,
     borderWidth: 0.2,
+    borderColor: colors.border,
     elevation: 0,
     shadowOpacity: 0,
   },

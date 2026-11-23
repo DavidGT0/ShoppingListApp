@@ -206,7 +206,7 @@ export const makeStyles = colors => StyleSheet.create({
     marginTop: 14,
   },
   deleteAccountButtonText: {
-    color: colors.danger,
+    color: colors.dangerText,
     fontSize: 16,
     fontWeight: '700',
   },

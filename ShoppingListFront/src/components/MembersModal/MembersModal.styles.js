@@ -8,7 +8,7 @@ export const makeStyles = colors => StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.sheet,
     width: '85%',
     maxHeight: '80%',
     borderRadius: 12,
@@ -53,7 +53,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   removeButtonText: {
     fontSize: 14,
-    color: colors.danger,
+    color: colors.dangerText,
     fontWeight: 'bold',
   },
   actions: {
@@ -90,7 +90,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   dangerButtonText: {
     fontSize: 16,
-    color: colors.danger,
+    color: colors.dangerText,
     fontWeight: 'bold',
   },
 });

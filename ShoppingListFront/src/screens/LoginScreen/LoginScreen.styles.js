@@ -130,7 +130,7 @@ export const makeStyles = colors => StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.raised,
     width: '85%',
     borderRadius: 16,
     padding: 20,

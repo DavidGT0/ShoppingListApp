@@ -381,6 +381,7 @@ const MyListsScreen = ({ navigation }) => {
             refreshing={refreshing}
             onRefresh={handlePullToRefresh}
             colors={[colors.primary]}
+            progressBackgroundColor={colors.raised}
           />
         }
         keyExtractor={item => item.id.toString()}

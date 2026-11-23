@@ -10,10 +10,11 @@ import {
 import { joinListByCode } from '../../services/api';
 import { extractInviteCode } from '../../services/inviteCode';
 import { makeStyles } from './JoinListModal.styles';
-import { useStyles } from '../../theme/ThemeContext';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
 
 const JoinListModal = ({ visible, onClose, onJoined }) => {
   const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,6 +60,7 @@ const JoinListModal = ({ visible, onClose, onJoined }) => {
             value={code}
             onChangeText={setCode}
             placeholder="הדבק כאן את ההודעה או את הקוד"
+            placeholderTextColor={colors.placeholder}
             autoCapitalize="characters"
             autoCorrect={false}
             autoFocus
