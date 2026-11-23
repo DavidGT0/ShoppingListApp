@@ -6,11 +6,11 @@ export const makeStyles = colors => StyleSheet.create({
     backgroundColor: colors.background,
     padding: 20,
   },
-  // אותה כותרת כחולה ומעוגלת כמו במסכי הרשימות (פורשת על כל רוחב המסך)
+  // אותה כותרת מעוגלת כמו במסכי הרשימות (פורשת על כל רוחב המסך). הרקע הוא מעבר
+  // הצבעים (LinearGradient) - colors.headerGradient
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
     marginHorizontal: -20,
     marginTop: -20,
     marginBottom: 30,
@@ -25,16 +25,17 @@ export const makeStyles = colors => StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text.inverse,
   },
+  // כרטיס כמו כרטיסי הרשימה: משטח הערכה, צל רך, בלי מסגרת
   userSection: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
-    shadowColor: colors.shadow.medium,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    marginBottom: 16,
+    shadowColor: colors.shadowBase,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 20,
@@ -42,30 +43,38 @@ export const makeStyles = colors => StyleSheet.create({
     color: colors.text.primary,
     marginBottom: 16,
   },
+  // מתג גלולה (כמו מתג המיון): מיכל מעוגל עם ריווח, בלי overflow שחותך את המסגרת
   themeSegments: {
     flexDirection: 'row-reverse',
-    borderRadius: 12,
-    overflow: 'hidden',
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: colors.raised,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   themeSegment: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
+    paddingVertical: 9,
+    borderRadius: 10,
   },
   themeSegmentActive: {
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   themeSegmentText: {
     fontSize: 14,
-    color: colors.primaryText,
+    color: colors.text.secondary,
     fontWeight: '600',
   },
   themeSegmentTextActive: {
     color: colors.text.inverse,
+    fontWeight: '700',
   },
   userInfo: {
     flexDirection: 'row',
@@ -107,14 +116,15 @@ export const makeStyles = colors => StyleSheet.create({
     color: colors.text.secondary,
     lineHeight: 24,
   },
+  // אדום כהה שעומד ב-AA עם טקסט לבן (5.6:1) בשתי הערכות
   logoutButton: {
-    backgroundColor: colors.danger,
+    backgroundColor: colors.dangerStrong,
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-    shadowColor: colors.danger,
+    marginTop: 4,
+    marginBottom: 20,
+    shadowColor: colors.dangerStrong,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -128,7 +138,7 @@ export const makeStyles = colors => StyleSheet.create({
   // --- סגנונות חדשים עבור שינוי סיסמה ---
   actionButton: {
     backgroundColor: colors.primary,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
     alignItems: 'center',
     marginTop: 10,
@@ -187,8 +197,6 @@ export const makeStyles = colors => StyleSheet.create({
   },
   // מחיקת חשבון
   dangerSection: {
-    borderWidth: 1,
-    borderColor: colors.dangerLight,
     marginBottom: 40,
   },
   dangerText: {
@@ -197,9 +205,10 @@ export const makeStyles = colors => StyleSheet.create({
     lineHeight: 22,
     textAlign: 'right',
   },
+  // משני אבל הרסני בבירור: מתאר וטקסט אדומים, בלי מילוי
   deleteAccountButton: {
     borderWidth: 1.5,
-    borderColor: colors.danger,
+    borderColor: colors.dangerText,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
@@ -212,7 +221,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   deleteConfirmButton: {
     flex: 1,
-    backgroundColor: colors.danger,
+    backgroundColor: colors.dangerStrong,
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',

@@ -13,6 +13,7 @@ import { buildRoute } from '../src/components/DepartmentRoute/buildRoute';
 import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListItem';
 import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import MyListsScreen from '../src/screens/MyListsScreen/MyListsScreen';
+import SettingsScreen from '../src/screens/SettingsScreen/SettingsScreen';
 import { resolveCategory } from '../src/services/categories';
 
 jest.mock('../src/hooks/useLiveRefresh', () => ({
@@ -43,6 +44,16 @@ jest.mock('react-native-draggable-flatlist', () => {
     NestableScrollContainer: MockContainer,
   };
 });
+jest.mock('../src/services/auth', () => ({
+  getCurrentUser: jest.fn(async () => ({
+    username: 'bob',
+    email: 'bob@example.com',
+  })),
+  logout: jest.fn(),
+  changePassword: jest.fn(),
+  changeUsername: jest.fn(),
+  deleteAccount: jest.fn(),
+}));
 jest.mock('../src/services/api', () => ({
   getShoppingLists: jest.fn(async () => []),
   getShoppingList: jest.fn(async () => [
@@ -374,6 +385,144 @@ describe('route colours', () => {
       }
     },
   );
+});
+
+// מסך ההגדרות בעיצוב החדש
+describe('settings screen', () => {
+  const host = (tree, id) =>
+    tree.root.findAll(n => n.props.testID === id && typeof n.type === 'string')[0];
+  const byText = (tree, text) =>
+    tree.root.findAll(n => n.type === 'Text' && n.props.children === text)[0];
+  // הרכיב הלחיץ המצויר הקרוב ביותר מעל טקסט
+  const buttonOf = (tree, text) => {
+    let n = byText(tree, text).parent;
+    while (n && !(typeof n.type === 'string' && n.props.accessibilityRole === 'button')) {
+      n = n.parent;
+    }
+    return n;
+  };
+  const renderSettings = mode =>
+    render(<SettingsScreen onLogout={jest.fn()} />, mode);
+
+  test.each(['light', 'dark'])(
+    '%s: gradient header with the white title and rounded bottom corners',
+    async mode => {
+      const palette = mode === 'dark' ? dark : light;
+      const tree = await renderSettings(mode);
+      try {
+        const header = gradients(tree).find(g => g.props.testID === 'settings_header');
+        expect(header.props.colors).toEqual(palette.headerGradient);
+        expect(header.props.useAngle).toBe(true);
+        expect(header.props.angle).toBe(135);
+        expect(flat(header).borderBottomLeftRadius).toBe(32);
+        expect(flat(header).borderBottomRightRadius).toBe(32);
+        expect(flat(header).backgroundColor).toBeUndefined();
+        expect(flat(byText(tree, 'הגדרות')).color).toBe(palette.text.inverse);
+      } finally {
+        await unmount(tree);
+      }
+    },
+  );
+
+  test.each(['light', 'dark'])(
+    '%s: section cards are borderless surface cards with a soft shadow',
+    async mode => {
+      const palette = mode === 'dark' ? dark : light;
+      const tree = await renderSettings(mode);
+      try {
+        const cards = tree.root.findAll(
+          n =>
+            typeof n.type === 'string' &&
+            typeof n.props.testID === 'string' &&
+            n.props.testID.startsWith('settings_card_'),
+        );
+        expect(cards.map(c => c.props.testID).sort()).toEqual([
+          'settings_card_account',
+          'settings_card_delete',
+          'settings_card_security',
+          'settings_card_theme',
+        ]);
+        cards.forEach(c => {
+          const s = flat(c);
+          expect(s.backgroundColor).toBe(palette.surface);
+          expect(s.borderWidth || 0).toBe(0);
+          expect(s.elevation).toBeLessThanOrEqual(3);
+          expect(s.shadowOpacity).toBeLessThanOrEqual(0.1);
+        });
+      } finally {
+        await unmount(tree);
+      }
+    },
+  );
+
+  test('the theme choice is the pill control, with the testIDs, roles and state', async () => {
+    const tree = await renderSettings('dark');
+    try {
+      const container = host(tree, 'theme_segments');
+      expect(flat(container).borderRadius).toBe(14);
+      expect(flat(container).padding).toBe(4);
+      expect(flat(container).overflow).toBeUndefined();
+      expect(flat(container).backgroundColor).toBe(dark.raised);
+      const active = host(tree, 'theme_dark');
+      const inactive = host(tree, 'theme_light');
+      expect(host(tree, 'theme_system')).toBeDefined();
+      expect(active.props.accessibilityRole).toBe('button');
+      expect(active.props.accessibilityState).toEqual({ selected: true });
+      expect(inactive.props.accessibilityState).toEqual({ selected: false });
+      expect(flat(active).backgroundColor).toBe(dark.primary);
+      expect(flat(active).borderRadius).toBe(10);
+      expect(flat(active).borderWidth || 0).toBe(0);
+      expect(flat(inactive).backgroundColor).toBeUndefined();
+      const textColor = n => flat(n.findAll(c => c.type === 'Text')[0]).color;
+      expect(textColor(active)).toBe(dark.text.inverse);
+      expect(textColor(inactive)).toBe(dark.text.secondary);
+    } finally {
+      await unmount(tree);
+    }
+  });
+
+  test.each(['light', 'dark'])(
+    '%s: change password is primary, logout is an AA danger fill, delete stays secondary',
+    async mode => {
+      const palette = mode === 'dark' ? dark : light;
+      const tree = await renderSettings(mode);
+      try {
+        const change = buttonOf(tree, 'שנה סיסמה');
+        expect(flat(change).backgroundColor).toBe(palette.primary);
+        const logout = buttonOf(tree, 'התנתק');
+        const logoutFill = flat(logout).backgroundColor;
+        expect(logoutFill).toBe(palette.dangerStrong);
+        expect(flat(byText(tree, 'התנתק')).color).toBe(palette.text.inverse);
+        expect(ratio(palette.text.inverse, logoutFill)).toBeGreaterThanOrEqual(4.5);
+        // מחיקת החשבון: מתאר אדום בלבד, בלי מילוי (משנית אבל הרסנית בבירור)
+        const del = host(tree, 'delete_account_button');
+        expect(flat(del).backgroundColor).toBeUndefined();
+        expect(flat(del).borderColor).toBe(palette.dangerText);
+        const delText = flat(byText(tree, 'מחק את החשבון שלי')).color;
+        expect(delText).toBe(palette.dangerText);
+        expect(ratio(delText, palette.surface)).toBeGreaterThanOrEqual(4.5);
+      } finally {
+        await unmount(tree);
+      }
+    },
+  );
+
+  test('the final delete confirmation is an AA danger fill too', async () => {
+    const tree = await renderSettings('light');
+    try {
+      await act(async () =>
+        tree.root
+          .findAll(n => n.props.testID === 'delete_account_button' && n.props.onPress)[0]
+          .props.onPress(),
+      );
+      const confirm = buttonOf(tree, 'מחק לצמיתות');
+      expect(flat(confirm).backgroundColor).toBe(light.dangerStrong);
+      // שם המשתמש: שורת העריכה ממשיכה לעבוד עם אותם מזהים
+      expect(host(tree, 'edit_username_button')).toBeDefined();
+    } finally {
+      await unmount(tree);
+    }
+  });
 });
 
 describe('jest mock', () => {

@@ -257,6 +257,7 @@ describe('light mode contrast walker: route, focus card and ring', () => {
     // המסכים עם כותרת המעבר על הרקע הבהיר החדש (#F4F7FB)
     ShoppingList: cases.ShoppingList,
     MyLists: cases.MyLists,
+    Settings: cases.Settings,
   };
   Object.entries(lightCases).forEach(([name, el]) => {
     test(`${name}: every text meets 4.5:1 on its background`, async () => {

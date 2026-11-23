@@ -31,6 +31,8 @@ export const light = {
   danger: '#F44336',
   // טקסט אדום כהה יותר: #F44336 על לבן הוא 3.68:1 בלבד
   dangerText: '#C62828',
+  // מילוי של כפתור הרסני עם טקסט לבן (5.6:1)
+  dangerStrong: '#C62828',
   dangerLight: '#EF5350',
   warning: '#FF9800',
   warningLight: '#FFB74D',
@@ -96,6 +98,7 @@ export const dark = {
   successLight: '#81C784',
   danger: '#F44336',
   dangerText: '#FF6B60',
+  dangerStrong: '#C62828',
   dangerLight: '#EF5350',
   warning: '#FF9800',
   warningLight: '#FFB74D',

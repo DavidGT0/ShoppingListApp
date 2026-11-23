@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import { makeStyles } from './SettingsScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import {
@@ -171,16 +172,21 @@ const SettingsScreen = ({ onLogout }) => {
   return (
     <ScrollView style={styles.container}>
       {/* ההגדרות הן לשונית בתפריט התחתון - אין צורך בכפתור "חזור" */}
-      <View
+      {/* כותרת במעבר צבעים, כמו במסכי הרשימות */}
+      <LinearGradient
+        colors={colors.headerGradient}
+        useAngle
+        angle={135}
         style={[styles.header, { paddingTop: insets.top + 24 }]}
         testID="settings_header"
       >
         <Text style={styles.title}>הגדרות</Text>
-      </View>
+      </LinearGradient>
 
-      <View style={styles.userSection}>
+      <View style={styles.userSection} testID="settings_card_theme">
         <Text style={styles.sectionTitle}>ערכת צבעים</Text>
-        <View style={styles.themeSegments}>
+        {/* מתג גלולה, כמו מתג המיון ברשימה */}
+        <View style={styles.themeSegments} testID="theme_segments">
           {[
             { value: 'light', label: 'בהיר' },
             { value: 'dark', label: 'כהה' },
@@ -216,7 +222,7 @@ const SettingsScreen = ({ onLogout }) => {
       </View>
 
       {user && (
-        <View style={styles.userSection}>
+        <View style={styles.userSection} testID="settings_card_account">
           <Text style={styles.sectionTitle}>פרטי משתמש</Text>
           <View style={styles.userInfo}>
             <Text style={styles.label}>שם משתמש:</Text>
@@ -288,7 +294,7 @@ const SettingsScreen = ({ onLogout }) => {
       )}
 
       {/* אזור אבטחה - שינוי סיסמה */}
-      <View style={styles.userSection}>
+      <View style={styles.userSection} testID="settings_card_security">
         <Text style={styles.sectionTitle}>אבטחה</Text>
 
         {!showPasswordForm ? (
@@ -369,7 +375,10 @@ const SettingsScreen = ({ onLogout }) => {
       </TouchableOpacity>
 
       {/* מחיקת חשבון (דרישה של Google Play) */}
-      <View style={[styles.userSection, styles.dangerSection]}>
+      <View
+        style={[styles.userSection, styles.dangerSection]}
+        testID="settings_card_delete"
+      >
         <Text style={styles.sectionTitle}>מחיקת חשבון</Text>
         <Text style={styles.dangerText}>
           מחיקת החשבון תמחק לצמיתות את המשתמש שלך, את כל הרשימות שיצרת ואת כל
