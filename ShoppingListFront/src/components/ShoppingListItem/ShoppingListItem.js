@@ -6,6 +6,10 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { makeStyles } from './ShoppingListItem.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 
+// אזורי לחיצה של 44dp לפחות סביב העיגול (26dp) והפח (28dp)
+const CIRCLE_HIT_SLOP = { top: 9, bottom: 9, left: 9, right: 9 };
+const TRASH_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+
 const ShoppingListItem = ({
   item,
   onTogglePurchased,
@@ -18,6 +22,7 @@ const ShoppingListItem = ({
   currentUsername = null,
   disabled = false,
   // 'focus': שורה גדולה בכרטיס "עכשיו במחלקה" (טקסט לבן על הצבע הראשי)
+  // 'route': שורה רגילה במסלול המחלקות (בלי הנקודה הצבעונית)
   variant,
 }) => {
   const styles = useStyles(makeStyles);
@@ -51,8 +56,13 @@ const ShoppingListItem = ({
     borderless: true,
   });
 
+  // הנקודה הצבעונית רק במצב ידני: במסלול סמל המחלקה כבר מראה את הצבע
+  const showDot = !!item.categoryColor && !variant;
+
   // הפקדים שחייבים להציג את חסימת האופליין (עיגול, שם, פח) אינם מושבתים:
   // המסך מריץ blockIfOffline. רק כפתורי הכמות מושבתים בפועל.
+  // סדר השורה כמו בעיצוב (row-reverse): מימין עיגול, שם, כמות, פח, ובקצה השמאלי
+  // ידית הגרירה - בתוך רצועת ה-dragHitSlop של הרשימה
   return (
     <View
       style={[
@@ -62,31 +72,11 @@ const ShoppingListItem = ({
         focus && styles.focusContainer,
       ]}
     >
-      {item.categoryColor && !focus && (
+      {showDot && (
         <View
+          testID="item_dot"
           style={[styles.categoryDot, { backgroundColor: item.categoryColor }]}
         />
-      )}
-
-      {onDrag && (
-        <GHTouchableOpacity
-          onLongPress={onDrag}
-          disabled={isActive}
-          delayLongPress={150}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={styles.dragHandle}
-          accessibilityRole="button"
-          accessibilityLabel="גרור לסידור מחדש"
-          accessibilityState={{ disabled: !!isActive }}
-          accessibilityHint="לחיצה כפולה והחזקה כדי לגרור"
-        >
-          <Icon
-            name="drag-vertical"
-            size={20}
-            color={colors.text.secondary}
-            style={{ opacity: 0.5 }}
-          />
-        </GHTouchableOpacity>
       )}
 
       <Pressable
@@ -101,7 +91,7 @@ const ShoppingListItem = ({
           .filter(Boolean)
           .join(', ')}
         accessibilityState={{ checked: !!item.purchased }}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        hitSlop={CIRCLE_HIT_SLOP}
         style={[
           styles.checkCircle,
           focus && styles.checkCircleFocus,
@@ -125,7 +115,10 @@ const ShoppingListItem = ({
           onLayout={e => setNameWidth(e.nativeEvent.layout.width)}
           style={styles.nameInner}
         >
+          {/* שבירה רק בין מילים: לשם יש את כל הרוחב שנשאר בשורה */}
           <Text
+            textBreakStrategy="simple"
+            android_hyphenationFrequency="none"
             style={[
               styles.itemName,
               item.purchased && styles.purchasedTextColor,
@@ -172,7 +165,7 @@ const ShoppingListItem = ({
         >
           <Icon name="minus" size={16} color={colors.primaryText} />
         </Pressable>
-        <Text testID="item_amount" style={styles.amountText}>
+        <Text testID="item_amount" numberOfLines={1} style={styles.amountText}>
           {item.unit ? `${item.amount} ${item.unit}` : String(item.amount)}
         </Text>
         <Pressable
@@ -194,15 +187,37 @@ const ShoppingListItem = ({
         onPress={() => onDelete()}
         accessibilityRole="button"
         accessibilityLabel={`מחק את ${item.name}`}
+        hitSlop={TRASH_HIT_SLOP}
         style={styles.actionButton}
         android_ripple={ripple(18)}
       >
         <Icon
           name="trash-can-outline"
           size={focus ? 22 : 20}
-          color={focus ? colors.text.inverse : colors.dangerText}
+          color={focus ? colors.text.inverse : colors.text.secondary}
         />
       </Pressable>
+
+      {onDrag && (
+        <GHTouchableOpacity
+          onLongPress={onDrag}
+          disabled={isActive}
+          delayLongPress={150}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.dragHandle}
+          accessibilityRole="button"
+          accessibilityLabel="גרור לסידור מחדש"
+          accessibilityState={{ disabled: !!isActive }}
+          accessibilityHint="לחיצה כפולה והחזקה כדי לגרור"
+        >
+          <Icon
+            name="drag-vertical"
+            size={20}
+            color={colors.text.secondary}
+            style={{ opacity: 0.5 }}
+          />
+        </GHTouchableOpacity>
+      )}
     </View>
   );
 };

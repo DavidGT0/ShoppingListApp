@@ -181,7 +181,22 @@ describe('DepartmentRoute', () => {
     expect(one(card, 'row_3').props.variant).toBe('focus');
     // מחלקה אחרת מקבלת שורות רגילות מחוץ לכרטיס
     expect(host(card, 'row_6')).toHaveLength(0);
-    expect(one(tree.root, 'row_6').props.variant).toBe('default');
+    expect(one(tree.root, 'row_6').props.variant).toBe('route');
+  });
+
+  test('the focus department keeps its highlighted pin row above the card', async () => {
+    const tree = await mount();
+    const station = one(tree.root, 'department_dairy');
+    const ids = station
+      .findAll(n => typeof n.type === 'string' && n.props.testID)
+      .map(n => n.props.testID);
+    expect(ids.indexOf('category_header_dairy')).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf('department_pin_dairy')).toBeGreaterThan(
+      ids.indexOf('category_header_dairy'),
+    );
+    expect(ids.indexOf('focus_card')).toBeGreaterThan(
+      ids.indexOf('department_pin_dairy'),
+    );
   });
 
   test('the focus card is announced as now in the department', async () => {

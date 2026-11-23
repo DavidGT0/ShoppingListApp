@@ -4,7 +4,7 @@ export const PIN_SIZE = 40;
 const PIN_RING = 4;
 const LINE_WIDTH = 3;
 // השורות והכרטיס מוזזים פנימה מעבר לקו המסלול
-export const ROW_INDENT = PIN_SIZE + 8;
+export const ROW_INDENT = PIN_SIZE + 4;
 
 // כמו שאר המסך: row-reverse ו-right כדי שהמסלול יהיה בצד ימין (תחילת השורה בעברית)
 export const makeStyles = colors =>

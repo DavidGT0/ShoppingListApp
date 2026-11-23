@@ -1,16 +1,17 @@
 ﻿import { StyleSheet } from 'react-native';
 
 export const makeStyles = colors => StyleSheet.create({
+  // סרגל קומפקטי: בלי רווח ריק מתחת לשדה (להצעות יש רווח משלהן)
   addContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
-    gap: 10,
+    gap: 8,
   },
   input: {
     flex: 1,
     backgroundColor: colors.surface,
-    padding: 15,
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     fontSize: 16,
     borderWidth: 1,
     borderColor: colors.border,
@@ -18,8 +19,8 @@ export const makeStyles = colors => StyleSheet.create({
   },
   addButton: {
     backgroundColor: colors.primary,
-    width: 55,
-    borderRadius: 8,
+    width: 48,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 2,
@@ -28,8 +29,7 @@ export const makeStyles = colors => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: -10,
-    marginBottom: 12,
+    marginTop: 8,
   },
   chip: {
     backgroundColor: colors.surface,

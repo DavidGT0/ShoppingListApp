@@ -109,8 +109,8 @@ export const makeStyles = colors => StyleSheet.create({
     backgroundColor: colors.surface,
     marginHorizontal: 20,
     marginTop: -28,
-    padding: 10,
-    borderRadius: 20,
+    padding: 8,
+    borderRadius: 16,
     shadowColor: colors.shadow.dark,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
@@ -163,6 +163,10 @@ export const makeStyles = colors => StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 380,
+  },
+  // המסלול צמוד יותר לקצוות (כמו בעיצוב), כדי להשאיר לשמות המוצרים רוחב
+  routeContent: {
+    paddingHorizontal: 14,
   },
 
   /* מודאל עריכה */
@@ -234,33 +238,5 @@ export const makeStyles = colors => StyleSheet.create({
     color: colors.text.inverse,
     fontSize: 17,
     fontWeight: '700',
-  },
-  tipContainer: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderWidth: 0.2,
-    borderColor: colors.border,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  tipTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.heading,
-    marginBottom: 4,
-    textAlign: 'right',
-  },
-  tipText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 18,
-    textAlign: 'right',
-  },
-  boldText: {
-    fontWeight: 'bold',
-    color: colors.text.primary,
   },
 });

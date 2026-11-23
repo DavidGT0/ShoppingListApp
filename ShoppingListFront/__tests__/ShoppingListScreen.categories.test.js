@@ -233,12 +233,14 @@ test('manual mode passes a gesture-handler RefreshControl that refreshes', async
   expect(getShoppingList).toHaveBeenCalledTimes(1);
 });
 
+// הידית בקצה השמאלי של השורה (32-60dp, עם hitSlop 22-70dp). רצועה צרה יותר
+// משאירה את שאר השורה (כולל הפח) למשיכה לריענון
 test('manual mode limits the drag gesture to the handle strip so a pull can refresh', async () => {
   const { I18nManager } = require('react-native');
   await mount(ITEMS);
   const { dragHitSlop } = global.__dragProps;
   const side = I18nManager.isRTL ? 'right' : 'left';
-  expect(dragHitSlop).toEqual({ [side]: 0, width: 100 });
+  expect(dragHitSlop).toEqual({ [side]: 0, width: 72 });
 });
 
 test('category mode passes a gesture-handler RefreshControl that refreshes', async () => {

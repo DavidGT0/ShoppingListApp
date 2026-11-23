@@ -260,6 +260,20 @@ describe('by department route', () => {
     expect(textOf(one(tree.root, 'sort_segment_category'))).toBe('לפי מחלקות');
   });
 
+  test('route rows use the route variant (no category dot)', async () => {
+    const tree = await mountRoute(ITEMS);
+    const route = one(tree.root, 'department_route');
+    const row = route
+      .findAllByType(ShoppingListItem)
+      .find(r => r.props.item.id === 4);
+    expect(row.props.variant).toBe('route');
+  });
+
+  test('there is no tip box above the route (the mockup has none)', async () => {
+    const tree = await mountRoute(ITEMS);
+    expect(tree.root.findAll(n => n.props.children === '💡 טיפ שימושי:')).toHaveLength(0);
+  });
+
   test('bought items stay in the bottom section', async () => {
     const tree = await mountRoute(ITEMS);
     const route = one(tree.root, 'department_route');
@@ -288,6 +302,9 @@ describe('manual mode', () => {
     expect(one(tree.root, 'progress_ring').props.accessibilityLabel).toBe(
       'נקנו 2 מתוך 4',
     );
+    // אין תיבת טיפ ריקה מתחת למתג המיון
+    expect(tree.root.findAll(n => n.props.children === '💡 טיפ שימושי:')).toHaveLength(0);
+    expect(textOf(tree.root)).toContain('מוצרים לקנייה');
   });
 });
 

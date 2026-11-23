@@ -7,7 +7,7 @@ export const makeStyles = colors =>
     card: {
       backgroundColor: colors.primary,
       borderRadius: 18,
-      paddingHorizontal: 12,
+      paddingHorizontal: 10,
       paddingTop: 12,
       paddingBottom: 14,
       marginTop: 4,

@@ -58,9 +58,10 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
 // מחוות הגרירה של הרשימה תופסת כל תנועה אנכית ובולעת את המשיכה לריענון.
-// מגבילים את תחילת המחווה לרצועה של ידית הגרירה (בצד ההתחלה של השורה),
-// כך שמשיכה מכל מקום אחר מגיעה לרכיב הריענון
-const DRAG_HIT_SLOP = { [I18nManager.isRTL ? 'right' : 'left']: 0, width: 100 };
+// מגבילים את תחילת המחווה לרצועה של ידית הגרירה, שבקצה השמאלי של השורה:
+// ריווח הרשימה 20 + ריווח השורה 12 = הידית ב-32-60dp, ועם hitSlop ב-22-70dp.
+// הרצועה (72dp) מכסה רק אותה, כך שמשיכה מכל מקום אחר (גם מהפח) מגיעה לרכיב הריענון
+const DRAG_HIT_SLOP = { [I18nManager.isRTL ? 'right' : 'left']: 0, width: 72 };
 // כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
 export const UNDO_MS = 5000;
 
@@ -810,16 +811,9 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   const listHeader = (
     <View>
-      <View style={styles.tipContainer}>
-        <Text style={styles.tipTitle}>💡 טיפ שימושי:</Text>
-        <Text style={styles.tipText}>
-          • <Text style={styles.boldText}>סימון כנקנה:</Text> לחיצה על העיגול.
-          {'\n'}• <Text style={styles.boldText}>מחיקת מוצר:</Text> לחיצה על הפח.
-          {'\n'}• <Text style={styles.boldText}>עריכה:</Text> לחיצה על שם המוצר.
-        </Text>
-      </View>
-
-      {/* הכותרת המקורית של "מוצרים לקנייה" מופיעה מתחת לטיפ במידה ויש מוצרים */}
+      {/* אין תיבת טיפ (אין בעיצוב, והייתה נראית כפס ריק מתחת למתג המיון).
+          העיגול, הפח והשם מסבירים את עצמם ויש להם תוויות נגישות */}
+      {/* הכותרת "מוצרים לקנייה" מופיעה במצב ידני כשיש מוצרים */}
       {unpurchasedItems.length > 0 && !categoryMode && (
         <Text style={styles.sectionLabel}>מוצרים לקנייה</Text>
       )}
@@ -983,7 +977,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
         // במצב מחלקות אין גרירה: מסלול של מחלקות עם כרטיס "עכשיו במחלקה"
         <ScrollView
           testID="category_list"
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, styles.routeContent]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

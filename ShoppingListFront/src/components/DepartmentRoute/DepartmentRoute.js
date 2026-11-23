@@ -81,7 +81,7 @@ const DepartmentRoute = ({ plan, renderItem }) => {
                 <View style={styles.rows}>
                   {station.items.map(row => (
                     <React.Fragment key={row.id}>
-                      {renderItem(row, {})}
+                      {renderItem(row, { variant: 'route' })}
                     </React.Fragment>
                   ))}
                 </View>

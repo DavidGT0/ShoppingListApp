@@ -219,10 +219,137 @@ describe('focus variant', () => {
     Object.values(fns).forEach(f => expect(f).toHaveBeenCalledTimes(1));
   });
 
-  test('the default row is unchanged without the variant', async () => {
+  test('the default row keeps its normal circle without the variant', async () => {
     const { tree } = await render({ id: 7 });
     const circle = StyleSheet.flatten(hostOf(tree, 'item_check_7').props.style);
     expect(circle.width).toBe(26);
-    expect(circle.borderColor).toBe(light.primaryText);
+    expect(circle.borderColor).toBe(light.text.secondary);
+  });
+});
+
+// סדר השורה כמו בעיצוב: מימין לשמאל עיגול, שם, כמות, פח, ובקצה השמאלי ידית הגרירה
+describe('row layout (device fix)', () => {
+  const { StyleSheet } = require('react-native');
+  const { light } = require('../src/theme/palettes');
+  const flat = node => StyleSheet.flatten(node.props.style) || {};
+  const hostOf = (tree, id) =>
+    tree.root.findAll(
+      n => n.props.testID === id && typeof n.type === 'string',
+    )[0];
+  const hasDesc = (json, pred) =>
+    !!json &&
+    typeof json === 'object' &&
+    (pred(json) || (json.children || []).some(c => hasDesc(c, pred)));
+  // מזהה כל ילד ישיר של השורה
+  const order = tree => {
+    const root = tree.toJSON();
+    return root.children.map(c => {
+      if (hasDesc(c, n => n.props.testID === 'item_check_7')) return 'check';
+      if (hasDesc(c, n => n.props.testID === 'item_name_7')) return 'name';
+      if (hasDesc(c, n => n.props.testID === 'item_amount')) return 'amount';
+      if (hasDesc(c, n => n.props.testID === 'item_delete_7')) return 'trash';
+      if (hasDesc(c, n => n.props.accessibilityLabel === 'גרור לסידור מחדש'))
+        return 'drag';
+      if (hasDesc(c, n => n.props.testID === 'item_dot')) return 'dot';
+      return '?';
+    });
+  };
+
+  test('the row is row-reverse: circle, name, amount, trash, then the handle at the far left', async () => {
+    const { tree } = await render(
+      { id: 7, categoryColor: '#123456' },
+      { onDrag: jest.fn() },
+    );
+    expect(flat(tree.toJSON()).flexDirection).toBe('row-reverse');
+    expect(order(tree)).toEqual(['dot', 'check', 'name', 'amount', 'trash', 'drag']);
+  });
+
+  test('the category dot shows only in the default (manual) row', async () => {
+    let r = await render({ id: 7, categoryColor: '#123456' });
+    expect(r.find('item_dot').length).toBeGreaterThan(0);
+    r = await render({ id: 7, categoryColor: '#123456' }, { variant: 'route' });
+    expect(r.find('item_dot')).toHaveLength(0);
+    r = await render({ id: 7, categoryColor: '#123456' }, { variant: 'focus' });
+    expect(r.find('item_dot')).toHaveLength(0);
+  });
+
+  test('the name takes the free width, the controls never grow or shrink', async () => {
+    const { tree } = await render({ id: 7, unit: 'חבילה' });
+    const name = flat(hostOf(tree, 'item_name_7'));
+    expect(name.flex).toBe(1);
+    expect(name.minWidth).toBe(0);
+    expect(flat(hostOf(tree, 'item_check_7')).flexShrink).toBe(0);
+    expect(flat(hostOf(tree, 'item_delete_7')).flexShrink).toBe(0);
+    // הפקד: ה-View המצויר הקרוב ביותר מעל טקסט הכמות
+    let amount = hostOf(tree, 'item_amount').parent;
+    while (typeof amount.type !== 'string') amount = amount.parent;
+    expect(flat(amount).flexShrink).toBe(0);
+    expect(flat(amount).flexGrow || 0).toBe(0);
+  });
+
+  test('the name wraps only between words', async () => {
+    const { tree } = await render({ id: 7, name: 'גבינה משולשת' });
+    const text = tree.root.findAll(
+      n => n.type === 'Text' && n.props.children === 'גבינה משולשת',
+    )[0];
+    expect(text.props.textBreakStrategy).toBe('simple');
+    expect(text.props.android_hyphenationFrequency).toBe('none');
+    expect(flat(text).textAlign).toBe('right');
+  });
+
+  test('a clear gap separates the circle from the name', async () => {
+    const { tree } = await render({ id: 7 });
+    // ב-row-reverse השם משמאל לעיגול
+    expect(flat(hostOf(tree, 'item_check_7')).marginLeft).toBeGreaterThanOrEqual(10);
+  });
+
+  test('the amount control is compact and keeps its text on one line', async () => {
+    const { tree } = await render({ id: 7, unit: 'חבילה' });
+    const buttons = tree.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        ['הפחת כמות', 'הוסף כמות'].includes(n.props.accessibilityLabel),
+    );
+    expect(buttons).toHaveLength(2);
+    buttons.forEach(b => expect(flat(b).width).toBeLessThanOrEqual(30));
+    const amount = hostOf(tree, 'item_amount');
+    expect(amount.props.numberOfLines).toBe(1);
+    expect(flat(amount).fontSize).toBeLessThanOrEqual(13);
+  });
+
+  const target = node => {
+    const s = flat(node);
+    const h = node.props.hitSlop || {};
+    return {
+      w: s.width + (h.left || 0) + (h.right || 0),
+      h: s.height + (h.top || 0) + (h.bottom || 0),
+    };
+  };
+
+  test('the circle and the trash are at least 44dp tap targets', async () => {
+    for (const variant of [undefined, 'focus']) {
+      const { tree } = await render({ id: 7 }, { variant });
+      [hostOf(tree, 'item_check_7'), hostOf(tree, 'item_delete_7')].forEach(n => {
+        const t = target(n);
+        expect(t.w).toBeGreaterThanOrEqual(44);
+        expect(t.h).toBeGreaterThanOrEqual(44);
+      });
+    }
+  });
+
+  test('muted circle border and trash in the normal row', async () => {
+    const { tree } = await render({ id: 7 });
+    expect(flat(hostOf(tree, 'item_check_7')).borderColor).toBe(
+      light.text.secondary,
+    );
+    const trash = hostOf(tree, 'item_delete_7').findAll(
+      n => n.props.name === 'trash-can-outline',
+    )[0];
+    expect(trash.props.color).toBe(light.text.secondary);
+  });
+
+  test('no no-op margins remain on the name', async () => {
+    const { tree } = await render({ id: 7 });
+    expect(flat(hostOf(tree, 'item_name_7')).marginLeft).toBeUndefined();
   });
 });

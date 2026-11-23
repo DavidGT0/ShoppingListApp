@@ -108,14 +108,27 @@ describe('dark mode screens', () => {
     });
   });
 
-  test('ShoppingList tip title uses the dark heading colour', async () => {
+  // תיבת הטיפ הוסרה (אין בעיצוב, והייתה נראית כפס ריק). תווית "מוצרים לקנייה" נשארת
+  test('ShoppingList section label uses the dark secondary text colour', async () => {
+    const api = require('../src/services/api');
+    api.getShoppingList.mockResolvedValueOnce([
+      { id: 1, name: 'חלב', amount: 1, purchased: false, position: 0 },
+    ]);
     const tree = await renderDark(screens.ShoppingList);
-    const title = tree.root.findAll(
-      n => n.props.children === '💡 טיפ שימושי:' && n.props.style,
-    )[0];
-    const color = StyleSheet.flatten(title.props.style).color;
-    expect(color).toBe(dark.heading);
-    expect(color).not.toBe('#0F172A');
+    try {
+      const label = tree.root.findAll(
+        n => n.props.children === 'מוצרים לקנייה' && n.props.style,
+      )[0];
+      expect(StyleSheet.flatten(label.props.style).color).toBe(
+        dark.text.secondary,
+      );
+      expect(
+        tree.root.findAll(n => n.props.children === '💡 טיפ שימושי:'),
+      ).toHaveLength(0);
+    } finally {
+      // פירוק בתוך act כדי שאנימציית השורה לא תמשיך אחרי הבדיקה
+      await act(async () => tree.unmount());
+    }
   });
 
   test('offline banner text stays dark on the warning background', async () => {

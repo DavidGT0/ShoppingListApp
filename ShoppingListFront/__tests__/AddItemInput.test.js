@@ -167,3 +167,16 @@ describe('AddItemInput when not editable', () => {
     await act(async () => tree.unmount());
   });
 });
+
+// סרגל ההוספה קומפקטי כמו בעיצוב: אין רווח ריק מתחת לשדה כשאין הצעות
+describe('AddItemInput compact bar', () => {
+  const { StyleSheet } = require('react-native');
+  test('no empty band under the input, chips get their own top gap', async () => {
+    const { makeStyles } = require('../src/components/AddItemInput/AddItemInput.styles');
+    const { light } = require('../src/theme/palettes');
+    const styles = makeStyles(light);
+    expect(StyleSheet.flatten(styles.addContainer).marginBottom || 0).toBe(0);
+    expect(StyleSheet.flatten(styles.chipsRow).marginTop).toBeGreaterThan(0);
+    expect(StyleSheet.flatten(styles.chipsRow).marginBottom || 0).toBe(0);
+  });
+});
