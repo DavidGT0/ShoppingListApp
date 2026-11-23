@@ -49,6 +49,7 @@ const SettingsScreen = ({ onLogout }) => {
       const userData = await getCurrentUser();
       setUser(userData);
     } catch (error) {
+      if (error.staleToken) return; // הטוקן הוחלף באמצע - לא שגיאה אמיתית
       console.error('Failed to load user:', error);
     }
   };
@@ -66,7 +67,7 @@ const SettingsScreen = ({ onLogout }) => {
     }
     setIsSavingUsername(true);
     try {
-      const updatedName = await changeUsername(newUsername);
+      const updatedName = await changeUsername(clean);
       setUser(prev => ({ ...prev, username: updatedName }));
       setEditingUsername(false);
       setNewUsername('');

@@ -366,3 +366,18 @@ describe('MyListsScreen icons', () => {
     await act(async () => tree.unmount());
   });
 });
+
+describe('MyListsScreen stale token', () => {
+  test('a stale-token error (token swapped by a rename) on pull-to-refresh shows no alert', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getShoppingLists.mockResolvedValue([]);
+    await renderScreen();
+    const stale = Object.assign(new Error('stale'), { staleToken: true });
+    getShoppingLists.mockRejectedValue(stale);
+    const control = tree.root.find(n => typeof n.props.onRefresh === 'function');
+    await act(async () => control.props.onRefresh());
+    expect(alertSpy).not.toHaveBeenCalled();
+    await act(async () => tree.unmount());
+    alertSpy.mockRestore();
+  });
+});

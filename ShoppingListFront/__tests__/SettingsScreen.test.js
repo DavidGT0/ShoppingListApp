@@ -83,7 +83,11 @@ test('settings render the shared rounded header', async () => {
 
 describe('rename in settings', () => {
   const byTestId = (tree, id) =>
-    tree.root.findAll(n => n.props.testID === id && n.props.onPress !== undefined || n.props.testID === id && n.props.onChangeText !== undefined)[0];
+    tree.root.findAll(
+      n =>
+        n.props.testID === id &&
+        (n.props.onPress !== undefined || n.props.onChangeText !== undefined),
+    )[0];
   const texts = tree =>
     tree.root
       .findAll(n => typeof n.props.children === 'string')

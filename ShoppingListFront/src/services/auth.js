@@ -1,5 +1,11 @@
 ﻿import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiFetch, publicFetch, readErrorMessage } from './http';
+import {
+  apiFetch,
+  publicFetch,
+  readErrorMessage,
+  beginTokenSwap,
+  endTokenSwap,
+} from './http';
 import { clearAllCaches } from './offlineCache';
 
 /**
@@ -85,6 +91,7 @@ export const changeUsername = async newName => {
   if (clean.includes('@')) {
     throw new Error('שם המשתמש לא יכול להכיל @');
   }
+  beginTokenSwap();
   try {
     const response = await apiFetch('/users/me', {
       method: 'PATCH',
@@ -105,6 +112,8 @@ export const changeUsername = async newName => {
   } catch (error) {
     console.error('Change username error:', error);
     throw error;
+  } finally {
+    endTokenSwap();
   }
 };
 

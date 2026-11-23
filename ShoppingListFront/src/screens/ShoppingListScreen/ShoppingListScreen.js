@@ -387,7 +387,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       // חוזרים למצב מקוון רק כשהמוצרים הגיעו מהשרת
       setOffline(itemsResult.fromCache || !!catsResult?.fromCache);
     } catch (error) {
-      if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה
+      if (error.sessionExpired || error.staleToken) return; // האפליקציה כבר מטפלת בזה / טוקן שהוחלף
       if (error.status === 403 || error.status === 404) {
         handleLostAccess();
       }
