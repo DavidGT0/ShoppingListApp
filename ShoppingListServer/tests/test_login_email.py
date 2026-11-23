@@ -65,3 +65,13 @@ def test_register_username_case_insensitive_duplicate(client, register):
     r = client.post("/register", json={"username": "dana", "email": "x@example.com", "password": "secret-pw"})
     assert r.status_code == 400
     assert r.json()["detail"] == "שם המשתמש כבר תפוס"
+
+
+def test_register_refuses_email_differing_only_in_case(client, register):
+    register("dana")  # dana@example.com
+    r = client.post(
+        "/register",
+        json={"username": "dana2", "email": "  DANA@Example.com ", "password": "secret-pw"},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "כתובת האימייל כבר רשומה"

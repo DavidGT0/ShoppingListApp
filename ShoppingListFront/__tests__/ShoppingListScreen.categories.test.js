@@ -64,12 +64,13 @@ jest.mock('../src/hooks/useLiveRefresh', () => ({
 jest.mock('../src/components/ShoppingListItem/ShoppingListItem', () => {
   const ReactLib = require('react');
   const { Text: RNText } = require('react-native');
-  const MockShoppingListItem = ({ item, onEdit }) =>
+  const MockShoppingListItem = ({ item, onEdit, currentUsername }) =>
     ReactLib.createElement(
       RNText,
       {
         testID: `row_${item.id}`,
         color: item.categoryColor,
+        currentUsername,
         onPress: onEdit,
       },
       item.name,
@@ -127,7 +128,13 @@ const mount = async items => {
       <GestureHandlerRootView>
         <ShoppingListScreen
           route={{ params: { listId: 7, listName: 'רשימה' } }}
-          navigation={{ goBack: jest.fn() }}
+          navigation={{
+            goBack: jest.fn(),
+            addListener: jest.fn((event, cb) => {
+              if (event === 'focus') global.__focus = cb;
+              return () => {};
+            }),
+          }}
         />
       </GestureHandlerRootView>,
     );
@@ -461,4 +468,13 @@ test('a 400 on edit shows the server message and reloads the categories', async 
     customs[0],
   ]);
   alertSpy.mockRestore();
+});
+
+test('the current username is re-read on focus (after a rename in settings)', async () => {
+  await AsyncStorage.setItem('username', 'bob');
+  const tree = await mount(ITEMS);
+  expect(byId(tree, 'row_2').props.currentUsername).toBe('bob');
+  await AsyncStorage.setItem('username', 'robert');
+  await act(async () => global.__focus());
+  expect(byId(tree, 'row_2').props.currentUsername).toBe('robert');
 });

@@ -123,10 +123,12 @@ const inTokenSwapWindow = () =>
  * (לא לשימוש בהתחברות עצמה - שם 401 פירושו סיסמה שגויה)
  */
 export const apiFetch = async (path, options = {}) => {
+  // ignoreSwapWindow: בקשת ההחלפה עצמה - 401 עליה הוא פקיעה אמיתית
+  const { ignoreSwapWindow, ...fetchOptions } = options;
   const token = await AsyncStorage.getItem('access_token');
 
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
-    ...options,
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -140,7 +142,8 @@ export const apiFetch = async (path, options = {}) => {
     const currentToken = await AsyncStorage.getItem('access_token');
     if (
       token &&
-      ((currentToken && currentToken !== token) || inTokenSwapWindow())
+      ((currentToken && currentToken !== token) ||
+        (!ignoreSwapWindow && inTokenSwapWindow()))
     ) {
       const staleError = new Error('ההתחברות התחדשה. נסה שוב.');
       staleError.status = 401;

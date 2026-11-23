@@ -255,17 +255,23 @@ const ShoppingListScreen = ({ route, navigation }) => {
     );
   };
 
-  // שם המשתמש הנוכחי (נשמר בכניסה) - לצורך "נוסף ע״י"
+  // שם המשתמש הנוכחי (נשמר בכניסה) - לצורך "נוסף ע״י".
+  // נקרא שוב בכל חזרה למסך, כי אפשר לשנות אותו בהגדרות
   useEffect(() => {
     let cancelled = false;
-    Promise.resolve(AsyncStorage.getItem('username'))
-      .then(value => {
-        if (!cancelled) setCurrentUsername(value || null);
-      })
-      .catch(() => {});
+    const loadUsername = () =>
+      Promise.resolve(AsyncStorage.getItem('username'))
+        .then(value => {
+          if (!cancelled) setCurrentUsername(value || null);
+        })
+        .catch(() => {});
+    loadUsername();
+    const unsubscribe = navigation?.addListener?.('focus', loadUsername);
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // מספר המשתתפים מוצג על כפתור הכותרת

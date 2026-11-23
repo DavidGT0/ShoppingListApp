@@ -95,6 +95,7 @@ export const changeUsername = async newName => {
   try {
     const response = await apiFetch('/users/me', {
       method: 'PATCH',
+      ignoreSwapWindow: true,
       body: JSON.stringify({ username: clean }),
     });
 

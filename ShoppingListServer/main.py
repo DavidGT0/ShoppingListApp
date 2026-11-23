@@ -282,7 +282,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="שם המשתמש כבר תפוס"
         )
-    if get_user_by_email(db, user.email):
+    if find_user_by_email_for_login(db, user.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="כתובת האימייל כבר רשומה"

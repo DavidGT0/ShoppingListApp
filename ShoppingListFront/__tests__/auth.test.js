@@ -268,4 +268,17 @@ describe('changeUsername', () => {
     );
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  test('a 401 on the rename request itself (expired token) expires the session', async () => {
+    const { setSessionExpiredHandler } = require('../src/services/http');
+    const onExpired = jest.fn();
+    setSessionExpiredHandler(onExpired);
+    global.fetch.mockResolvedValue({ ok: false, status: 401 });
+
+    await expect(changeUsername('robert')).rejects.toMatchObject({
+      sessionExpired: true,
+    });
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem('access_token')).toBeNull();
+  });
 });
