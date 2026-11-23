@@ -149,10 +149,15 @@ describe('dark mode contrast walker', () => {
   Object.entries(cases).forEach(([name, el]) => {
     test(`${name}: every text meets 4.5:1 on its background`, async () => {
       const tree = await renderDark(el);
-      const json = tree.toJSON();
-      expect(json).not.toBeNull();
-      if (name === 'ShoppingList') expect(JSON.stringify(json)).toContain('חלב');
-      expect(failures(json, name)).toEqual([]);
+      try {
+        const json = tree.toJSON();
+        expect(json).not.toBeNull();
+        if (name === 'ShoppingList') expect(JSON.stringify(json)).toContain('חלב');
+        expect(failures(json, name)).toEqual([]);
+      } finally {
+        // פירוק בתוך act כדי שאנימציות של השורות לא ימשיכו לרוץ אחרי הבדיקה
+        await act(async () => tree.unmount());
+      }
     });
   });
 });
