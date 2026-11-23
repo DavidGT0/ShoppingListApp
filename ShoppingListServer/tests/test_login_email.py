@@ -58,3 +58,10 @@ def test_send_email_without_key_does_not_log_address(monkeypatch, caplog):
         assert email_sender.send_email("secret.person@example.com", "s", "<p>h</p>") is False
     assert caplog.records
     assert all("secret.person@example.com" not in r.getMessage() for r in caplog.records)
+
+
+def test_register_username_case_insensitive_duplicate(client, register):
+    register("Dana")
+    r = client.post("/register", json={"username": "dana", "email": "x@example.com", "password": "secret-pw"})
+    assert r.status_code == 400
+    assert r.json()["detail"] == "שם המשתמש כבר תפוס"

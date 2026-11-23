@@ -248,7 +248,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     
     user = get_user_by_username(db, username=token_data.username)
-    if user is None:
+    # ה-token קשור גם למזהה המשתמש: אחרי שינוי שם, מי שירשום את השם הישן לא יירש את ה-token הישן.
+    # token בלי uid (ישן) נדחה - התחברות מחדש חד-פעמית
+    if user is None or payload.get("uid") != user.id:
         raise credentials_exception
     return user
 
@@ -275,7 +277,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         )
 
     # בדיקה אם המשתמש כבר קיים
-    if get_user_by_username(db, user.username):
+    if db.query(models.User).filter(func.lower(models.User.username) == user.username.lower()).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="שם המשתמש כבר תפוס"
@@ -320,7 +322,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "uid": user.id}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer", "username": user.username}
 
@@ -354,10 +356,14 @@ def rename_me(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="שם המשתמש כבר תפוס")
     if current_user.username != new_name:
         current_user.username = new_name
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="שם המשתמש כבר תפוס")
         db.refresh(current_user)
     access_token = create_access_token(
-        data={"sub": current_user.username},
+        data={"sub": current_user.username, "uid": current_user.id},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     return {"access_token": access_token, "token_type": "bearer", "username": current_user.username}
