@@ -1,7 +1,17 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { makeStyles } from './FocusCard.styles';
-import { useStyles } from '../../theme/ThemeContext';
+import { useStyles, useTheme } from '../../theme/ThemeContext';
+
+// מעבר מכחול לטורקיז (כמו בעיצוב). לבן על הטורקיז הוא 2.1:1 בלבד, ולכן:
+// - המעבר מתחיל בפינה הימנית העליונה, שם יושבת הכותרת (row-reverse), ונשאר כחול
+//   עד 65% מהדרך; הטורקיז מופיע רק לכיוון הפינה השמאלית התחתונה
+// - הכותרת נצבעת בעצמה בקצה הכחול, כך שאין טקסט לבן ישירות על המעבר
+// - השורות על primaryDark, והתג בטורקיז עם טקסט כהה
+const GRADIENT_START = { x: 1, y: 0 };
+const GRADIENT_END = { x: 0, y: 1 };
+const GRADIENT_LOCATIONS = [0, 0.65, 1];
 
 // כרטיס "עכשיו במחלקה": המחלקה הראשונה בסדר שעוד יש בה מה לקנות, עם שורות גדולות.
 // בלי מחלקה (הכל נקנה) מוצג הכרטיס "הכל בעגלה 🎉".
@@ -9,6 +19,8 @@ import { useStyles } from '../../theme/ThemeContext';
 // לא מקוון, פס ביטול ומשמר השינויים)
 const FocusCard = ({ department, renderItem }) => {
   const styles = useStyles(makeStyles);
+  const { colors } = useTheme();
+  const [blue, teal] = colors.focusGradient;
 
   if (!department) {
     return (
@@ -26,8 +38,14 @@ const FocusCard = ({ department, renderItem }) => {
 
   const items = department.items || [];
   return (
-    <View testID="focus_card" style={styles.card}>
-      <View style={styles.accent} />
+    <LinearGradient
+      testID="focus_card"
+      colors={[blue, blue, teal]}
+      locations={GRADIENT_LOCATIONS}
+      start={GRADIENT_START}
+      end={GRADIENT_END}
+      style={styles.card}
+    >
       <View style={styles.titleRow}>
         {/* רק הכותרת מקובצת לקריאה, כדי שהשורות יישארו נגישות אחת אחת */}
         <View
@@ -54,7 +72,7 @@ const FocusCard = ({ department, renderItem }) => {
           </React.Fragment>
         ))}
       </View>
-    </View>
+    </LinearGradient>
   );
 };
 

@@ -15,6 +15,7 @@ import {
   NestableDraggableFlatList,
 } from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 
 // קומפוננטות מופרדות
 import ShoppingListItem from '../../components/ShoppingListItem/ShoppingListItem';
@@ -847,7 +848,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
         אפשר להקטין עוד אם צריך
       */}
       {/* הורדנו את הרווח העליון, והשארנו רווח תחתון קטן רק כדי לעבור את חלון ההוספה */}
-      <View
+      {/* כותרת במעבר צבעים מכחול כהה לכחול (135 מעלות, כמו בעיצוב) */}
+      <LinearGradient
+        testID="header_gradient"
+        colors={colors.headerGradient}
+        useAngle
+        angle={135}
         style={[
           styles.headerBackground,
           { paddingTop: insets.top + 5, paddingBottom: 40 },
@@ -925,7 +931,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
             </Text>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* תיבת ההוספה נשארת קבועה כדי שתמיד יהיה אפשר להוסיף מוצרים */}
       <View style={styles.addCard}>

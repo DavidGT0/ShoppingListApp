@@ -14,7 +14,7 @@ export const makeStyles = colors => StyleSheet.create({
 
   /* כותרת עליונה */
   headerBackground: {
-    backgroundColor: colors.primary,
+    // הרקע הוא מעבר הצבעים (LinearGradient) - colors.headerGradient
     paddingBottom: 44,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 32,

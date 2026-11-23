@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   getShoppingLists,
   createShoppingList,
@@ -324,7 +325,13 @@ const MyListsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* כותרת עליונה מעוצבת */}
-      <View style={[styles.headerBackground, { paddingTop: insets.top + 24 }]}>
+      <LinearGradient
+        testID="header_gradient"
+        colors={colors.headerGradient}
+        useAngle
+        angle={135}
+        style={[styles.headerBackground, { paddingTop: insets.top + 24 }]}
+      >
         <Text style={styles.headerEyebrow}>ניהול קניות חכם</Text>
         <Text style={styles.mainTitle}>הרשימות שלי</Text>
         <Text style={styles.headerSubtitle}>
@@ -332,7 +339,7 @@ const MyListsScreen = ({ navigation }) => {
             ? `${lists.length} רשימות פעילות`
             : 'בואו ניצור את הרשימה הראשונה'}
         </Text>
-      </View>
+      </LinearGradient>
 
       {/* כרטיס יצירת רשימה - "מרחף" מעל הכותרת */}
       <View style={styles.createCard}>

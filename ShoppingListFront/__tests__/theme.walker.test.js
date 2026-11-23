@@ -98,23 +98,57 @@ const ALLOWED = new Set(
   ].map(([a, b]) => `${up(a)}|${up(b)}`),
 );
 
+// רקע של צומת: צבע אטום, או מעבר צבעים (LinearGradient, prop בשם colors) - אז
+// הטקסט נבדק מול כל אחת מנקודות המעבר (המקרה הגרוע), כך שטקסט שיושב ישירות על
+// הקצה הטורקיז של כרטיס "עכשיו במחלקה" נכשל
 const failures = (json, name, base = dark.background) => {
   const out = [];
-  const visit = (n, bg) => {
+  // gradient: הרקע הגיע ממעבר צבעים. הזוגות המותרים (ALLOWED) חלים רק על רקע אטום
+  const visit = (n, bgs, gradient) => {
     if (!n || typeof n === 'string') return;
     const style = StyleSheet.flatten(n.props && n.props.style) || {};
-    const ownBg = isHex(style.backgroundColor) ? style.backgroundColor : bg;
-    if (n.type === 'Text' && isHex(style.color)) {
-      const r = ratio(style.color, ownBg);
-      if (r < 4.5 && !ALLOWED.has(`${up(style.color)}|${up(ownBg)}`)) {
-        out.push(`${name}: ${style.color} on ${ownBg} = ${r.toFixed(2)}`);
-      }
+    const stops = n.props && n.props.colors;
+    let ownBgs = bgs;
+    let ownGradient = gradient;
+    if (isHex(style.backgroundColor)) {
+      ownBgs = [style.backgroundColor];
+      ownGradient = false;
+    } else if (Array.isArray(stops) && stops.length && stops.every(isHex)) {
+      ownBgs = stops;
+      ownGradient = true;
     }
-    (n.children || []).forEach(c => visit(c, ownBg));
+    if (n.type === 'Text' && isHex(style.color)) {
+      ownBgs.forEach(bg => {
+        const r = ratio(style.color, bg);
+        const allowed =
+          !ownGradient && ALLOWED.has(`${up(style.color)}|${up(bg)}`);
+        if (r < 4.5 && !allowed) {
+          out.push(`${name}: ${style.color} on ${bg} = ${r.toFixed(2)}`);
+        }
+      });
+    }
+    (n.children || []).forEach(c => visit(c, ownBgs, ownGradient));
   };
-  [].concat(json).forEach(n => visit(n, base));
+  [].concat(json).forEach(n => visit(n, [base], false));
   return out;
 };
+
+// בדיקת השומר עצמו: טקסט לבן ישירות על מעבר כחול-טורקיז נכשל
+test('the walker treats a gradient as its worst stop', () => {
+  const json = {
+    type: 'View',
+    props: { colors: [dark.primary, dark.secondary] },
+    children: [
+      { type: 'Text', props: { style: { color: dark.text.inverse } }, children: ['x'] },
+    ],
+  };
+  expect(failures(json, 'probe')).toEqual([
+    `probe: ${dark.text.inverse} on ${dark.secondary} = ${ratio(
+      dark.text.inverse,
+      dark.secondary,
+    ).toFixed(2)}`,
+  ]);
+});
 
 const renderDark = async (element, mode = 'dark') => {
   await AsyncStorage.setItem('@theme_mode', mode);
@@ -217,7 +251,13 @@ describe('dark mode contrast walker', () => {
 
 // גם בערכה הבהירה: הטקסט של המסלול, הכרטיס והטבעת עומד ב-AA
 describe('light mode contrast walker: route, focus card and ring', () => {
-  const lightCases = { ...routeCases, ProgressRing: ringCase(light) };
+  const lightCases = {
+    ...routeCases,
+    ProgressRing: ringCase(light),
+    // המסכים עם כותרת המעבר על הרקע הבהיר החדש (#F4F7FB)
+    ShoppingList: cases.ShoppingList,
+    MyLists: cases.MyLists,
+  };
   Object.entries(lightCases).forEach(([name, el]) => {
     test(`${name}: every text meets 4.5:1 on its background`, async () => {
       const tree = await renderDark(el, 'light');

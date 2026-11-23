@@ -1,7 +1,7 @@
 // שתי פלטות הצבעים של האפליקציה. לשתיהן אותו מבנה מפתחות.
 export const light = {
-  // צבעי רקע
-  background: '#F8F9FA',
+  // צבעי רקע (#F4F7FB כמו בעיצוב המאושר)
+  background: '#F4F7FB',
   surface: '#FFFFFF',
   surfaceHover: '#F1F3F5',
   surfaceHighlight: '#F0F4F8',
@@ -18,7 +18,8 @@ export const light = {
   onSnackbar: '#FFFFFF',
   snackbarAction: '#4C8DF0',
   heading: '#0F172A',
-  primaryText: '#1E6FE8',
+  // כחול כהה יותר לטקסט: הכחול הראשי על הרקע החדש הוא 4.35:1 בלבד
+  primaryText: '#1557BF',
   onWarning: '#212529',
   onPrimarySubtle: 'rgba(255, 255, 255, 0.15)',
   onPrimaryMuted: 'rgba(255, 255, 255, 0.75)',
@@ -28,7 +29,8 @@ export const light = {
   success: '#1FC9A3',
   successLight: '#81C784',
   danger: '#F44336',
-  dangerText: '#F44336',
+  // טקסט אדום כהה יותר: #F44336 על לבן הוא 3.68:1 בלבד
+  dangerText: '#C62828',
   dangerLight: '#EF5350',
   warning: '#FF9800',
   warningLight: '#FFB74D',
@@ -36,7 +38,8 @@ export const light = {
   // טקסט
   text: {
     primary: '#212529',
-    secondary: '#6C757D',
+    // 5.4:1 על הרקע, 4.8:1 על borderLight (הקודם, #6C757D, היה 4.36:1 על הרקע)
+    secondary: '#5B6676',
     disabled: '#ADB5BD',
     inverse: '#FFFFFF',
   },
@@ -57,6 +60,13 @@ export const light = {
     medium: 'rgba(0, 0, 0, 0.1)',
     dark: 'rgba(0, 0, 0, 0.2)',
   },
+
+  // מעברי צבע (react-native-linear-gradient), כמו בעיצוב: כותרת מכחול כהה לכחול,
+  // וכרטיס "עכשיו במחלקה" מכחול לטורקיז
+  headerGradient: ['#0F172A', '#1E6FE8'],
+  focusGradient: ['#1E6FE8', '#1FC9A3'],
+  // הקו המקווקו של מסלול המחלקות
+  routeLine: '#C7D2FE',
 };
 
 export const dark = {
@@ -110,4 +120,8 @@ export const dark = {
     medium: 'rgba(0, 0, 0, 0.4)',
     dark: 'rgba(0, 0, 0, 0.5)',
   },
+
+  headerGradient: ['#111A2E', '#14306A'],
+  focusGradient: ['#1E6FE8', '#1FC9A3'],
+  routeLine: '#334155',
 };

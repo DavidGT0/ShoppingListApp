@@ -53,7 +53,7 @@ const DepartmentRoute = ({ plan, renderItem }) => {
 
   return (
     <View testID="department_route" style={styles.route}>
-      <View style={styles.line} pointerEvents="none" />
+      <View testID="route_line" style={styles.line} pointerEvents="none" />
       {allDone && (
         <View style={styles.rows}>
           <FocusCard department={null} />

@@ -2,7 +2,7 @@
 // צבע שאינו hex (למשל ערך לא צפוי מהשרת) מחזיר null, והקורא בוחר צבע מהערכה.
 
 // אחוז השקיפות של רקע סמל המחלקה בכל ערכה
-export const STATION_TINT_LIGHT = 0.2;
+export const STATION_TINT_LIGHT = 0.18;
 export const STATION_TINT_DARK = 0.35;
 
 const parseHex = value => {
@@ -40,10 +40,10 @@ export const mixOver = (color, alpha, base) => {
   return toHex(rgb.map((v, i) => v * alpha + under[i] * (1 - alpha)));
 };
 
-// רקע הסמל העגול של מחלקה במסלול: גוון בהיר בערכה הבהירה, כהה יותר בכהה
+// רקע הסמל העגול של מחלקה במסלול: פסטל בהיר (על המשטח הלבן) בערכה הבהירה,
+// כמו בעיצוב, וגוון עמוק (על הרקע הכהה) בכהה
 export const stationTint = (color, colors, isDark) =>
-  mixOver(
-    color,
-    isDark ? STATION_TINT_DARK : STATION_TINT_LIGHT,
-    colors.background,
-  ) || colors.surfaceHighlight;
+  (isDark
+    ? mixOver(color, STATION_TINT_DARK, colors.background)
+    : mixOver(color, STATION_TINT_LIGHT, colors.surface)) ||
+  colors.surfaceHighlight;

@@ -22,7 +22,7 @@ export const makeStyles = colors =>
       width: LINE_WIDTH,
       borderWidth: LINE_WIDTH / 2,
       borderStyle: 'dashed',
-      borderColor: colors.border,
+      borderColor: colors.routeLine,
       borderRadius: 1,
     },
     station: {
@@ -56,13 +56,12 @@ export const makeStyles = colors =>
     stationNameDone: {
       fontWeight: '600',
     },
+    // תג שטוח כמו בעיצוב (בלי מסגרת)
     count: {
       fontSize: 12,
       fontWeight: '700',
       color: colors.text.secondary,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: colors.borderLight,
       borderRadius: 8,
       overflow: 'hidden',
       paddingHorizontal: 7,

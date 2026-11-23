@@ -143,7 +143,7 @@ describe('header toggle', () => {
     expect(toggle.props.accessibilityRole).toBe('button');
     expect(toggle.props.accessibilityLabel).toBe('מצב כהה');
     expect(iconName(tree)).toBe('weather-night');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
     await press(tree, 'theme_toggle');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('dark');
     expect(rootBg(tree)).toContain('#0B1220');
@@ -151,7 +151,7 @@ describe('header toggle', () => {
     expect(iconName(tree)).toBe('white-balance-sunny');
     await press(tree, 'theme_toggle');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('light');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
   });
 
   test('system mode flips to the opposite of the current scheme', async () => {
@@ -160,7 +160,7 @@ describe('header toggle', () => {
     expect(iconName(tree)).toBe('white-balance-sunny');
     await press(tree, 'theme_toggle');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('light');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
   });
 
   test('works offline: no alert, theme still changes', async () => {
@@ -214,6 +214,6 @@ describe('settings segments', () => {
     expect(rootBg(tree)).toContain('#0B1220');
     await press(tree, 'theme_light');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('light');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
   });
 });

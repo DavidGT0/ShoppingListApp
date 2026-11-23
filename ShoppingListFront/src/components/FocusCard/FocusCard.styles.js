@@ -1,39 +1,25 @@
 import { StyleSheet } from 'react-native';
 
-// הכרטיס: הצבע הראשי (טקסט לבן עליו 4.67:1). אין ספריית מעברי צבע, ולכן
-// הירוק של המעבר מופיע בתג הספירה ובפס בתחתית, לא מתחת לטקסט
+// הכרטיס הוא מעבר צבעים (FocusCard.js). כל טקסט בו יושב על משטח אטום משלו
 export const makeStyles = colors =>
   StyleSheet.create({
     card: {
-      backgroundColor: colors.primary,
       borderRadius: 18,
       paddingHorizontal: 10,
       paddingTop: 12,
-      paddingBottom: 14,
+      paddingBottom: 12,
       marginTop: 4,
       marginBottom: 10,
-      overflow: 'hidden',
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      elevation: 6,
-    },
-    accent: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      height: 5,
-      backgroundColor: colors.secondary,
     },
     titleRow: {
       flexDirection: 'row-reverse',
       alignItems: 'center',
       marginBottom: 4,
     },
+    // נצבע בקצה הכחול של המעבר: בלתי נראה (המעבר כחול כאן), ומבטיח AA לכותרת
     titleBlock: {
       flex: 1,
+      backgroundColor: colors.focusGradient[0],
     },
     eyebrow: {
       color: colors.text.inverse,
@@ -62,19 +48,18 @@ export const makeStyles = colors =>
     rows: {
       marginTop: 4,
     },
+    // "הכל בעגלה": טורקיז עם טקסט כהה (9:1)
     doneCard: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.secondary,
       borderRadius: 18,
       paddingVertical: 18,
       paddingHorizontal: 16,
       marginTop: 4,
       marginBottom: 10,
       alignItems: 'center',
-      overflow: 'hidden',
-      elevation: 4,
     },
     doneText: {
-      color: colors.text.inverse,
+      color: colors.navy,
       fontSize: 20,
       fontWeight: '800',
       textAlign: 'center',

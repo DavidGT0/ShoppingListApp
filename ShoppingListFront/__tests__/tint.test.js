@@ -20,9 +20,10 @@ describe('tint helpers', () => {
     expect(mixOver(undefined, 0.2, '#000000')).toBeNull();
   });
 
-  test('station tint: 20% over the light background, 35% over the dark one', () => {
+  // פסטל כמו בעיצוב: 18% על המשטח הלבן בבהיר, 35% על הרקע הכהה
+  test('station tint: 18% over the light surface, 35% over the dark background', () => {
     expect(stationTint('#4CAF50', light, false)).toBe(
-      mixOver('#4CAF50', 0.2, light.background),
+      mixOver('#4CAF50', 0.18, light.surface),
     );
     expect(stationTint('#4CAF50', dark, true)).toBe(
       mixOver('#4CAF50', 0.35, dark.background),
