@@ -51,6 +51,12 @@ class ShoppingList(Base):
     # קוד הזמנה (אחד לכל רשימה, נמחק יחד איתה)
     invite = relationship("ListInvite", uselist=False, cascade="all, delete-orphan")
 
+    # מחלקות מותאמות אישית של הרשימה (נמחקות יחד איתה)
+    custom_categories = relationship(
+        "CustomCategory", back_populates="shopping_list",
+        cascade="all, delete-orphan", order_by="CustomCategory.id"
+    )
+
 
 class ShoppingItem(Base):
     __tablename__ = "items"
@@ -61,8 +67,28 @@ class ShoppingItem(Base):
     purchased = Column(Boolean, default=False)
     position = Column(Integer, default=0)  # לסדר הפריטים
     list_id = Column(Integer, ForeignKey('shopping_lists.id'))
-    
+    # עמודות שנוספו בסבב 2 (נוספות ל-DB קיים דרך schema_upgrade.ensure_columns)
+    unit = Column(String(10), nullable=True)
+    note = Column(String(100), nullable=True)
+    category = Column(String(40), nullable=True)
+    added_by_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+
     shopping_list = relationship("ShoppingList", back_populates="items")
+    added_by = relationship("User", foreign_keys=[added_by_id])
+
+
+class CustomCategory(Base):
+    """מחלקה מותאמת אישית, שייכת לרשימה אחת. הערך בפריט: custom:<id>"""
+    __tablename__ = "custom_categories"
+    __table_args__ = (UniqueConstraint("list_id", "name", name="uq_custom_category_list_name"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    list_id = Column(Integer, ForeignKey('shopping_lists.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = Column(String(30), nullable=False)
+    color = Column(String(9), nullable=False)
+    created_at = Column(DateTime, nullable=False)  # UTC
+
+    shopping_list = relationship("ShoppingList", back_populates="custom_categories")
 
 
 class ItemHistory(Base):
@@ -76,6 +102,7 @@ class ItemHistory(Base):
     name_key = Column(String(100), nullable=False)  # name.strip().lower()
     use_count = Column(Integer, default=1, nullable=False)
     last_used = Column(DateTime, nullable=False)  # UTC
+    category = Column(String(40), nullable=True)
 
     user = relationship("User", back_populates="item_history")
 

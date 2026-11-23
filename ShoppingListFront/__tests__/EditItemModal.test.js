@@ -13,7 +13,7 @@ test('reopening the edit window after cancel shows the saved name, not the disca
   await act(async () => {
     tree = ReactTestRenderer.create(<EditItemModal {...props} visible />);
   });
-  const input = () => tree.root.findByType(TextInput);
+  const input = () => tree.root.findAllByType(TextInput)[0];
 
   await act(async () => input().props.onChangeText('טקסט שלא נשמר'));
   await act(async () => tree.update(<EditItemModal {...props} visible={false} />));

@@ -11,6 +11,8 @@ const PurchasedItemsSection = ({
   onUpdateAmount,
   onRestoreAll,
   onClearAll,
+  showAddedBy = false,
+  currentUsername = null,
 }) => {
   // אם אין מוצרים שנקנו, לא מרנדרים כלום
   if (!items || items.length === 0) return null;
@@ -63,6 +65,8 @@ const PurchasedItemsSection = ({
           onEdit={() => onEdit(item)}
           onDelete={() => onDelete(item.id)}
           onUpdateAmount={newAmount => onUpdateAmount(item, newAmount)}
+          showAddedBy={showAddedBy}
+          currentUsername={currentUsername}
         />
       ))}
     </View>

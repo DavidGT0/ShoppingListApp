@@ -8,6 +8,15 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  outerScroll: {
+    width: '100%',
+  },
+  outerScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
   modalContent: {
     backgroundColor: colors.background,
     width: '85%',
@@ -31,6 +40,63 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     color: colors.text.primary,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.secondary,
+    textAlign: 'right',
+    marginBottom: 8,
+  },
+  chipsScroll: {
+    maxHeight: 220,
+    marginBottom: 16,
+  },
+  chipsRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  chipNew: {
+    borderStyle: 'dashed',
+  },
+  chipDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginLeft: 6,
+  },
+  chipText: {
+    fontSize: 14,
+    color: colors.text.primary,
+  },
+  chipTextActive: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  newCategoryRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  newCategoryInput: {
+    flex: 1,
+    marginBottom: 0,
   },
   modalButtons: {
     flexDirection: 'row',

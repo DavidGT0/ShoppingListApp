@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
-from typing import Annotated, Optional, List
+from typing import Annotated, Literal, Optional, List
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -15,6 +15,7 @@ import web_pages
 import email_sender
 import sharing
 from database import engine, get_db
+from schema_upgrade import ensure_columns
 import os
 import hashlib
 import secrets
@@ -25,6 +26,10 @@ load_dotenv()
 
 # יצירת הטבלאות ב-DB
 models.Base.metadata.create_all(bind=engine)
+# הוספת עמודות חדשות לטבלאות קיימות (בטוח להרצה חוזרת)
+added_columns = ensure_columns(engine)
+if added_columns:
+    print("schema upgrade added:", added_columns, flush=True)
 
 app = FastAPI()
 
@@ -90,6 +95,8 @@ class TokenData(BaseModel):
 
 # שם של רשימה/מוצר: בלי רווחים מסביב, לא ריק, עד 100 תווים
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+# שם מחלקה מותאמת: 1 עד 30 תווים
+CategoryName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]
 # כמות של מוצר: 1 עד 999
 Amount = Annotated[int, Field(ge=1, le=999)]
 
@@ -107,16 +114,54 @@ class ShoppingListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# יחידת מידה (אופציונלית): קבוצה סגורה
+Unit = Literal["יח׳", "ק״ג", "גרם", "ליטר", "חבילה"]
+NOTE_MAX_LENGTH = 100
+
+
+def _clean_note(value):
+    """הערה: בלי רווחים מסביב, ריקה הופכת ל-null, עד 100 תווים"""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("note must be a string")
+    value = value.strip()
+    if not value:
+        return None
+    if len(value) > NOTE_MAX_LENGTH:
+        raise ValueError("note too long")
+    return value
+
+
 class ItemCreate(BaseModel):
     name: Name
     amount: Amount = 1
     list_id: int
+    category: Optional[str] = None
+    unit: Optional[Unit] = None
+    note: Optional[str] = None
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def clean_note(cls, value):
+        return _clean_note(value)
 
 class ItemUpdate(BaseModel):
     name: Optional[Name] = None
     amount: Optional[Amount] = None
     purchased: Optional[bool] = None
     position: Optional[int] = None
+    category: Optional[str] = None
+    unit: Optional[Unit] = None
+    note: Optional[str] = None
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def clean_note(cls, value):
+        return _clean_note(value)
+
+class CategoryCreate(BaseModel):
+    name: CategoryName
 
 class ReorderEntry(BaseModel):
     id: int
@@ -290,6 +335,10 @@ def delete_user_account(db: Session, user: models.User):
     for shopping_list in list(user.owned_lists):
         db.delete(shopping_list)  # המוצרים נמחקים בזכות cascade, והשיתופים של הרשימה נמחקים אוטומטית
     user.shared_lists.clear()  # הסרת הגישה לרשימות של אחרים
+    # מוצרים שהמשתמש הוסיף ברשימות של אחרים נשארים, בלי שם המוסיף (גם ב-SQLite, שלא אוכף מפתחות זרים)
+    db.query(models.ShoppingItem).filter(models.ShoppingItem.added_by_id == user.id).update(
+        {models.ShoppingItem.added_by_id: None}, synchronize_session=False)
+    db.expire(user)
     db.delete(user)
     db.commit()
 
@@ -461,6 +510,15 @@ def duplicate_list(list_id: int, current_user: models.User = Depends(get_current
         .order_by(models.ShoppingItem.position)
         .all()
     )
+    # מחלקות מותאמות: מועתקות עם מזהים חדשים, וערכי custom:<ישן> במוצרים מתורגמים
+    id_map = {}
+    for cat in source.custom_categories:
+        copy = models.CustomCategory(
+            list_id=new_list.id, name=cat.name, color=cat.color, created_at=datetime.utcnow()
+        )
+        db.add(copy)
+        db.flush()
+        id_map[f"custom:{cat.id}"] = f"custom:{copy.id}"
     for item in source_items:
         db.add(models.ShoppingItem(
             name=item.name,
@@ -468,6 +526,10 @@ def duplicate_list(list_id: int, current_user: models.User = Depends(get_current
             position=item.position,
             purchased=False,
             list_id=new_list.id,
+            category=id_map.get(item.category, item.category if item.category in BUILTIN_CATEGORIES else None),
+            unit=item.unit,
+            note=item.note,
+            added_by_id=None,  # ההעתק שייך למשכפל, לא למוסיפים המקוריים
         ))
     db.commit()
     db.refresh(new_list)
@@ -536,7 +598,49 @@ def get_items(list_id: int, current_user: models.User = Depends(get_current_user
         raise HTTPException(status_code=403, detail="Not authorized to access this list")
     
     items = db.query(models.ShoppingItem).filter(models.ShoppingItem.list_id == list_id).order_by(models.ShoppingItem.position).all()
-    return items
+    return [_item_out(i) for i in items]
+
+
+def _item_out(item: models.ShoppingItem) -> dict:
+    """תגובת מוצר: added_by הוא שם המשתמש בלבד (אף פעם לא אימייל או אובייקט משתמש)"""
+    return {
+        "id": item.id,
+        "name": item.name,
+        "amount": item.amount,
+        "purchased": item.purchased,
+        "position": item.position,
+        "list_id": item.list_id,
+        "category": item.category,
+        "unit": item.unit,
+        "note": item.note,
+        "added_by": item.added_by.username if item.added_by is not None else None,
+    }
+
+BUILTIN_CATEGORIES = {
+    "produce", "dairy", "bakery", "meat", "pantry", "frozen",
+    "drinks", "snacks", "cleaning", "care", "other",
+}
+CUSTOM_CATEGORY_COLORS = ["#8E44AD", "#16A085", "#D35400", "#2C3E50", "#C0392B", "#7F8C8D", "#27AE60", "#2980B9"]
+
+
+def _is_valid_category(db: Session, list_id: int, value) -> bool:
+    """ערך מחלקה תקף: ריק, מפתח מובנה, או custom:<id> של מחלקה השייכת לרשימה הזו"""
+    if value is None or value in BUILTIN_CATEGORIES:
+        return True
+    prefix, _, raw_id = value.partition(":")
+    # רק צורה קנונית (בלי אפסים מובילים, עד 9 ספרות), כדי שההתאמה במחיקה/שכפול תהיה מדויקת
+    if prefix != "custom" or not raw_id.isascii() or not raw_id.isdigit() or len(raw_id) > 9 or raw_id != str(int(raw_id)):
+        return False
+    return db.query(models.CustomCategory).filter(
+        models.CustomCategory.id == int(raw_id),
+        models.CustomCategory.list_id == list_id
+    ).first() is not None
+
+
+def _validate_category(db: Session, list_id: int, value):
+    if not _is_valid_category(db, list_id, value):
+        raise HTTPException(status_code=400, detail="מחלקה לא תקינה")
+
 
 def _find_history(db: Session, user_id: int, name_key: str):
     return db.query(models.ItemHistory).filter(
@@ -545,16 +649,20 @@ def _find_history(db: Session, user_id: int, name_key: str):
     ).first()
 
 
-def _record_history(db: Session, user_id: int, name: str):
-    """מעדכן את היסטוריית המוצרים. בתוך SAVEPOINT, כדי שהוספה מקבילה לא תכשיל את הוספת המוצר"""
+def _record_history(db: Session, user_id: int, name: str, category=None, set_category: bool = False, bump_count: bool = True):
+    """מעדכן את היסטוריית המוצרים. בתוך SAVEPOINT, כדי שהוספה מקבילה לא תכשיל את הוספת המוצר.
+    set_category=True קובע גם את המחלקה שנלמדה (None מנקה אותה)"""
     name_key = name.strip().lower()[:100]
     clean_name = name.strip()[:100]
     now = datetime.utcnow()
 
     def bump(row):
-        row.use_count = (row.use_count or 0) + 1
-        row.last_used = now
-        row.name = clean_name
+        if bump_count:
+            row.use_count = (row.use_count or 0) + 1
+            row.last_used = now
+            row.name = clean_name
+        if set_category:
+            row.category = category
 
     history = _find_history(db, user_id, name_key)
     if history:
@@ -564,7 +672,8 @@ def _record_history(db: Session, user_id: int, name: str):
         with db.begin_nested():
             db.add(models.ItemHistory(
                 user_id=user_id, name=clean_name, name_key=name_key,
-                use_count=1, last_used=now
+                use_count=1, last_used=now,
+                category=category if set_category else None
             ))
     except IntegrityError:
         # הוספה מקבילה יצרה את השורה קודם - מגדילים אותה
@@ -583,6 +692,10 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
     if shopping_list.owner_id != current_user.id and current_user not in shopping_list.shared_users:
         raise HTTPException(status_code=403, detail="Not authorized to modify this list")
     
+    explicit_category = item.category
+    if explicit_category is not None:
+        _validate_category(db, item.list_id, explicit_category)
+
     # מוצר חדש נכנס לראש הרשימה: position קטן מכל הקיימים
     # (כך האפליקציה לא צריכה לשלוח בקשת סידור נוספת אחרי כל הוספה)
     min_position = db.query(func.min(models.ShoppingItem.position)).filter(
@@ -601,21 +714,38 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
     if revived is not None:
         revived.purchased = False
         revived.position = top_position
+        revived.added_by_id = current_user.id
+        if "unit" in item.model_fields_set:
+            revived.unit = item.unit
+        if "note" in item.model_fields_set:
+            revived.note = item.note
+        if explicit_category is not None:
+            revived.category = explicit_category
         new_item = revived
     else:
+        category = explicit_category
+        if category is None:
+            # למידה: המחלקה האחרונה שהמשתמש בחר למוצר בשם הזה (רק אם תקפה לרשימה הזו)
+            learned = _find_history(db, current_user.id, wanted[:100])
+            if learned is not None and _is_valid_category(db, item.list_id, learned.category):
+                category = learned.category
         new_item = models.ShoppingItem(
             name=item.name,
             amount=item.amount,
             list_id=item.list_id,
-            position=top_position
+            position=top_position,
+            category=category,
+            unit=item.unit,
+            note=item.note,
+            added_by_id=current_user.id,
         )
         db.add(new_item)
 
     # היסטוריית מוצרים של המשתמש המוסיף (באותה טרנזקציה)
-    _record_history(db, current_user.id, item.name)
+    _record_history(db, current_user.id, item.name, explicit_category, set_category=explicit_category is not None)
     db.commit()
     db.refresh(new_item)
-    return new_item
+    return _item_out(new_item)
 
 @app.put("/items/{item_id}")
 def update_item(item_id: int, item_update: ItemUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -637,10 +767,19 @@ def update_item(item_id: int, item_update: ItemUpdate, current_user: models.User
         item.purchased = item_update.purchased
     if item_update.position is not None:
         item.position = item_update.position
+    if "unit" in item_update.model_fields_set:
+        item.unit = item_update.unit
+    if "note" in item_update.model_fields_set:
+        item.note = item_update.note
+    if "category" in item_update.model_fields_set:
+        if item_update.category is not None:
+            _validate_category(db, item.list_id, item_update.category)
+        item.category = item_update.category
+        _record_history(db, current_user.id, item.name, item_update.category, set_category=True, bump_count=False)
     
     db.commit()
     db.refresh(item)
-    return item
+    return _item_out(item)
 
 @app.delete("/items/{item_id}")
 def delete_item(item_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -777,6 +916,57 @@ def join_list(join_request: JoinListRequest, current_user: models.User = Depends
         shopping_list.shared_users.append(current_user)
         db.commit()
     return ShoppingListResponse(id=shopping_list.id, name=shopping_list.name, owner_id=shopping_list.owner_id, is_owner=False)
+
+# === Custom Categories Endpoints ===
+
+def _category_json(cat: models.CustomCategory):
+    return {"id": cat.id, "name": cat.name, "color": cat.color}
+
+
+@app.get("/lists/{list_id}/categories")
+def get_list_categories(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    shopping_list = get_accessible_list_or_error(db, list_id, current_user)
+    return [_category_json(c) for c in shopping_list.custom_categories]
+
+
+@app.post("/lists/{list_id}/categories", status_code=status.HTTP_201_CREATED)
+def create_list_category(list_id: int, data: CategoryCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    shopping_list = get_accessible_list_or_error(db, list_id, current_user)
+    existing = shopping_list.custom_categories
+    if any(c.name == data.name for c in existing):
+        raise HTTPException(status_code=400, detail="המחלקה כבר קיימת ברשימה")
+    used = {c.color for c in existing}
+    color = next((c for c in CUSTOM_CATEGORY_COLORS if c not in used), None)
+    if color is None:
+        color = CUSTOM_CATEGORY_COLORS[len(existing) % len(CUSTOM_CATEGORY_COLORS)]
+    cat = models.CustomCategory(list_id=list_id, name=data.name, color=color, created_at=datetime.utcnow())
+    db.add(cat)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="המחלקה כבר קיימת ברשימה")
+    db.refresh(cat)
+    return _category_json(cat)
+
+
+@app.delete("/lists/{list_id}/categories/{cat_id}")
+def delete_list_category(list_id: int, cat_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    get_accessible_list_or_error(db, list_id, current_user)
+    cat = db.query(models.CustomCategory).filter(
+        models.CustomCategory.id == cat_id, models.CustomCategory.list_id == list_id
+    ).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="המחלקה לא נמצאה")
+    value = f"custom:{cat_id}"
+    # מוצרים והיסטוריה (של כל המשתמשים) שהצביעו על המחלקה חוזרים למיון אוטומטי
+    db.query(models.ShoppingItem).filter(models.ShoppingItem.category == value).update(
+        {models.ShoppingItem.category: None}, synchronize_session=False)
+    db.query(models.ItemHistory).filter(models.ItemHistory.category == value).update(
+        {models.ItemHistory.category: None}, synchronize_session=False)
+    db.delete(cat)
+    db.commit()
+    return {"message": "המחלקה נמחקה"}
 
 # === Members Endpoints ===
 

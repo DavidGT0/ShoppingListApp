@@ -105,3 +105,44 @@ def test_shares_and_invite_are_not_copied(client, register, db):
     copy = db.query(models.ShoppingList).filter(models.ShoppingList.id == new_id).first()
     assert copy.shared_users == []
     assert copy.invite is None
+
+
+def test_duplicate_remaps_custom_categories(client, register):
+    alice = register("alice")
+    list_id = _make_list(client, alice)
+    cat = client.post(f"/lists/{list_id}/categories", json={"name": "Pets"}, headers=alice).json()
+    custom_value = f"custom:{cat['id']}"
+    for name, category in (("Dog food", custom_value), ("Milk", "dairy"), ("Plain", None)):
+        client.post("/items", json={"name": name, "amount": 1, "list_id": list_id, "category": category}, headers=alice)
+
+    new_id = client.post(f"/lists/{list_id}/duplicate", headers=alice).json()["id"]
+
+    new_cats = client.get(f"/lists/{new_id}/categories", headers=alice).json()
+    assert [(c["name"], c["color"]) for c in new_cats] == [("Pets", cat["color"])]
+    assert new_cats[0]["id"] != cat["id"]
+    by_name = {i["name"]: i["category"] for i in _items(client, alice, new_id)}
+    assert by_name == {"Dog food": f"custom:{new_cats[0]['id']}", "Milk": "dairy", "Plain": None}
+    # המקור לא השתנה
+    assert client.get(f"/lists/{list_id}/categories", headers=alice).json() == [cat]
+    src = {i["name"]: i["category"] for i in _items(client, alice, list_id)}
+    assert src["Dog food"] == custom_value
+
+
+def test_duplicate_copies_unit_note_and_clears_added_by(client, register):
+    alice = register("alice")
+    bob = register("bob")
+    list_id = _make_list(client, alice)
+    client.post("/lists/share", json={"list_id": list_id, "username": "bob"}, headers=alice)
+    client.post(
+        "/items",
+        json={"name": "Milk", "list_id": list_id, "unit": "ליטר", "note": "בלי לקטוז"},
+        headers=alice,
+    )
+
+    new_id = client.post(f"/lists/{list_id}/duplicate", headers=bob).json()["id"]
+
+    copy = _items(client, bob, new_id)
+    assert len(copy) == 1
+    assert copy[0]["unit"] == "ליטר"
+    assert copy[0]["note"] == "בלי לקטוז"
+    assert copy[0]["added_by"] is None

@@ -21,6 +21,8 @@ const ShoppingListItem = ({
   onUpdateAmount,
   onDrag,
   isActive,
+  showAddedBy = false,
+  currentUsername = null,
 }) => {
   const swipeableRef = useRef(null);
   const cardScale = useRef(new Animated.Value(1)).current;
@@ -34,6 +36,12 @@ const ShoppingListItem = ({
       useNativeDriver: false,
     }).start();
   }, [item.purchased, lineAnim]);
+
+  // "נוסף ע״י" רק ברשימה משותפת ורק למוצר של מישהו אחר
+  const showAdder =
+    showAddedBy &&
+    !!item.added_by &&
+    item.added_by.trim() !== (currentUsername || '').trim();
 
   const handleCardPressIn = () => {
     Animated.spring(cardScale, {
@@ -123,20 +131,22 @@ const ShoppingListItem = ({
             />
           )}
 
-          <GHTouchableOpacity
-            onLongPress={onDrag}
-            disabled={isActive}
-            delayLongPress={150}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={styles.dragHandle}
-          >
-            <Icon
-              name="drag-vertical"
-              size={20}
-              color={colors.text.secondary}
-              style={{ opacity: 0.5 }}
-            />
-          </GHTouchableOpacity>
+          {onDrag && (
+            <GHTouchableOpacity
+              onLongPress={onDrag}
+              disabled={isActive}
+              delayLongPress={150}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={styles.dragHandle}
+            >
+              <Icon
+                name="drag-vertical"
+                size={20}
+                color={colors.text.secondary}
+                style={{ opacity: 0.5 }}
+              />
+            </GHTouchableOpacity>
+          )}
 
           <View style={styles.nameContainer}>
             <View
@@ -156,6 +166,25 @@ const ShoppingListItem = ({
                 style={[styles.strikeLine, { width: strikeWidth }]}
               />
             </View>
+            {!!item.note && (
+              <Text
+                testID="item_note"
+                numberOfLines={2}
+                style={styles.itemMeta}
+              >
+                {item.note}
+              </Text>
+            )}
+            {showAdder && (
+              <Text
+                testID="item_added_by"
+                numberOfLines={1}
+                style={styles.itemMeta}
+              >
+                {'נוסף ע״י '}
+                {item.added_by}
+              </Text>
+            )}
           </View>
 
           <View style={styles.amountContainer}>
@@ -170,7 +199,9 @@ const ShoppingListItem = ({
             >
               <Icon name="minus" size={16} color={colors.primary} />
             </Pressable>
-            <Text style={styles.amountText}>{item.amount}</Text>
+            <Text testID="item_amount" style={styles.amountText}>
+              {item.unit ? `${item.amount} ${item.unit}` : String(item.amount)}
+            </Text>
             <Pressable
               style={styles.amountButton}
               android_ripple={{

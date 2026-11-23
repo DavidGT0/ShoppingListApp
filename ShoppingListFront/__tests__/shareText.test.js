@@ -25,4 +25,32 @@ describe('buildListShareText', () => {
     ).toBeNull();
     expect(buildListShareText('סופר', null)).toBeNull();
   });
+
+  test('adds unit and note: name amount unit (note)', () => {
+    const text = buildListShareText('סופר', [
+      {
+        name: 'עגבניות',
+        amount: 2,
+        unit: 'ק״ג',
+        note: 'שרי',
+        purchased: false,
+      },
+    ]);
+    expect(text).toBe('🛒 סופר\n• עגבניות 2 ק״ג (שרי)');
+  });
+
+  test('shows the amount when a unit is set even if the amount is 1', () => {
+    const text = buildListShareText('סופר', [
+      { name: 'חלב', amount: 1, unit: 'ליטר', purchased: false },
+    ]);
+    expect(text).toBe('🛒 סופר\n• חלב 1 ליטר');
+  });
+
+  test('note alone, and no unit with amount above 1', () => {
+    const text = buildListShareText('סופר', [
+      { name: 'חלב', amount: 1, note: '3%', purchased: false },
+      { name: 'לחם', amount: 2, note: 'פרוס', purchased: false },
+    ]);
+    expect(text).toBe('🛒 סופר\n• חלב (3%)\n• לחם ×2 (פרוס)');
+  });
 });
