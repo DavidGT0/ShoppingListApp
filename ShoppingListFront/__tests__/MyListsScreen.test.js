@@ -169,7 +169,7 @@ describe('MyListsScreen', () => {
     });
 
     expect(getShoppingList).toHaveBeenCalledWith(1);
-    expect(shareSpy).toHaveBeenCalledWith({ message: '🛒 שלי\n• חלב 2' });
+    expect(shareSpy).toHaveBeenCalledWith({ message: '🛒 שלי\n• חלב ×2' });
   });
 
   test('share text failure shows a Hebrew error and does not share', async () => {

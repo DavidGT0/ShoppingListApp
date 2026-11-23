@@ -6,8 +6,9 @@ export const buildListShareText = (listName, items) => {
     // הכמות מוצגת כשהיא מעל 1 או כשיש יחידה
     const showAmount = item.amount > 1 || !!item.unit;
     let line = `• ${item.name}`;
-    if (showAmount) line += ` ${item.amount}`;
-    if (item.unit) line += ` ${item.unit}`;
+    // בלי יחידה: ×n; עם יחידה: n יחידה
+    if (item.unit) line += ` ${item.amount} ${item.unit}`;
+    else if (showAmount) line += ` ×${item.amount}`;
     if (item.note) line += ` (${item.note})`;
     return line;
   });

@@ -635,6 +635,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
       onUpdateAmount={handleUpdateAmount}
       onRestoreAll={handleRestoreAll}
       onClearAll={handleClearAll}
+      showAddedBy={memberCount > 1}
+      currentUsername={currentUsername}
     />
   );
 

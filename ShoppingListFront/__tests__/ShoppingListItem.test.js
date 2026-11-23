@@ -69,6 +69,12 @@ test('added-by: shown only for another member with showAddedBy', async () => {
   // own item
   r = await render(item, { showAddedBy: true, currentUsername: 'dana' });
   expect(r.find('item_added_by')).toHaveLength(0);
+  // legacy trailing-space username of the same user
+  r = await render(
+    { added_by: 'dana ' },
+    { showAddedBy: true, currentUsername: 'dana' },
+  );
+  expect(r.find('item_added_by')).toHaveLength(0);
   // no adder
   r = await render(
     { added_by: null },

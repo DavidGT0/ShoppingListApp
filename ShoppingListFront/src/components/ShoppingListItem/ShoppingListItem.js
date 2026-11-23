@@ -39,7 +39,9 @@ const ShoppingListItem = ({
 
   // "נוסף ע״י" רק ברשימה משותפת ורק למוצר של מישהו אחר
   const showAdder =
-    showAddedBy && !!item.added_by && item.added_by !== currentUsername;
+    showAddedBy &&
+    !!item.added_by &&
+    item.added_by.trim() !== (currentUsername || '').trim();
 
   const handleCardPressIn = () => {
     Animated.spring(cardScale, {
@@ -165,12 +167,20 @@ const ShoppingListItem = ({
               />
             </View>
             {!!item.note && (
-              <Text testID="item_note" style={styles.itemMeta}>
+              <Text
+                testID="item_note"
+                numberOfLines={2}
+                style={styles.itemMeta}
+              >
                 {item.note}
               </Text>
             )}
             {showAdder && (
-              <Text testID="item_added_by" style={styles.itemMeta}>
+              <Text
+                testID="item_added_by"
+                numberOfLines={1}
+                style={styles.itemMeta}
+              >
                 {'נוסף ע״י '}
                 {item.added_by}
               </Text>
