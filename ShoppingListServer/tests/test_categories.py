@@ -26,7 +26,7 @@ def test_create_and_list_categories_in_order_with_colors(client, register):
     assert a["name"] == "Pets"
     assert a["color"] == PALETTE[0] and b["color"] == PALETTE[1]
     got = client.get(f"/lists/{lid}/categories", headers=alice).json()
-    assert got == [a, b]
+    assert got["custom"] == [a, b]
 
 
 def test_color_cycles_after_palette_is_used(client, register):
@@ -173,7 +173,7 @@ def test_delete_category_nulls_items_and_history(client, register, db):
     items = {i["id"]: i for i in client.get("/items", params={"list_id": lid}, headers=alice).json()}
     assert items[item["id"]]["category"] is None
     assert items[kept["id"]]["category"] == f"custom:{keep['id']}"
-    assert [c["id"] for c in client.get(f"/lists/{lid}/categories", headers=alice).json()] == [keep["id"]]
+    assert [c["id"] for c in client.get(f"/lists/{lid}/categories", headers=alice).json()["custom"]] == [keep["id"]]
 
 
 def test_non_canonical_custom_ids_rejected(client, register):

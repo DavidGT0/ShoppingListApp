@@ -38,7 +38,11 @@ import {
   createListCategory,
   deleteListCategory,
 } from '../../services/api';
-import { resolveCategory, customKey } from '../../services/categories';
+import {
+  resolveCategory,
+  customKey,
+  normalizeCategories,
+} from '../../services/categories';
 import {
   loadWithCache,
   cacheKeys,
@@ -78,6 +82,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [memberCount, setMemberCount] = useState(null);
   const [currentUsername, setCurrentUsername] = useState(null);
   const [customCategories, setCustomCategories] = useState([]);
+  // שמות, סמלים וסדר המחלקות של הרשימה (נשמר בשרת, מתעדכן ברענון החי)
+  const [layout, setLayout] = useState([]);
   // 'manual' (גרירה) או 'category' (מקובץ לפי מחלקות)
   const [sortMode, setSortMode] = useState('manual');
   // מצב לא מקוון: מוצגת הגרסה השמורה ואי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
@@ -222,6 +228,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
     };
   }, [listId]);
 
+  // המטמון עלול להחזיק את הצורה הישנה (מערך): normalizeCategories מטפל בשתיהן
+  const applyCategories = value => {
+    const { custom, layout: nextLayout } = normalizeCategories(value);
+    setCustomCategories(custom);
+    setLayout(nextLayout);
+  };
+
   const loadCategories = async () => {
     try {
       const { data, fromCache, alreadyShown } = await loadWithCache(
@@ -231,16 +244,16 @@ const ShoppingListScreen = ({ route, navigation }) => {
           graceMs: INITIAL_LOAD_GRACE_MS,
           signal: loadAbort.current.signal,
           onEarlyCache: cached => {
-            if (Array.isArray(cached) && !hasCategories.current) {
-              setCustomCategories(cached);
+            if (cached && !hasCategories.current) {
+              applyCategories(cached);
               hasCategories.current = true;
             }
           },
         },
       );
       if (alreadyShown) return;
-      if (Array.isArray(data) && !(fromCache && hasCategories.current)) {
-        setCustomCategories(data);
+      if (data && !(fromCache && hasCategories.current)) {
+        applyCategories(data);
         hasCategories.current = true;
       }
       if (fromCache) setOffline(true);
@@ -390,11 +403,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setItems(sortByPosition(itemsResult.data));
       hasItems.current = true;
       if (!itemsResult.fromCache) liveApplied.current = true;
-      if (
-        Array.isArray(catsResult?.data) &&
-        !(catsResult.fromCache && hasCategories.current)
-      ) {
-        setCustomCategories(catsResult.data);
+      if (catsResult?.data && !(catsResult.fromCache && hasCategories.current)) {
+        applyCategories(catsResult.data);
         hasCategories.current = true;
       }
       // חוזרים למצב מקוון רק כשהמוצרים הגיעו מהשרת
@@ -741,10 +751,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const resolvedItems = useMemo(
     () =>
       items.map(item => {
-        const cat = resolveCategory(item, customCategories);
+        const cat = resolveCategory(item, customCategories, layout);
         return { item: { ...item, categoryColor: cat.color }, cat };
       }),
-    [items, customCategories],
+    [items, customCategories, layout],
   );
 
   if (loading) {
@@ -764,7 +774,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const purchasedItems = visibleItems.filter(item => item.purchased);
   const categoryMode = sortMode === 'category';
 
-  // קבוצות לפי מחלקה, בסדר המעברים (מובנות, מותאמות, אחר)
+  // קבוצות לפי מחלקה, לפי הסדר ששמור בפריסת הרשימה (cat.order), "אחר" תמיד אחרונה
   const groups = [];
   if (categoryMode) {
     const byKey = new Map();
@@ -1041,6 +1051,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
         item={editingItem}
         onSave={handleEditItem}
         categories={customCategories}
+        layout={layout}
         onCreateCategory={handleCreateCategory}
         onDeleteCategory={handleDeleteCategory}
         onClose={() => setModalVisible(false)}

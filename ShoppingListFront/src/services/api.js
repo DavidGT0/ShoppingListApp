@@ -1,4 +1,5 @@
 ﻿import { apiFetch, readErrorMessage } from './http';
+import { normalizeCategories } from './categories';
 
 /**
  * קבלת כל הרשימות של המשתמש
@@ -335,23 +336,37 @@ export const duplicateList = async listId => {
 };
 
 /**
- * מחלקות מותאמות של הרשימה (לפי סדר היצירה)
+ * מחלקות הרשימה: {custom, layout}. custom - המחלקות המותאמות, layout - שמות, סמלים וסדר.
+ * תשובה בצורה הישנה (מערך) נקראת כ-{custom: מערך, layout: []}
  */
 export const getListCategories = async listId => {
   const response = await apiFetch(`/lists/${listId}/categories`);
   if (!response.ok) {
     await throwResponseError(response, 'לא הצלחנו להביא את המחלקות');
   }
-  return await response.json();
+  return normalizeCategories(await response.json());
 };
 
 /**
- * יצירת מחלקה מותאמת ברשימה. מחזיר {id, name, color}
+ * שמירת הפריסה של המחלקות ברשימה: [{key, name?, icon?}], סדר המערך הוא הסדר
  */
-export const createListCategory = async (listId, name) => {
+export const saveCategoryLayout = async (listId, layout) => {
+  const response = await apiFetch(`/lists/${listId}/categories/layout`, {
+    method: 'PUT',
+    body: JSON.stringify({ layout }),
+  });
+  if (!response.ok) {
+    await throwResponseError(response, 'לא הצלחנו לשמור את המחלקות');
+  }
+};
+
+/**
+ * יצירת מחלקה מותאמת ברשימה, עם סמל לא חובה. מחזיר {id, name, color, icon}
+ */
+export const createListCategory = async (listId, name, icon) => {
   const response = await apiFetch(`/lists/${listId}/categories`, {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(icon ? { name, icon } : { name }),
   });
   if (!response.ok) {
     await throwResponseError(response, 'לא הצלחנו ליצור את המחלקה');

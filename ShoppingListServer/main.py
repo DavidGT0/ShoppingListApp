@@ -167,8 +167,20 @@ class ItemUpdate(BaseModel):
     def clean_note(cls, value):
         return _clean_note(value)
 
+DEFAULT_CATEGORY_ICON = "🛒"
+CATEGORY_ICON_MAX_LENGTH = 16
+
 class CategoryCreate(BaseModel):
     name: CategoryName
+    icon: Optional[str] = None
+
+class LayoutEntry(BaseModel):
+    key: str
+    name: Optional[str] = None
+    icon: Optional[str] = None
+
+class CategoryLayoutUpdate(BaseModel):
+    layout: List[LayoutEntry]
 
 class ReorderEntry(BaseModel):
     id: int
@@ -581,11 +593,19 @@ def duplicate_list(list_id: int, current_user: models.User = Depends(get_current
     id_map = {}
     for cat in source.custom_categories:
         copy = models.CustomCategory(
-            list_id=new_list.id, name=cat.name, color=cat.color, created_at=datetime.utcnow()
+            list_id=new_list.id, name=cat.name, color=cat.color, icon=cat.icon, created_at=datetime.utcnow()
         )
         db.add(copy)
         db.flush()
         id_map[f"custom:{cat.id}"] = f"custom:{copy.id}"
+    # סידור, שמות ואייקונים של המחלקות: מועתקים עם מפתחות custom מתורגמים
+    for setting in source.category_settings:
+        new_key = id_map.get(setting.key, setting.key if setting.key in BUILTIN_CATEGORIES else None)
+        if new_key is None:
+            continue
+        db.add(models.ListCategorySetting(
+            list_id=new_list.id, key=new_key, name=setting.name, icon=setting.icon, position=setting.position
+        ))
     for item in source_items:
         db.add(models.ShoppingItem(
             name=item.name,
@@ -987,13 +1007,96 @@ def join_list(join_request: JoinListRequest, current_user: models.User = Depends
 # === Custom Categories Endpoints ===
 
 def _category_json(cat: models.CustomCategory):
-    return {"id": cat.id, "name": cat.name, "color": cat.color}
+    return {"id": cat.id, "name": cat.name, "color": cat.color, "icon": cat.icon or DEFAULT_CATEGORY_ICON}
+
+
+# סדר ברירת המחדל של המחלקות המובנות ("other" תמיד אחרונה)
+DEFAULT_CATEGORY_ORDER = [
+    "produce", "dairy", "bakery", "meat", "pantry", "frozen",
+    "drinks", "snacks", "cleaning", "care", "other",
+]
+
+
+def _layout_json(shopping_list: models.ShoppingList):
+    """הסידור בפועל: מה ששמור לפי position, ואחריו מחלקות חסרות בסדר ברירת המחדל; "other" תמיד אחרונה"""
+    custom = {f"custom:{c.id}": c for c in shopping_list.custom_categories}
+    saved = {}
+    for s in shopping_list.category_settings:
+        if s.key in BUILTIN_CATEGORIES or s.key in custom:
+            saved[s.key] = s
+    ordered = list(saved)
+    for key in DEFAULT_CATEGORY_ORDER[:-1] + list(custom) + ["other"]:
+        if key not in saved:
+            ordered.append(key)
+    ordered.remove("other")
+    ordered.append("other")
+    result = []
+    for position, key in enumerate(ordered):
+        s = saved.get(key)
+        icon = s.icon if s and s.icon else None
+        if icon is None and key in custom:
+            icon = custom[key].icon or DEFAULT_CATEGORY_ICON
+        result.append({"key": key, "name": s.name if s else None, "icon": icon, "position": position})
+    return result
+
+
+def _categories_payload(shopping_list: models.ShoppingList):
+    return {"custom": [_category_json(c) for c in shopping_list.custom_categories], "layout": _layout_json(shopping_list)}
 
 
 @app.get("/lists/{list_id}/categories")
 def get_list_categories(list_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     shopping_list = get_accessible_list_or_error(db, list_id, current_user)
-    return [_category_json(c) for c in shopping_list.custom_categories]
+    return _categories_payload(shopping_list)
+
+
+def _clean_icon(value):
+    icon = (value or "").strip()
+    if len(icon) > CATEGORY_ICON_MAX_LENGTH:
+        raise HTTPException(status_code=400, detail="האייקון ארוך מדי")
+    return icon or None
+
+
+@app.put("/lists/{list_id}/categories/layout")
+def update_category_layout(list_id: int, data: CategoryLayoutUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """שמירת סדר, שמות ואייקונים של המחלקות (כל משתתף). הסדר = סדר המערך; מפתחות שכבר לא קיימים מתעלמים מהם"""
+    # נעילת שורת הרשימה: שמירות במקביל מתנהלות בטור במקום להתנגש באילוץ הייחודיות (SQLite מתעלם)
+    db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).with_for_update().first()
+    shopping_list = get_accessible_list_or_error(db, list_id, current_user)
+    existing_custom = {f"custom:{c.id}" for c in shopping_list.custom_categories}
+    entries = []
+    seen = set()
+    for entry in data.layout:
+        key = entry.key
+        if key not in BUILTIN_CATEGORIES:
+            prefix, _, raw_id = key.partition(":")
+            if prefix != "custom" or not raw_id.isascii() or not raw_id.isdigit() or len(raw_id) > 9 or raw_id != str(int(raw_id)):
+                raise HTTPException(status_code=400, detail="מחלקה לא מוכרת")
+        name = None
+        if entry.name is not None:
+            name = entry.name.strip()
+            if not 1 <= len(name) <= 30:
+                raise HTTPException(status_code=400, detail="שם המחלקה חייב להכיל 1-30 תווים")
+        icon = _clean_icon(entry.icon)
+        if key in BUILTIN_CATEGORIES or key in existing_custom:
+            if key not in seen:  # כפילות: הראשונה קובעת
+                seen.add(key)
+                entries.append((key, name, icon))
+    keys = [e[0] for e in entries]
+    if "other" in keys and keys[-1] != "other":
+        raise HTTPException(status_code=400, detail='"אחר" חייבת להיות המחלקה האחרונה')
+    try:
+        # ה-flush חייב לבוא לפני ההוספה: מוחק את השורות הישנות לפני שנכנסות החדשות (אילוץ ייחודיות)
+        shopping_list.category_settings.clear()
+        db.flush()
+        for position, (key, name, icon) in enumerate(entries):
+            shopping_list.category_settings.append(models.ListCategorySetting(key=key, name=name, icon=icon, position=position))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="המחלקות עודכנו במקביל, נסה שוב")
+    db.refresh(shopping_list)
+    return _categories_payload(shopping_list)
 
 
 @app.post("/lists/{list_id}/categories", status_code=status.HTTP_201_CREATED)
@@ -1006,7 +1109,7 @@ def create_list_category(list_id: int, data: CategoryCreate, current_user: model
     color = next((c for c in CUSTOM_CATEGORY_COLORS if c not in used), None)
     if color is None:
         color = CUSTOM_CATEGORY_COLORS[len(existing) % len(CUSTOM_CATEGORY_COLORS)]
-    cat = models.CustomCategory(list_id=list_id, name=data.name, color=color, created_at=datetime.utcnow())
+    cat = models.CustomCategory(list_id=list_id, name=data.name, color=color, icon=_clean_icon(data.icon) or DEFAULT_CATEGORY_ICON, created_at=datetime.utcnow())
     db.add(cat)
     try:
         db.commit()
@@ -1031,6 +1134,9 @@ def delete_list_category(list_id: int, cat_id: int, current_user: models.User = 
         {models.ShoppingItem.category: None}, synchronize_session=False)
     db.query(models.ItemHistory).filter(models.ItemHistory.category == value).update(
         {models.ItemHistory.category: None}, synchronize_session=False)
+    db.query(models.ListCategorySetting).filter(
+        models.ListCategorySetting.list_id == list_id, models.ListCategorySetting.key == value
+    ).delete(synchronize_session=False)
     db.delete(cat)
     db.commit()
     return {"message": "המחלקה נמחקה"}

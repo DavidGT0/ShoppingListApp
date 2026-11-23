@@ -117,13 +117,13 @@ def test_duplicate_remaps_custom_categories(client, register):
 
     new_id = client.post(f"/lists/{list_id}/duplicate", headers=alice).json()["id"]
 
-    new_cats = client.get(f"/lists/{new_id}/categories", headers=alice).json()
+    new_cats = client.get(f"/lists/{new_id}/categories", headers=alice).json()["custom"]
     assert [(c["name"], c["color"]) for c in new_cats] == [("Pets", cat["color"])]
     assert new_cats[0]["id"] != cat["id"]
     by_name = {i["name"]: i["category"] for i in _items(client, alice, new_id)}
     assert by_name == {"Dog food": f"custom:{new_cats[0]['id']}", "Milk": "dairy", "Plain": None}
     # המקור לא השתנה
-    assert client.get(f"/lists/{list_id}/categories", headers=alice).json() == [cat]
+    assert client.get(f"/lists/{list_id}/categories", headers=alice).json()["custom"] == [cat]
     src = {i["name"]: i["category"] for i in _items(client, alice, list_id)}
     assert src["Dog food"] == custom_value
 
