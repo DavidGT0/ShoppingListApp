@@ -263,3 +263,39 @@ test('a touched custom selection that disappears from categories falls back to t
     category: undefined,
   });
 });
+
+test('chips show the overridden names, icons and order from the layout', async () => {
+  const layout = [
+    { key: 'custom:5', name: 'מתנות חג', icon: '🎁', position: 0 },
+    { key: 'dairy', name: 'חלבי', icon: '🧀', position: 1 },
+  ];
+  const { tree, byId } = await setup({ layout });
+  const chip = byId('category_chip_dairy');
+  expect(chip.props.accessibilityLabel).toBe('מחלקה חלבי');
+  const texts = chip.findAll(n => n.type === 'Text').map(n => n.props.children);
+  expect(texts).toEqual(['🧀', 'חלבי']);
+  expect(byId('category_chip_custom:5').props.accessibilityLabel).toBe(
+    'מחלקה מתנות חג',
+  );
+  const ids = tree.root
+    .findAll(
+      n =>
+        typeof n.props.testID === 'string' &&
+        n.props.testID.startsWith('category_chip_') &&
+        typeof n.type === 'string',
+    )
+    .map(n => n.props.testID);
+  expect(ids.slice(0, 3)).toEqual([
+    'category_chip_auto',
+    'category_chip_custom:5',
+    'category_chip_dairy',
+  ]);
+  expect(ids[ids.length - 2]).toBe('category_chip_other');
+});
+
+test('without a layout the chips keep the default names', async () => {
+  const { byId } = await setup();
+  expect(byId('category_chip_dairy').props.accessibilityLabel).toBe(
+    'מחלקה מוצרי חלב וביצים',
+  );
+});

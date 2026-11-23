@@ -12,11 +12,16 @@ import {
 } from 'react-native';
 import { makeStyles } from './EditItemModal.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
-import { BUILTIN_CATEGORIES, customKey } from '../../services/categories';
+import {
+  BUILTIN_CATEGORIES,
+  customKey,
+  orderedDepartments,
+} from '../../services/categories';
 
 const MAX_CATEGORY_NAME = 30;
 const MAX_NOTE = 100;
 const NO_CATEGORIES = [];
+const NO_LAYOUT = [];
 const UNITS = ['יח׳', 'ק״ג', 'גרם', 'ליטר', 'חבילה'];
 
 // הפניה למחלקה מותאמת שכבר לא קיימת נחשבת אוטומטי
@@ -33,6 +38,7 @@ const EditItemModal = ({
   onSave,
   onClose,
   categories = NO_CATEGORIES,
+  layout = NO_LAYOUT,
   onCreateCategory,
   onDeleteCategory,
 }) => {
@@ -126,7 +132,10 @@ const EditItemModal = ({
     );
   };
 
-  const renderChip = (id, label, value, color, extra = {}) => {
+  // שמות, סמלים וסדר לפי פריסת הרשימה (ברירת מחדל: מובנות, מותאמות, אחר)
+  const departments = orderedDepartments(categories, layout);
+
+  const renderChip = (id, label, value, color, extra = {}, icon = null) => {
     const active = selected === value;
     return (
       <TouchableOpacity
@@ -146,6 +155,7 @@ const EditItemModal = ({
         {color ? (
           <View style={[styles.chipDot, { backgroundColor: color }]} />
         ) : null}
+        {icon ? <Text style={styles.chipIcon}>{icon}</Text> : null}
         <Text style={[styles.chipText, active && styles.chipTextActive]}>
           {label}
         </Text>
@@ -186,23 +196,17 @@ const EditItemModal = ({
             >
               <View style={styles.chipsRow}>
                 {renderChip('auto', 'אוטומטי', null, null)}
-                {BUILTIN_CATEGORIES.filter(c => c.key !== 'other').map(c =>
-                  renderChip(c.key, c.name, c.key, c.color),
-                )}
-                {categories.map(c =>
-                  renderChip(
-                    customKey(c.id),
-                    c.name,
-                    customKey(c.id),
-                    c.color,
-                    {
-                      onLongPress: () => confirmDelete(c),
-                    },
-                  ),
-                )}
-                {BUILTIN_CATEGORIES.filter(c => c.key === 'other').map(c =>
-                  renderChip(c.key, c.name, c.key, c.color),
-                )}
+                {departments.map(d => {
+                  const custom = categories.find(c => customKey(c.id) === d.key);
+                  return renderChip(
+                    d.key,
+                    d.name,
+                    d.key,
+                    d.color,
+                    custom ? { onLongPress: () => confirmDelete(custom) } : {},
+                    d.icon,
+                  );
+                })}
                 <TouchableOpacity
                   testID="category_chip_new"
                   accessibilityRole="button"

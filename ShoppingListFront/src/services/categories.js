@@ -2,17 +2,17 @@
 // הסדר ברשימה הוא סדר המעברים בסופר.
 
 export const BUILTIN_CATEGORIES = [
-  { key: 'produce', name: 'פירות וירקות', color: '#4CAF50' },
-  { key: 'dairy', name: 'מוצרי חלב וביצים', color: '#64B5F6' },
-  { key: 'bakery', name: 'מאפים ולחם', color: '#D4A056' },
-  { key: 'meat', name: 'בשר ודגים', color: '#E57373' },
-  { key: 'pantry', name: 'יבשים ושימורים', color: '#A1887F' },
-  { key: 'frozen', name: 'קפואים', color: '#4DD0E1' },
-  { key: 'drinks', name: 'משקאות', color: '#7986CB' },
-  { key: 'snacks', name: 'חטיפים ומתוקים', color: '#FF8A65' },
-  { key: 'cleaning', name: 'ניקיון ובית', color: '#26A69A' },
-  { key: 'care', name: 'טיפוח ותינוקות', color: '#BA68C8' },
-  { key: 'other', name: 'אחר', color: '#9E9E9E' },
+  { key: 'produce', name: 'פירות וירקות', color: '#4CAF50', icon: '🥦' },
+  { key: 'dairy', name: 'מוצרי חלב וביצים', color: '#64B5F6', icon: '🥛' },
+  { key: 'bakery', name: 'מאפים ולחם', color: '#D4A056', icon: '🥖' },
+  { key: 'meat', name: 'בשר ודגים', color: '#E57373', icon: '🥩' },
+  { key: 'pantry', name: 'יבשים ושימורים', color: '#A1887F', icon: '🥫' },
+  { key: 'frozen', name: 'קפואים', color: '#4DD0E1', icon: '🧊' },
+  { key: 'drinks', name: 'משקאות', color: '#7986CB', icon: '🥤' },
+  { key: 'snacks', name: 'חטיפים ומתוקים', color: '#FF8A65', icon: '🍫' },
+  { key: 'cleaning', name: 'ניקיון ובית', color: '#26A69A', icon: '🧽' },
+  { key: 'care', name: 'טיפוח ותינוקות', color: '#BA68C8', icon: '🧴' },
+  { key: 'other', name: 'אחר', color: '#9E9E9E', icon: '🛒' },
 ];
 
 const KEYWORDS = {
@@ -375,33 +375,97 @@ export const categorize = name => {
   return key;
 };
 
-const OTHER_ORDER = 1000;
-const CUSTOM_ORDER_BASE = 100;
-
-const builtinByKey = Object.fromEntries(
-  BUILTIN_CATEGORIES.map((c, index) => [
-    c.key,
-    { ...c, order: c.key === 'other' ? OTHER_ORDER : index },
-  ]),
-);
+const DEFAULT_ICON = '🛒';
+const EMPTY = [];
 
 export const customKey = id => `custom:${id}`;
 
-// המחלקה של מוצר: בחירה ידנית תקפה, אחרת אוטומטית. הפניה לא קיימת חוזרת לאוטומטי
-export const resolveCategory = (item, customCategories = []) => {
-  const value = item && item.category;
-  if (value) {
-    if (builtinByKey[value]) return builtinByKey[value];
-    const index = customCategories.findIndex(c => customKey(c.id) === value);
-    if (index !== -1) {
-      const custom = customCategories[index];
-      return {
-        key: value,
-        name: custom.name,
-        color: custom.color,
-        order: CUSTOM_ORDER_BASE + index,
-      };
-    }
+// תשובת המחלקות בשני צורות: הישנה (מערך מחלקות מותאמות, גם מהמטמון) והחדשה {custom, layout}
+export const normalizeCategories = value => {
+  if (Array.isArray(value)) return { custom: value, layout: EMPTY };
+  return {
+    custom: Array.isArray(value?.custom) ? value.custom : EMPTY,
+    layout: Array.isArray(value?.layout) ? value.layout : EMPTY,
+  };
+};
+
+// כל המחלקות בסדר ברירת המחדל: מובנות, מותאמות לפי יצירה, אחר
+const defaultDepartments = custom => [
+  ...BUILTIN_CATEGORIES.filter(c => c.key !== 'other'),
+  ...custom.map(c => ({
+    key: customKey(c.id),
+    name: c.name,
+    color: c.color,
+    icon: c.icon || DEFAULT_ICON,
+  })),
+  ...BUILTIN_CATEGORIES.filter(c => c.key === 'other'),
+];
+
+// זיכרון לפי זהות המערכים - המסך מחשב מחדש רק כשהמחלקות או הפריסה מתחלפות
+const departmentCache = new WeakMap();
+const mapCache = new WeakMap();
+
+// המחלקות בסדר הפריסה של הרשימה, עם שמות וסמלים מעודכנים. מחלקה שחסרה בפריסה
+// נוספת בסוף לפי סדר ברירת המחדל, ו"אחר" תמיד אחרונה
+export const orderedDepartments = (custom = EMPTY, layout = EMPTY) => {
+  const customList = Array.isArray(custom) ? custom : EMPTY;
+  const layoutList = Array.isArray(layout) ? layout : EMPTY;
+  let byLayout = departmentCache.get(customList);
+  if (!byLayout) {
+    byLayout = new WeakMap();
+    departmentCache.set(customList, byLayout);
   }
-  return builtinByKey[categorize(item && item.name)];
+  const hit = byLayout.get(layoutList);
+  if (hit) return hit;
+
+  const defaults = defaultDepartments(customList);
+  const known = new Map(defaults.map(d => [d.key, d]));
+  const overrides = new Map();
+  [...layoutList]
+    .filter(entry => entry && known.has(entry.key))
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .forEach(entry => {
+      if (!overrides.has(entry.key)) overrides.set(entry.key, entry);
+    });
+  const placed = [...overrides.keys()].filter(key => key !== 'other');
+  const rest = defaults
+    .map(d => d.key)
+    .filter(key => key !== 'other' && !overrides.has(key));
+  const keys = [...placed, ...rest, 'other'];
+
+  const result = keys.map((key, index) => {
+    const base = known.get(key);
+    const entry = overrides.get(key);
+    return {
+      ...base,
+      name: entry?.name || base.name,
+      icon: entry?.icon || base.icon || DEFAULT_ICON,
+      order: index,
+    };
+  });
+  byLayout.set(layoutList, result);
+  return result;
+};
+
+const departmentMap = (custom, layout) => {
+  const list = orderedDepartments(custom, layout);
+  let map = mapCache.get(list);
+  if (!map) {
+    map = new Map(list.map(d => [d.key, d]));
+    mapCache.set(list, map);
+  }
+  return map;
+};
+
+// המחלקה של מוצר: בחירה ידנית תקפה, אחרת אוטומטית. הפניה לא קיימת חוזרת לאוטומטי.
+// מחזיר {key, name, color, icon, order} עם שמות, סמלים וסדר לפי פריסת הרשימה
+export const resolveCategory = (
+  item,
+  customCategories = EMPTY,
+  layout = EMPTY,
+) => {
+  const map = departmentMap(customCategories, layout);
+  const value = item && item.category;
+  if (value && map.has(value)) return map.get(value);
+  return map.get(categorize(item && item.name));
 };
