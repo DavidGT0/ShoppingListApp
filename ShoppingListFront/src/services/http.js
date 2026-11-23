@@ -98,16 +98,37 @@ export class SessionExpiredError extends Error {
   }
 }
 
+// חלון החלפת טוקן (שינוי שם משתמש): השרת מבטל את הטוקן הישן ברגע השינוי,
+// ולכן בקשה שיצאה עם הטוקן הישן עלולה לקבל 401 לפני שהחדש נשמר.
+// בזמן החלון (ועוד רגע אחריו) 401 אינו פקיעת התחברות.
+const TOKEN_SWAP_GRACE_MS = 2000;
+let activeSwaps = 0;
+let swapEndedAt = 0;
+
+export const beginTokenSwap = () => {
+  activeSwaps += 1;
+};
+
+export const endTokenSwap = () => {
+  activeSwaps = Math.max(0, activeSwaps - 1);
+  swapEndedAt = Date.now();
+};
+
+const inTokenSwapWindow = () =>
+  activeSwaps > 0 || Date.now() - swapEndedAt < TOKEN_SWAP_GRACE_MS;
+
 /**
  * קריאה לשרת עם הטוקן השמור.
  * אם השרת מחזיר 401 - מוחקים את הטוקן, מודיעים ל-App וזורקים SessionExpiredError.
  * (לא לשימוש בהתחברות עצמה - שם 401 פירושו סיסמה שגויה)
  */
 export const apiFetch = async (path, options = {}) => {
+  // ignoreSwapWindow: בקשת ההחלפה עצמה - 401 עליה הוא פקיעה אמיתית
+  const { ignoreSwapWindow, ...fetchOptions } = options;
   const token = await AsyncStorage.getItem('access_token');
 
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
-    ...options,
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -116,6 +137,19 @@ export const apiFetch = async (path, options = {}) => {
   });
 
   if (response.status === 401) {
+    // שינוי שם משתמש מחליף את הטוקן באמצע בקשה (למשל רענון חי): 401 על הטוקן
+    // הישן אינו פקיעת התחברות, כי כבר נשמר טוקן חדש
+    const currentToken = await AsyncStorage.getItem('access_token');
+    if (
+      token &&
+      ((currentToken && currentToken !== token) ||
+        (!ignoreSwapWindow && inTokenSwapWindow()))
+    ) {
+      const staleError = new Error('ההתחברות התחדשה. נסה שוב.');
+      staleError.status = 401;
+      staleError.staleToken = true;
+      throw staleError;
+    }
     await AsyncStorage.removeMany(['access_token', 'username']); // AsyncStorage v3 (אין multiRemove)
     await clearAllCaches();
     if (token && token !== lastExpiredToken) {

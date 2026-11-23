@@ -109,25 +109,34 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'right',
   },
-  sortToggle: {
+  sortSegments: {
     flexDirection: 'row-reverse',
-    alignSelf: 'flex-end',
     marginHorizontal: 20,
     marginTop: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  sortSegment: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
   },
-  sortToggleText: {
-    fontSize: 13,
-    color: colors.text.secondary,
+  sortSegmentActive: {
+    backgroundColor: colors.primary,
   },
-  sortToggleActive: {
+  sortSegmentText: {
+    fontSize: 14,
+    marginRight: 6,
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: '600',
+  },
+  sortSegmentTextActive: {
+    color: colors.text.inverse,
   },
   categoryHeader: {
     flexDirection: 'row-reverse',

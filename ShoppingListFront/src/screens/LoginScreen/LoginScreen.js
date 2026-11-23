@@ -128,16 +128,18 @@ const LoginScreen = ({ onLoginSuccess }) => {
           <Text style={styles.title}>{isLogin ? 'התחברות' : 'הרשמה'}</Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>שם משתמש</Text>
+            <Text style={styles.label}>
+              {isLogin ? 'שם משתמש או אימייל' : 'שם משתמש'}
+            </Text>
             <TextInput
               style={styles.input}
-              placeholder="הזן שם משתמש"
+              placeholder={isLogin ? 'שם משתמש או אימייל' : 'הזן שם משתמש'}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
               testID="username_input" // <-- נוסף מזהה
-              accessibilityLabel="שם משתמש"
+              accessibilityLabel={isLogin ? 'שם משתמש או אימייל' : 'שם משתמש'}
             />
           </View>
 

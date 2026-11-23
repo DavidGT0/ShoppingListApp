@@ -132,7 +132,7 @@ const MyListsScreen = ({ navigation }) => {
     try {
       await refreshLists();
     } catch (error) {
-      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (error.sessionExpired || error.staleToken) return; // ההתראה כבר הוצגה / טוקן שהוחלף
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את הרשימות שלך.');
     } finally {
       setRefreshing(false);
@@ -187,7 +187,7 @@ const MyListsScreen = ({ navigation }) => {
       hasLists.current = true;
       setOffline(fromCache);
     } catch (error) {
-      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (error.sessionExpired || error.staleToken) return; // ההתראה כבר הוצגה / טוקן שהוחלף
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את הרשימות שלך.');
     } finally {
       setLoading(false);

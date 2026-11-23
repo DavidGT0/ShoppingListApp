@@ -59,6 +59,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+USERNAME_MAX_LENGTH = 50
+USERNAME_AT_MESSAGE = "שם המשתמש לא יכול להכיל @"
+
 # ===== Pydantic Models =====
 class UserCreate(BaseModel):
     username: str
@@ -89,6 +92,10 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    username: str
+
+class UsernameChange(BaseModel):
+    username: str
 
 class TokenData(BaseModel):
     username: Optional[str] = None
@@ -197,7 +204,23 @@ def get_user_by_username(db: Session, username: str):
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 
-def find_user_for_login(db: Session, username: str):
+def find_user_by_email_for_login(db: Session, email: str):
+    """לפי אימייל, בלי רווחים מסביב ובלי הבדל בין אותיות גדולות לקטנות"""
+    cleaned = email.strip().lower()
+    if not cleaned:
+        return None
+    return db.query(models.User).filter(func.lower(func.trim(models.User.email)) == cleaned).first()
+
+def find_user_for_login(db: Session, identifier: str):
+    """אימייל (אם יש @) ואם לא נמצא - לפי שם משתמש.
+    הנפילה לשם משתמש משרתת משתמשים ישנים ששמם מכיל @"""
+    if "@" in identifier:
+        user = find_user_by_email_for_login(db, identifier)
+        if user:
+            return user
+    return find_user_by_username_for_login(db, identifier)
+
+def find_user_by_username_for_login(db: Session, username: str):
     """שם מדויק; ואם לא נמצא - לפי השם בלי רווחים מסביב
     (כולל משתמשים ישנים שנרשמו בטעות עם רווח, לפני שההרשמה התחילה להסיר רווחים)"""
     user = get_user_by_username(db, username)
@@ -225,7 +248,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     
     user = get_user_by_username(db, username=token_data.username)
-    if user is None:
+    # ה-token קשור גם למזהה המשתמש: אחרי שינוי שם, מי שירשום את השם הישן לא יירש את ה-token הישן.
+    # token בלי uid (ישן) נדחה - התחברות מחדש חד-פעמית
+    if user is None or payload.get("uid") != user.id:
         raise credentials_exception
     return user
 
@@ -240,6 +265,11 @@ def root():
 @app.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     """רישום משתמש חדש"""
+    if "@" in user.username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=USERNAME_AT_MESSAGE
+        )
     if len(user.password) < MIN_PASSWORD_LENGTH:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -247,12 +277,12 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         )
 
     # בדיקה אם המשתמש כבר קיים
-    if get_user_by_username(db, user.username):
+    if db.query(models.User).filter(func.lower(models.User.username) == user.username.lower()).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="שם המשתמש כבר תפוס"
         )
-    if get_user_by_email(db, user.email):
+    if find_user_by_email_for_login(db, user.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="כתובת האימייל כבר רשומה"
@@ -292,15 +322,52 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "uid": user.id}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "username": user.username}
 
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     """קבלת פרטי המשתמש המחובר"""
     return current_user
     
+@app.patch("/users/me", response_model=Token)
+def rename_me(
+    data: UsernameChange,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """שינוי שם משתמש. ה-token מכיל את השם, לכן מוחזר token חדש (הישן מפסיק לעבוד)"""
+    new_name = data.username.strip()
+    if not new_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="שם המשתמש לא יכול להיות ריק")
+    if "@" in new_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=USERNAME_AT_MESSAGE)
+    if len(new_name) > USERNAME_MAX_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"שם המשתמש ארוך מדי (עד {USERNAME_MAX_LENGTH} תווים)"
+        )
+    taken = db.query(models.User).filter(
+        func.lower(models.User.username) == new_name.lower(),
+        models.User.id != current_user.id,
+    ).first()
+    if taken:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="שם המשתמש כבר תפוס")
+    if current_user.username != new_name:
+        current_user.username = new_name
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="שם המשתמש כבר תפוס")
+        db.refresh(current_user)
+    access_token = create_access_token(
+        data={"sub": current_user.username, "uid": current_user.id},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    return {"access_token": access_token, "token_type": "bearer", "username": current_user.username}
+
 @app.put("/users/password")
 def change_password(
     password_data: PasswordChangeRequest, 

@@ -6,6 +6,8 @@ import {
   readErrorMessage,
   wakeUpServer,
   setSessionExpiredHandler,
+  beginTokenSwap,
+  endTokenSwap,
   API_BASE_URL,
   REQUEST_TIMEOUT_MS,
 } from '../src/services/http';
@@ -80,6 +82,56 @@ describe('apiFetch', () => {
       sessionExpired: true,
     });
     expect(onExpired).toHaveBeenCalledTimes(2);
+  });
+
+  test('on 401 after the stored token was replaced (rename): no session expiry, token kept', async () => {
+    await AsyncStorage.setItem('access_token', 'T-old');
+    global.fetch = jest.fn(async () => {
+      // השרת עונה 401 לטוקן הישן, אחרי שהטוקן החדש כבר נשמר
+      await AsyncStorage.setItem('access_token', 'T-new');
+      return { status: 401, ok: false };
+    });
+
+    const result = await apiFetch('/items?list_id=1').catch(e => e);
+
+    expect(result).toBeInstanceOf(Error);
+    expect(result.sessionExpired).toBeUndefined();
+    expect(await AsyncStorage.getItem('access_token')).toBe('T-new');
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  test('a 401 during a token swap, before the new token is stored, is non-fatal and flagged stale', async () => {
+    await AsyncStorage.setItem('access_token', 'T-swap-old');
+    mockFetchStatus(401);
+    beginTokenSwap();
+    let result;
+    try {
+      result = await apiFetch('/items?list_id=1').catch(e => e);
+    } finally {
+      endTokenSwap();
+    }
+
+    expect(result.staleToken).toBe(true);
+    expect(result.sessionExpired).toBeUndefined();
+    expect(await AsyncStorage.getItem('access_token')).toBe('T-swap-old');
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  test('a 401 well after the swap ended expires the session again', async () => {
+    const realNow = Date.now;
+    await AsyncStorage.setItem('access_token', 'T-after-swap');
+    mockFetchStatus(401);
+    beginTokenSwap();
+    endTokenSwap();
+    Date.now = () => realNow() + 5000;
+    try {
+      await expect(apiFetch('/lists')).rejects.toMatchObject({
+        sessionExpired: true,
+      });
+    } finally {
+      Date.now = realNow;
+    }
+    expect(onExpired).toHaveBeenCalledTimes(1);
   });
 
   test('on 401 without a token: throws but does not notify', async () => {

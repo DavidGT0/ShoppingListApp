@@ -6,9 +6,8 @@ import {
   TouchableOpacity,
   Alert,
   AppState,
-  RefreshControl,
 } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
+import { ScrollView, RefreshControl } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -248,25 +247,31 @@ const ShoppingListScreen = ({ route, navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listId]);
 
-  const toggleSortMode = () => {
-    const next = sortMode === 'category' ? 'manual' : 'category';
+  const selectSortMode = next => {
+    if (next === sortMode) return;
     setSortMode(next);
     Promise.resolve(AsyncStorage.setItem(sortModeKey(listId), next)).catch(
       () => {},
     );
   };
 
-  // שם המשתמש הנוכחי (נשמר בכניסה) - לצורך "נוסף ע״י"
+  // שם המשתמש הנוכחי (נשמר בכניסה) - לצורך "נוסף ע״י".
+  // נקרא שוב בכל חזרה למסך, כי אפשר לשנות אותו בהגדרות
   useEffect(() => {
     let cancelled = false;
-    Promise.resolve(AsyncStorage.getItem('username'))
-      .then(value => {
-        if (!cancelled) setCurrentUsername(value || null);
-      })
-      .catch(() => {});
+    const loadUsername = () =>
+      Promise.resolve(AsyncStorage.getItem('username'))
+        .then(value => {
+          if (!cancelled) setCurrentUsername(value || null);
+        })
+        .catch(() => {});
+    loadUsername();
+    const unsubscribe = navigation?.addListener?.('focus', loadUsername);
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // מספר המשתתפים מוצג על כפתור הכותרת
@@ -388,7 +393,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       // חוזרים למצב מקוון רק כשהמוצרים הגיעו מהשרת
       setOffline(itemsResult.fromCache || !!catsResult?.fromCache);
     } catch (error) {
-      if (error.sessionExpired) return; // האפליקציה כבר מטפלת בזה
+      if (error.sessionExpired || error.staleToken) return; // האפליקציה כבר מטפלת בזה / טוקן שהוחלף
       if (error.status === 403 || error.status === 404) {
         handleLostAccess();
       }
@@ -878,33 +883,43 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       <OfflineBanner visible={isOffline} />
 
-      <TouchableOpacity
-        testID="sort_mode_toggle"
-        accessibilityLabel={`מיון: ${categoryMode ? 'לפי מחלקות' : 'סדר ידני'}`}
-        accessibilityHint="לחיצה כפולה להחלפת מצב המיון"
-        accessibilityRole="button"
-        style={styles.sortToggle}
-        onPress={toggleSortMode}
-        activeOpacity={0.8}
-      >
-        <Text
-          style={[
-            styles.sortToggleText,
-            !categoryMode && styles.sortToggleActive,
-          ]}
-        >
-          סדר ידני
-        </Text>
-        <Text style={styles.sortToggleText}> / </Text>
-        <Text
-          style={[
-            styles.sortToggleText,
-            categoryMode && styles.sortToggleActive,
-          ]}
-        >
-          לפי מחלקות
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.sortSegments}>
+        {[
+          { mode: 'manual', label: 'סדר ידני', icon: 'drag-horizontal-variant' },
+          { mode: 'category', label: 'לפי מחלקות', icon: 'shape-outline' },
+        ].map(({ mode, label, icon }) => {
+          const selected = (mode === 'category') === categoryMode;
+          return (
+            <TouchableOpacity
+              key={mode}
+              testID={`sort_segment_${mode}`}
+              accessibilityLabel={label}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              style={[
+                styles.sortSegment,
+                selected && styles.sortSegmentActive,
+              ]}
+              onPress={() => selectSortMode(mode)}
+              activeOpacity={0.8}
+            >
+              <Icon
+                name={icon}
+                size={18}
+                color={selected ? colors.text.inverse : colors.primary}
+              />
+              <Text
+                style={[
+                  styles.sortSegmentText,
+                  selected && styles.sortSegmentTextActive,
+                ]}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       {categoryMode ? (
         // במצב מחלקות אין גרירה: רשימה רגילה עם כותרת לכל מחלקה
@@ -912,7 +927,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
           testID="category_list"
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+            />
           }
         >
           {listHeader}
@@ -959,8 +978,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
           contentContainerStyle={styles.listContent}
           onDragBegin={handleDragBegin}
           onDragEnd={handleDragEnd}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+            />
+          }
           ListHeaderComponent={listHeader}
           renderItem={({ item, drag, isActive }) => (
             <ShoppingListItem

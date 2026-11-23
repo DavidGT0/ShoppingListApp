@@ -58,6 +58,15 @@ export const styles = StyleSheet.create({
     color: colors.text.primary,
     fontWeight: '600',
   },
+  editButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+  },
+  editButtonText: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
+  },
   section: {
     backgroundColor: colors.surface,
     borderRadius: 12,

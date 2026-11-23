@@ -142,3 +142,17 @@ describe('LoginScreen - branding', () => {
     expect(texts.some(t => t.includes('🛒'))).toBe(false);
   });
 });
+
+describe('LoginScreen - login with username or email', () => {
+  test('login mode asks for a username or an email; registration keeps "שם משתמש"', async () => {
+    const { byTestId } = await renderLogin();
+    expect(byTestId('username_input').props.accessibilityLabel).toBe(
+      'שם משתמש או אימייל',
+    );
+    expect(byTestId('username_input').props.placeholder).toBe(
+      'שם משתמש או אימייל',
+    );
+    await act(async () => byTestId('switch_mode_button').props.onPress());
+    expect(byTestId('username_input').props.accessibilityLabel).toBe('שם משתמש');
+  });
+});

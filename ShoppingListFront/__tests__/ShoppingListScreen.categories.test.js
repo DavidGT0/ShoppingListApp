@@ -3,7 +3,10 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+  GestureHandlerRootView,
+  RefreshControl as GHRefreshControl,
+} from 'react-native-gesture-handler';
 import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import EditItemModal from '../src/components/EditItemModal/EditItemModal';
 import {
@@ -14,10 +17,17 @@ import {
   deleteListCategory,
 } from '../src/services/api';
 
-// ScrollView של gesture-handler דורש Reanimated מלא; כאן מספיק ה-ScrollView הרגיל
+// ScrollView של gesture-handler דורש Reanimated מלא (וה-RefreshControl שלו דורש
+// את ה-ScrollView שלו); כאן ה-ScrollView מוחלף ברכיב פשוט שמציג את הילדים,
+// וה-refreshControl נבדק דרך ה-props שהוא מקבל
 jest.mock('react-native-gesture-handler', () => ({
   ...jest.requireActual('react-native-gesture-handler'),
-  ScrollView: require('react-native').ScrollView,
+  ScrollView: ({ children, testID }) =>
+    require('react').createElement(
+      require('react-native').View,
+      { testID: `${testID}_inner` },
+      children,
+    ),
 }));
 
 // גרירה לא נבדקת כאן: הרשימה הנגררת מוחלפת ברכיב פשוט שרושם שהוא רונדר
@@ -26,6 +36,7 @@ jest.mock('react-native-draggable-flatlist', () => {
   const { View } = require('react-native');
   const MockDraggableFlatList = props => {
     global.__dragRendered = (global.__dragRendered || 0) + 1;
+    global.__dragProps = props;
     return ReactLib.createElement(
       View,
       { testID: 'draggable' },
@@ -53,12 +64,13 @@ jest.mock('../src/hooks/useLiveRefresh', () => ({
 jest.mock('../src/components/ShoppingListItem/ShoppingListItem', () => {
   const ReactLib = require('react');
   const { Text: RNText } = require('react-native');
-  const MockShoppingListItem = ({ item, onEdit }) =>
+  const MockShoppingListItem = ({ item, onEdit, currentUsername }) =>
     ReactLib.createElement(
       RNText,
       {
         testID: `row_${item.id}`,
         color: item.categoryColor,
+        currentUsername,
         onPress: onEdit,
       },
       item.name,
@@ -116,7 +128,13 @@ const mount = async items => {
       <GestureHandlerRootView>
         <ShoppingListScreen
           route={{ params: { listId: 7, listName: 'רשימה' } }}
-          navigation={{ goBack: jest.fn() }}
+          navigation={{
+            goBack: jest.fn(),
+            addListener: jest.fn((event, cb) => {
+              if (event === 'focus') global.__focus = cb;
+              return () => {};
+            }),
+          }}
         />
       </GestureHandlerRootView>,
     );
@@ -169,14 +187,60 @@ test('manual mode is the default and uses the draggable list', async () => {
   expect(headerKeys(tree)).toEqual([]);
 });
 
-test('toggle switches to category mode, persists it, and drops the draggable list', async () => {
+test('the segments switch the mode, persist it, and expose selected', async () => {
   const tree = await mount(ITEMS);
-  await act(async () => byId(tree, 'sort_mode_toggle').props.onPress());
+  expect(byId(tree, 'sort_segment_manual').props.accessibilityState).toEqual({
+    selected: true,
+  });
+  expect(byId(tree, 'sort_segment_category').props.accessibilityState).toEqual({
+    selected: false,
+  });
+  expect(byId(tree, 'sort_segment_manual').props.accessibilityRole).toBe(
+    'button',
+  );
+  await act(async () => byId(tree, 'sort_segment_category').props.onPress());
   expect(await AsyncStorage.getItem('@sort_mode_7')).toBe('category');
   expect(has(tree, 'draggable')).toBe(false);
-  await act(async () => byId(tree, 'sort_mode_toggle').props.onPress());
+  expect(byId(tree, 'sort_segment_category').props.accessibilityState).toEqual({
+    selected: true,
+  });
+  expect(byId(tree, 'sort_segment_manual').props.accessibilityState).toEqual({
+    selected: false,
+  });
+  await act(async () => byId(tree, 'sort_segment_manual').props.onPress());
   expect(await AsyncStorage.getItem('@sort_mode_7')).toBe('manual');
   expect(has(tree, 'draggable')).toBe(true);
+});
+
+test('the segments carry the agreed icons', async () => {
+  const tree = await mount(ITEMS);
+  const iconOf = id =>
+    byId(tree, id)
+      .findAll(n => n.type === 'Icon')
+      .map(n => n.props.name);
+  expect(iconOf('sort_segment_manual')).toEqual(['drag-horizontal-variant']);
+  expect(iconOf('sort_segment_category')).toEqual(['shape-outline']);
+});
+
+test('manual mode passes a gesture-handler RefreshControl that refreshes', async () => {
+  await mount(ITEMS);
+  const { refreshControl, refreshing, onRefresh } = global.__dragProps;
+  expect(refreshing).toBeUndefined();
+  expect(onRefresh).toBeUndefined();
+  expect(refreshControl.type).toBe(GHRefreshControl);
+  getShoppingList.mockClear();
+  await act(async () => refreshControl.props.onRefresh());
+  expect(getShoppingList).toHaveBeenCalledTimes(1);
+});
+
+test('category mode passes a gesture-handler RefreshControl that refreshes', async () => {
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  const { refreshControl } = byId(tree, 'category_list').props;
+  expect(refreshControl.type).toBe(GHRefreshControl);
+  getShoppingList.mockClear();
+  await act(async () => refreshControl.props.onRefresh());
+  expect(getShoppingList).toHaveBeenCalledTimes(1);
 });
 
 test('a saved category mode is restored on mount', async () => {
@@ -404,4 +468,13 @@ test('a 400 on edit shows the server message and reloads the categories', async 
     customs[0],
   ]);
   alertSpy.mockRestore();
+});
+
+test('the current username is re-read on focus (after a rename in settings)', async () => {
+  await AsyncStorage.setItem('username', 'bob');
+  const tree = await mount(ITEMS);
+  expect(byId(tree, 'row_2').props.currentUsername).toBe('bob');
+  await AsyncStorage.setItem('username', 'robert');
+  await act(async () => global.__focus());
+  expect(byId(tree, 'row_2').props.currentUsername).toBe('robert');
 });

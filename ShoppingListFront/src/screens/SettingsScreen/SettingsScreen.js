@@ -14,6 +14,7 @@ import {
   logout,
   getCurrentUser,
   changePassword,
+  changeUsername,
   deleteAccount,
 } from '../../services/auth';
 import { MIN_PASSWORD_LENGTH } from '../../services/validation';
@@ -21,6 +22,11 @@ import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 const SettingsScreen = ({ onLogout }) => {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
+
+  // States עבור שינוי שם משתמש
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
 
   // States עבור שינוי סיסמה
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -43,7 +49,33 @@ const SettingsScreen = ({ onLogout }) => {
       const userData = await getCurrentUser();
       setUser(userData);
     } catch (error) {
+      if (error.staleToken) return; // הטוקן הוחלף באמצע - לא שגיאה אמיתית
       console.error('Failed to load user:', error);
+    }
+  };
+
+  // שינוי שם משתמש: הטוקן החדש נשמר בשירות, בלי התנתקות ובלי ניווט
+  const handleSaveUsername = async () => {
+    const clean = newUsername.trim();
+    if (!clean) {
+      Alert.alert('שגיאה', 'נא להזין שם משתמש');
+      return;
+    }
+    if (clean.includes('@')) {
+      Alert.alert('שגיאה', 'שם המשתמש לא יכול להכיל @');
+      return;
+    }
+    setIsSavingUsername(true);
+    try {
+      const updatedName = await changeUsername(clean);
+      setUser(prev => ({ ...prev, username: updatedName }));
+      setEditingUsername(false);
+      setNewUsername('');
+    } catch (error) {
+      if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      Alert.alert('שגיאה', error.message || 'שינוי שם המשתמש נכשל');
+    } finally {
+      setIsSavingUsername(false);
     }
   };
 
@@ -149,7 +181,65 @@ const SettingsScreen = ({ onLogout }) => {
           <View style={styles.userInfo}>
             <Text style={styles.label}>שם משתמש:</Text>
             <Text style={styles.value}>{user.username}</Text>
+            {!editingUsername && (
+              <TouchableOpacity
+                testID="edit_username_button"
+                style={styles.editButton}
+                onPress={() => {
+                  setNewUsername(user.username);
+                  setEditingUsername(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="עריכת שם המשתמש"
+              >
+                <Text style={styles.editButtonText}>ערוך</Text>
+              </TouchableOpacity>
+            )}
           </View>
+          {editingUsername && (
+            <View style={styles.passwordForm}>
+              <TextInput
+                testID="username_input_settings"
+                style={styles.input}
+                placeholder="שם משתמש חדש"
+                placeholderTextColor="#888"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={newUsername}
+                onChangeText={setNewUsername}
+                accessibilityLabel="שם משתמש חדש"
+              />
+              <View style={styles.formButtonsRow}>
+                <TouchableOpacity
+                  testID="save_username_button"
+                  style={styles.saveButton}
+                  onPress={handleSaveUsername}
+                  disabled={isSavingUsername}
+                  accessibilityRole="button"
+                  accessibilityLabel="שמירת שם המשתמש"
+                >
+                  {isSavingUsername ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>שמור</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="cancel_username_button"
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setEditingUsername(false);
+                    setNewUsername('');
+                  }}
+                  disabled={isSavingUsername}
+                  accessibilityRole="button"
+                  accessibilityLabel="ביטול שינוי שם המשתמש"
+                >
+                  <Text style={styles.cancelButtonText}>ביטול</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           <View style={styles.userInfo}>
             <Text style={styles.label}>אימייל:</Text>
             <Text style={styles.value}>{user.email}</Text>
