@@ -1,5 +1,5 @@
 /* global jest, describe, beforeEach, afterEach, test, expect */
-import { requestPasswordReset, logout, deleteAccount } from '../src/services/auth';
+import { requestPasswordReset, logout, deleteAccount, login } from '../src/services/auth';
 import { API_BASE_URL } from '../src/services/http';
 
 describe('requestPasswordReset', () => {
@@ -143,6 +143,42 @@ describe('cache clearing', () => {
   test('deleteAccount clears every cache on success', async () => {
     global.fetch = jest.fn(async () => ({ ok: true, status: 200 }));
     await deleteAccount('pw');
+    expect(await AsyncStorage.getItem('@cache_lists')).toBeNull();
+    expect(await AsyncStorage.getItem('@cache_items_2')).toBeNull();
+  });
+
+  test('login clears a previous user cache before storing the new token', async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ access_token: 'NEW', token_type: 'bearer' }),
+    }));
+    await login('bob', 'pw-1234');
+    expect(await AsyncStorage.getItem('@cache_lists')).toBeNull();
+    expect(await AsyncStorage.getItem('@cache_items_2')).toBeNull();
+    expect(await AsyncStorage.getItem('access_token')).toBe('NEW');
+  });
+
+  test('a failed login keeps the existing cache', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: 'x' }),
+    }));
+    await expect(login('bob', 'bad')).rejects.toThrow();
+    expect(await AsyncStorage.getItem('@cache_lists')).toBe('[1]');
+    console.error.mockRestore();
+  });
+
+  test('logout still clears the caches when removeItem throws', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const spy = jest
+      .spyOn(AsyncStorage, 'removeItem')
+      .mockRejectedValueOnce(new Error('boom'));
+    await logout();
+    spy.mockRestore();
+    console.error.mockRestore();
     expect(await AsyncStorage.getItem('@cache_lists')).toBeNull();
     expect(await AsyncStorage.getItem('@cache_items_2')).toBeNull();
   });

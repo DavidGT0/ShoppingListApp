@@ -58,6 +58,9 @@ export const login = async (username, password) => {
 
     const data = await response.json();
 
+    // מטמון של משתמש קודם לא ישרוד להתחברות חדשה
+    await clearAllCaches();
+
     // שמירת ה-token ב-AsyncStorage
     await AsyncStorage.setItem('access_token', data.access_token);
     await AsyncStorage.setItem('username', cleanUsername);
@@ -76,9 +79,10 @@ export const logout = async () => {
   try {
     await AsyncStorage.removeItem('access_token');
     await AsyncStorage.removeItem('username');
-    await clearAllCaches();
   } catch (error) {
     console.error('Logout error:', error);
+  } finally {
+    await clearAllCaches();
   }
 };
 
