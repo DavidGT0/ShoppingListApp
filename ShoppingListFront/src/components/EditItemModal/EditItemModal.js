@@ -7,12 +7,15 @@ import {
   Modal,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { styles } from './EditItemModal.styles';
 import { BUILTIN_CATEGORIES, customKey } from '../../services/categories';
 
 const MAX_CATEGORY_NAME = 30;
 const MAX_NOTE = 100;
+const NO_CATEGORIES = [];
 const UNITS = ['יח׳', 'ק״ג', 'גרם', 'ליטר', 'חבילה'];
 
 // הפניה למחלקה מותאמת שכבר לא קיימת נחשבת אוטומטי
@@ -28,7 +31,7 @@ const EditItemModal = ({
   item,
   onSave,
   onClose,
-  categories = [],
+  categories = NO_CATEGORIES,
   onCreateCategory,
   onDeleteCategory,
 }) => {
@@ -62,6 +65,23 @@ const EditItemModal = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, item]);
+
+  // המחלקות יכולות להגיע (או להשתנות) אחרי פתיחת החלון: מחשבים מחדש את הבחירה
+  // מהמחלקה השמורה של המוצר. בחירה ידנית של מחלקה שנמחקה בינתיים מתאפסת
+  useEffect(() => {
+    if (!visible || !item) return;
+    if (!touched) {
+      setSelected(initialSelection(item, categories));
+    } else if (
+      selected &&
+      selected.startsWith('custom:') &&
+      !categories.some(c => customKey(c.id) === selected)
+    ) {
+      setSelected(initialSelection(item, categories));
+      setTouched(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
 
   const handleCreate = async () => {
     const name = newName.trim();
@@ -134,121 +154,139 @@ const EditItemModal = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>ערוך מוצר</Text>
-          <TextInput
-            style={styles.modalInput}
-            value={editName}
-            onChangeText={setEditName}
-            autoFocus
-          />
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={styles.outerScroll}
+          contentContainerStyle={styles.outerScrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>ערוך מוצר</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editName}
+              onChangeText={setEditName}
+              autoFocus
+            />
 
-          <Text style={styles.sectionTitle}>מחלקה</Text>
-          <ScrollView style={styles.chipsScroll}>
-            <View style={styles.chipsRow}>
-              {renderChip('auto', 'אוטומטי', null, null)}
-              {BUILTIN_CATEGORIES.map(c =>
-                renderChip(c.key, c.name, c.key, c.color),
-              )}
-              {categories.map(c =>
-                renderChip(customKey(c.id), c.name, customKey(c.id), c.color, {
-                  onLongPress: () => confirmDelete(c),
-                }),
-              )}
-              <TouchableOpacity
-                testID="category_chip_new"
-                style={[styles.chip, styles.chipNew]}
-                onPress={() => setAdding(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.chipText}>+ מחלקה חדשה</Text>
-              </TouchableOpacity>
-            </View>
-            {adding && (
-              <View style={styles.newCategoryRow}>
-                <TextInput
-                  testID="new_category_input"
-                  style={[styles.modalInput, styles.newCategoryInput]}
-                  value={newName}
-                  onChangeText={setNewName}
-                  maxLength={MAX_CATEGORY_NAME}
-                  placeholder="שם המחלקה"
-                  autoFocus
-                />
+            <Text style={styles.sectionTitle}>מחלקה</Text>
+            <ScrollView style={styles.chipsScroll} nestedScrollEnabled>
+              <View style={styles.chipsRow}>
+                {renderChip('auto', 'אוטומטי', null, null)}
+                {BUILTIN_CATEGORIES.filter(c => c.key !== 'other').map(c =>
+                  renderChip(c.key, c.name, c.key, c.color),
+                )}
+                {categories.map(c =>
+                  renderChip(
+                    customKey(c.id),
+                    c.name,
+                    customKey(c.id),
+                    c.color,
+                    {
+                      onLongPress: () => confirmDelete(c),
+                    },
+                  ),
+                )}
+                {BUILTIN_CATEGORIES.filter(c => c.key === 'other').map(c =>
+                  renderChip(c.key, c.name, c.key, c.color),
+                )}
                 <TouchableOpacity
-                  testID="new_category_save"
-                  style={[styles.modalButton, styles.saveButton]}
-                  onPress={handleCreate}
-                >
-                  <Text style={styles.saveButtonText}>הוסף</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-
-          <Text style={styles.sectionTitle}>יחידה</Text>
-          <View style={styles.chipsRow}>
-            {[null, ...UNITS].map(u => {
-              const active = unit === u;
-              return (
-                <TouchableOpacity
-                  key={u || 'none'}
-                  testID={`unit_chip_${u || 'none'}`}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => {
-                    setUnit(u);
-                    setUnitTouched(true);
-                  }}
+                  testID="category_chip_new"
+                  style={[styles.chip, styles.chipNew]}
+                  onPress={() => setAdding(true)}
                   activeOpacity={0.8}
                 >
-                  <Text
-                    style={[styles.chipText, active && styles.chipTextActive]}
-                  >
-                    {u || 'ללא'}
-                  </Text>
+                  <Text style={styles.chipText}>+ מחלקה חדשה</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              </View>
+              {adding && (
+                <View style={styles.newCategoryRow}>
+                  <TextInput
+                    testID="new_category_input"
+                    style={[styles.modalInput, styles.newCategoryInput]}
+                    value={newName}
+                    onChangeText={setNewName}
+                    maxLength={MAX_CATEGORY_NAME}
+                    placeholder="שם המחלקה"
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    testID="new_category_save"
+                    style={[styles.modalButton, styles.saveButton]}
+                    onPress={handleCreate}
+                  >
+                    <Text style={styles.saveButtonText}>הוסף</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
 
-          <Text style={styles.sectionTitle}>הערה</Text>
-          <TextInput
-            testID="note_input"
-            style={styles.modalInput}
-            value={note}
-            onChangeText={text => {
-              setNote(text);
-              setNoteTouched(true);
-            }}
-            maxLength={MAX_NOTE}
-            placeholder="הערה (לא חובה)"
-          />
+            <Text style={styles.sectionTitle}>יחידה</Text>
+            <View style={styles.chipsRow}>
+              {[null, ...UNITS].map(u => {
+                const active = unit === u;
+                return (
+                  <TouchableOpacity
+                    key={u || 'none'}
+                    testID={`unit_chip_${u || 'none'}`}
+                    style={[styles.chip, active && styles.chipActive]}
+                    onPress={() => {
+                      setUnit(u);
+                      setUnitTouched(true);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[styles.chipText, active && styles.chipTextActive]}
+                    >
+                      {u || 'ללא'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelButtonText}>ביטול</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID="edit_save_button"
-              style={[styles.modalButton, styles.saveButton]}
-              onPress={() =>
-                onSave({
-                  name: editName,
-                  category: touched ? selected : undefined,
-                  unit: unitTouched ? unit : undefined,
-                  note: noteTouched ? note.trim() || null : undefined,
-                })
-              }
-            >
-              <Text style={styles.saveButtonText}>שמור</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>הערה</Text>
+            <TextInput
+              testID="note_input"
+              style={styles.modalInput}
+              value={note}
+              onChangeText={text => {
+                setNote(text);
+                setNoteTouched(true);
+              }}
+              maxLength={MAX_NOTE}
+              placeholder="הערה (לא חובה)"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={onClose}
+              >
+                <Text style={styles.cancelButtonText}>ביטול</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="edit_save_button"
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={() =>
+                  onSave({
+                    name: editName,
+                    category: touched ? selected : undefined,
+                    unit: unitTouched ? unit : undefined,
+                    note: noteTouched ? note.trim() || null : undefined,
+                  })
+                }
+              >
+                <Text style={styles.saveButtonText}>שמור</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

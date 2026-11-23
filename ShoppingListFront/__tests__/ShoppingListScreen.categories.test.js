@@ -385,3 +385,23 @@ test('a failed delete keeps the category and alerts', async () => {
   expect(alertSpy).toHaveBeenCalledWith('שגיאה', 'לא הצלחנו למחוק את המחלקה');
   alertSpy.mockRestore();
 });
+
+test('a 400 on edit shows the server message and reloads the categories', async () => {
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const tree = await mount(ITEMS);
+  const error = new Error('מחלקה לא תקינה');
+  error.status = 400;
+  updateItem.mockRejectedValue(error);
+  getListCategories.mockClear();
+  getListCategories.mockResolvedValue([customs[0]]);
+  const modal = await openEdit(tree, 2);
+  await act(async () =>
+    modal.props.onSave({ name: 'חלב', category: 'custom:6' }),
+  );
+  expect(alertSpy).toHaveBeenCalledWith('שגיאה', 'מחלקה לא תקינה');
+  expect(getListCategories).toHaveBeenCalledTimes(1);
+  expect(tree.root.findByType(EditItemModal).props.categories).toEqual([
+    customs[0],
+  ]);
+  alertSpy.mockRestore();
+});

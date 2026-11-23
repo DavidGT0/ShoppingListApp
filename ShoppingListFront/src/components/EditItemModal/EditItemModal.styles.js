@@ -8,6 +8,15 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  outerScroll: {
+    width: '100%',
+  },
+  outerScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
   modalContent: {
     backgroundColor: colors.background,
     width: '85%',

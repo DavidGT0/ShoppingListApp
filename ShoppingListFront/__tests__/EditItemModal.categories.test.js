@@ -1,8 +1,9 @@
 /* global jest, test, expect */
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
-import { Alert, TextInput } from 'react-native';
+import { Alert, StyleSheet, TextInput } from 'react-native';
 import EditItemModal from '../src/components/EditItemModal/EditItemModal';
+import { styles } from '../src/components/EditItemModal/EditItemModal.styles';
 
 const { act } = ReactTestRenderer;
 const customs = [{ id: 5, name: 'מתנות', color: '#123456' }];
@@ -186,6 +187,76 @@ test('name editing still works', async () => {
   await act(async () => byId('edit_save_button').props.onPress());
   expect(props.onSave).toHaveBeenCalledWith({
     name: 'חלב עיזים',
+    category: undefined,
+  });
+});
+
+test('chip order: auto, built-ins, custom categories, then other last', async () => {
+  const { tree } = await setup();
+  const ids = tree.root
+    .findAll(
+      n =>
+        typeof n.props.testID === 'string' &&
+        n.props.testID.startsWith('category_chip_') &&
+        typeof n.type === 'string',
+    )
+    .map(n => n.props.testID.replace('category_chip_', ''));
+  expect(ids[0]).toBe('auto');
+  expect(ids.slice(-3)).toEqual(['custom:5', 'other', 'new']);
+  expect(ids.indexOf('dairy')).toBeLessThan(ids.indexOf('custom:5'));
+});
+
+test('categories that load after opening select the stored custom category, still not resent', async () => {
+  const props = {
+    item: { id: 1, name: 'חלב', category: 'custom:5' },
+    categories: [],
+    onSave: jest.fn(),
+    onClose: jest.fn(),
+    visible: true,
+  };
+  let tree;
+  await act(async () => {
+    tree = ReactTestRenderer.create(<EditItemModal {...props} />);
+  });
+  const chip = () =>
+    tree.root.findAllByProps({ testID: 'category_chip_custom:5' })[0];
+  expect(chip()).toBeUndefined();
+  await act(async () => {
+    tree.update(<EditItemModal {...props} categories={customs} />);
+  });
+  const bg = c => StyleSheet.flatten(c.props.style).backgroundColor;
+  const auto = tree.root.findAllByProps({ testID: 'category_chip_auto' })[0];
+  expect(bg(chip())).toBe(styles.chipActive.backgroundColor);
+  expect(bg(auto)).not.toBe(styles.chipActive.backgroundColor);
+  await act(async () =>
+    tree.root.findAllByProps({ testID: 'edit_save_button' })[0].props.onPress(),
+  );
+  expect(props.onSave).toHaveBeenCalledWith({
+    name: 'חלב',
+    category: undefined,
+  });
+});
+
+test('a touched custom selection that disappears from categories falls back to the stored category', async () => {
+  const props = {
+    item: { id: 1, name: 'חלב', category: 'snacks' },
+    categories: customs,
+    onSave: jest.fn(),
+    onClose: jest.fn(),
+    visible: true,
+  };
+  let tree;
+  await act(async () => {
+    tree = ReactTestRenderer.create(<EditItemModal {...props} />);
+  });
+  const find = id => tree.root.findAllByProps({ testID: id })[0];
+  await act(async () => find('category_chip_custom:5').props.onPress());
+  await act(async () => {
+    tree.update(<EditItemModal {...props} categories={[]} />);
+  });
+  await act(async () => find('edit_save_button').props.onPress());
+  expect(props.onSave).toHaveBeenCalledWith({
+    name: 'חלב',
     category: undefined,
   });
 });

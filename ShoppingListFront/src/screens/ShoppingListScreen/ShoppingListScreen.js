@@ -421,6 +421,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
       setModalVisible(false);
     } catch (error) {
       if (error.sessionExpired) return; // ההתראה כבר הוצגה וחזרנו למסך הכניסה
+      if (error.status === 400 && error.message) {
+        // למשל מחלקה שנמחקה בינתיים: מציגים את הודעת השרת וטוענים מחדש את
+        // המחלקות, כדי שהחלון לא ימשיך להציע אותה
+        Alert.alert('שגיאה', error.message);
+        loadCategories();
+        return;
+      }
       Alert.alert('שגיאה', 'לא הצלחנו לערוך את המוצר');
     } finally {
       endMutation();
