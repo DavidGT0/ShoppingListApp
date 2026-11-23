@@ -2,13 +2,6 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
-jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
-  const R = require('react');
-  return {
-    __esModule: true,
-    default: R.forwardRef(({ children }, _ref) => <>{children}</>),
-  };
-});
 jest.mock('react-native-gesture-handler', () => {
   const { TouchableOpacity } = require('react-native');
   return { TouchableOpacity };
@@ -97,4 +90,87 @@ test('an enabled row keeps the amount buttons active', async () => {
     .findAll(n => n.props.android_ripple?.radius === 16 && !!n.props.onPress)
     .map(p => !!p.props.disabled);
   expect(disabledFlags).toEqual([false, false]);
+});
+
+test('the check circle is a checkbox that toggles purchased', async () => {
+  const onTogglePurchased = jest.fn();
+  const r = await render({ id: 7 }, { onTogglePurchased });
+  const [circle] = r.find('item_check_7');
+  expect(circle.props.accessibilityRole).toBe('checkbox');
+  expect(circle.props.accessibilityState.checked).toBe(false);
+  expect(circle.props.accessibilityLabel).toBe('עגבניות');
+  await act(async () => circle.props.onPress());
+  expect(onTogglePurchased).toHaveBeenCalledTimes(1);
+});
+
+test('a bought row shows a checked circle that un-buys', async () => {
+  const onTogglePurchased = jest.fn();
+  const r = await render({ id: 7, purchased: true }, { onTogglePurchased });
+  const [circle] = r.find('item_check_7');
+  expect(circle.props.accessibilityState.checked).toBe(true);
+  await act(async () => circle.props.onPress());
+  expect(onTogglePurchased).toHaveBeenCalledTimes(1);
+});
+
+test('the trash deletes and has a Hebrew label', async () => {
+  const onDelete = jest.fn();
+  const r = await render({ id: 7 }, { onDelete });
+  const [trash] = r.find('item_delete_7');
+  expect(trash.props.accessibilityRole).toBe('button');
+  expect(trash.props.accessibilityLabel).toBe('מחק את עגבניות');
+  await act(async () => trash.props.onPress());
+  expect(onDelete).toHaveBeenCalledTimes(1);
+});
+
+test('tapping the name opens edit', async () => {
+  const onEdit = jest.fn();
+  const r = await render({ id: 7 }, { onEdit });
+  const [name] = r.find('item_name_7');
+  expect(name.props.accessibilityRole).toBe('button');
+  expect(name.props.accessibilityHint).toBe('לחיצה לעריכה');
+  await act(async () => name.props.onPress());
+  expect(onEdit).toHaveBeenCalledTimes(1);
+});
+
+test('offline: circle, trash and name stay pressable and not a11y-disabled', async () => {
+  const fns = {
+    onTogglePurchased: jest.fn(),
+    onDelete: jest.fn(),
+    onEdit: jest.fn(),
+  };
+  const r = await render({ id: 7 }, { disabled: true, ...fns });
+  for (const id of ['item_check_7', 'item_delete_7', 'item_name_7']) {
+    const [n] = r.find(id);
+    expect(n.props.accessibilityState?.disabled).toBeUndefined();
+    expect(n.props.disabled).toBeFalsy();
+    await act(async () => n.props.onPress());
+  }
+  Object.values(fns).forEach(f => expect(f).toHaveBeenCalledTimes(1));
+});
+
+test('there is no swipe container and no pencil any more', async () => {
+  const { tree } = await render({ id: 7 });
+  expect(
+    tree.root.findAll(n => n.props.name === 'pencil-outline'),
+  ).toHaveLength(0);
+  const src = require('fs').readFileSync(
+    require('path').join(
+      __dirname,
+      '../src/components/ShoppingListItem/ShoppingListItem.js',
+    ),
+    'utf8',
+  );
+  expect(src).not.toMatch(/Swipeable/);
+});
+
+test('drag handle shows only when onDrag is given', async () => {
+  let r = await render({ id: 7 });
+  expect(
+    r.tree.root.findAll(n => n.props.accessibilityLabel === 'גרור לסידור מחדש'),
+  ).toHaveLength(0);
+  r = await render({ id: 7 }, { onDrag: jest.fn() });
+  expect(
+    r.tree.root.findAll(n => n.props.accessibilityLabel === 'גרור לסידור מחדש')
+      .length,
+  ).toBeGreaterThan(0);
 });

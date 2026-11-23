@@ -98,23 +98,6 @@ jest.mock('react-native-draggable-flatlist', () => {
   return { __esModule: true, default: MockDraggableFlatList };
 });
 
-// מציג גם את פעולות ההחלקה, כדי שאפשר יהיה לבדוק אותן
-jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
-  const R = require('react');
-  return {
-    __esModule: true,
-    default: R.forwardRef(
-      ({ children, renderLeftActions, renderRightActions }, _ref) => (
-        <>
-          {renderLeftActions && renderLeftActions()}
-          {renderRightActions && renderRightActions()}
-          {children}
-        </>
-      ),
-    ),
-  };
-});
-
 const { act } = ReactTestRenderer;
 const trees = [];
 const render = async element => {
@@ -343,7 +326,7 @@ describe('labels, roles and states', () => {
     expect(box.props.accessibilityLabel).toBe('חלב, 3%, נוסף ע״י dana');
   });
 
-  test('the checkbox activate action toggles purchased, even when disabled', async () => {
+  test('the check circle toggles purchased, even when disabled', async () => {
     const onToggle = jest.fn();
     const tree = await render(
       <ShoppingListItem
@@ -357,7 +340,7 @@ describe('labels, roles and states', () => {
     );
     const box = tree.root.findAll(n => n.props.accessibilityRole === 'checkbox')[0];
     expect(box.props.accessibilityState.disabled).toBeUndefined();
-    await act(async () => box.props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }));
+    await act(async () => box.props.onPress());
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 

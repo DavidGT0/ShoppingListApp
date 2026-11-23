@@ -34,13 +34,6 @@ jest.mock('react-native-draggable-flatlist', () => {
       ),
   };
 });
-jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
-  const R = require('react');
-  return {
-    __esModule: true,
-    default: R.forwardRef(({ children }, _ref) => <>{children}</>),
-  };
-});
 jest.mock('../src/hooks/useLiveRefresh', () => ({
   __esModule: true,
   default: jest.fn(),

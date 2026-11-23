@@ -43,7 +43,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   nameContainer: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 0,
   },
   nameInner: {
     alignSelf: 'flex-start',
@@ -108,17 +108,18 @@ export const makeStyles = colors => StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
   },
-  swipeAction: {
+  checkCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: colors.primaryText,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 76,
-    marginBottom: 12,
-    borderRadius: 20,
+    marginLeft: 10,
   },
-  swipeActionPurchase: {
+  checkCircleDone: {
     backgroundColor: colors.success,
-  },
-  swipeActionDelete: {
-    backgroundColor: colors.danger,
+    borderColor: colors.success,
   },
 });
