@@ -82,3 +82,19 @@ test('added-by: shown only for another member with showAddedBy', async () => {
   );
   expect(r.find('item_added_by')).toHaveLength(0);
 });
+
+test('a disabled row disables the amount buttons', async () => {
+  const { tree } = await render({}, { disabled: true });
+  const disabledFlags = tree.root
+    .findAll(n => n.props.android_ripple?.radius === 16 && !!n.props.onPress)
+    .map(p => !!p.props.disabled);
+  expect(disabledFlags).toEqual([true, true]);
+});
+
+test('an enabled row keeps the amount buttons active', async () => {
+  const { tree } = await render({});
+  const disabledFlags = tree.root
+    .findAll(n => n.props.android_ripple?.radius === 16 && !!n.props.onPress)
+    .map(p => !!p.props.disabled);
+  expect(disabledFlags).toEqual([false, false]);
+});

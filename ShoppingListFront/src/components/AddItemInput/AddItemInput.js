@@ -6,7 +6,7 @@ import { styles } from './AddItemInput.styles';
 const DEBOUNCE_MS = 250;
 const MAX_CHIPS = 5;
 
-const AddItemInput = ({ onAdd, listId }) => {
+const AddItemInput = ({ onAdd, listId, editable = true }) => {
   const [name, setName] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   // מספר השאילתה האחרונה - תשובה של שאילתה ישנה יותר נזרקת
@@ -15,7 +15,7 @@ const AddItemInput = ({ onAdd, listId }) => {
   useEffect(() => {
     const query = name.trim();
     const id = ++queryId.current;
-    if (!query || !listId) {
+    if (!query || !listId || !editable) {
       setSuggestions([]);
       return undefined;
     }
@@ -31,7 +31,7 @@ const AddItemInput = ({ onAdd, listId }) => {
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [name, listId]);
+  }, [name, listId, editable]);
 
   const handleChip = chipName => {
     onAdd(chipName);
@@ -39,6 +39,11 @@ const AddItemInput = ({ onAdd, listId }) => {
   };
 
   const handleAdd = () => {
+    if (!editable) {
+      // במצב לא מקוון ההורה מציג את ההודעה (ולא "אנא הזן שם מוצר")
+      onAdd(name.trim());
+      return;
+    }
     if (!name.trim()) {
       Alert.alert('שגיאה', 'אנא הזן שם מוצר');
       return;
@@ -54,6 +59,7 @@ const AddItemInput = ({ onAdd, listId }) => {
         style={styles.input}
         placeholder="הוסף מוצר חדש..."
         value={name}
+        editable={editable}
         onChangeText={setName}
         onSubmitEditing={handleAdd}
         testID="add_item_input" // <-- מזהה עבור שדה ההקלדה
@@ -68,7 +74,7 @@ const AddItemInput = ({ onAdd, listId }) => {
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
       </View>
-      {suggestions.length > 0 && (
+      {editable && suggestions.length > 0 && (
         <View style={styles.chipsRow}>
           {suggestions.map((chip, index) => (
             <TouchableOpacity

@@ -82,3 +82,31 @@ describe('PurchasedItemsSection header buttons', () => {
     expect(onClearAll).not.toHaveBeenCalled();
   });
 });
+
+describe('PurchasedItemsSection offline guard', () => {
+  test('restore and clear check the guard before any confirmation', () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const guard = jest.fn(() => true);
+    let tree;
+    act(() => {
+      tree = ReactTestRenderer.create(
+        <PurchasedItemsSection
+          items={items}
+          onTogglePurchased={jest.fn()}
+          onEdit={jest.fn()}
+          onDelete={jest.fn()}
+          onUpdateAmount={jest.fn()}
+          onRestoreAll={jest.fn()}
+          onClearAll={jest.fn()}
+          blockIfOffline={guard}
+        />,
+      );
+    });
+    act(() => button(tree, 'restore_all_button').props.onPress());
+    act(() => button(tree, 'clear_purchased_button').props.onPress());
+    expect(guard).toHaveBeenCalledTimes(2);
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+    act(() => tree.unmount());
+  });
+});

@@ -1,5 +1,6 @@
 ﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch, publicFetch, readErrorMessage } from './http';
+import { clearAllCaches } from './offlineCache';
 
 /**
  * הרשמה של משתמש חדש
@@ -57,6 +58,9 @@ export const login = async (username, password) => {
 
     const data = await response.json();
 
+    // מטמון של משתמש קודם לא ישרוד להתחברות חדשה
+    await clearAllCaches();
+
     // שמירת ה-token ב-AsyncStorage
     await AsyncStorage.setItem('access_token', data.access_token);
     await AsyncStorage.setItem('username', cleanUsername);
@@ -77,6 +81,8 @@ export const logout = async () => {
     await AsyncStorage.removeItem('username');
   } catch (error) {
     console.error('Logout error:', error);
+  } finally {
+    await clearAllCaches();
   }
 };
 

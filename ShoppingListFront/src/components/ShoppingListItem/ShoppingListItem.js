@@ -23,6 +23,7 @@ const ShoppingListItem = ({
   isActive,
   showAddedBy = false,
   currentUsername = null,
+  disabled = false,
 }) => {
   const swipeableRef = useRef(null);
   const cardScale = useRef(new Animated.Value(1)).current;
@@ -111,7 +112,7 @@ const ShoppingListItem = ({
       overshootLeft={false}
       overshootRight={false}
       friction={2}
-      enabled={!isActive}
+      enabled={!isActive && !disabled}
     >
       <Pressable onPressIn={handleCardPressIn} onPressOut={handleCardPressOut}>
         <Animated.View
@@ -187,7 +188,9 @@ const ShoppingListItem = ({
             )}
           </View>
 
-          <View style={styles.amountContainer}>
+          <View
+            style={[styles.amountContainer, disabled && styles.amountDisabled]}
+          >
             <Pressable
               style={styles.amountButton}
               android_ripple={{
@@ -195,6 +198,7 @@ const ShoppingListItem = ({
                 radius: 16,
                 borderless: true,
               }}
+              disabled={disabled}
               onPress={() => onUpdateAmount(Math.max(1, item.amount - 1))}
             >
               <Icon name="minus" size={16} color={colors.primary} />
@@ -209,6 +213,7 @@ const ShoppingListItem = ({
                 radius: 16,
                 borderless: true,
               }}
+              disabled={disabled}
               onPress={() => onUpdateAmount(item.amount + 1)}
             >
               <Icon name="plus" size={16} color={colors.primary} />

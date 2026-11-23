@@ -55,6 +55,20 @@ describe('apiFetch', () => {
     expect(onExpired).toHaveBeenCalledTimes(1);
   });
 
+  test('on 401: also clears every offline cache', async () => {
+    await AsyncStorage.setItem('access_token', 'T-cache');
+    await AsyncStorage.setItem('@cache_lists', '[1]');
+    await AsyncStorage.setItem('@cache_items_4', '[2]');
+    mockFetchStatus(401);
+
+    await expect(apiFetch('/lists')).rejects.toMatchObject({
+      sessionExpired: true,
+    });
+
+    expect(await AsyncStorage.getItem('@cache_lists')).toBeNull();
+    expect(await AsyncStorage.getItem('@cache_items_4')).toBeNull();
+  });
+
   test('a later session that expires notifies again', async () => {
     mockFetchStatus(401);
     await AsyncStorage.setItem('access_token', 'T-first');

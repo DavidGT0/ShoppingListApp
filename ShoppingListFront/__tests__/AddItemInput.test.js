@@ -126,3 +126,44 @@ describe('AddItemInput suggestions', () => {
     expect(chipIds(tree)).toEqual(['suggestion_chip_0']);
   });
 });
+
+describe('AddItemInput when not editable', () => {
+  test('the field is locked and no suggestions are requested or shown', async () => {
+    jest.useFakeTimers();
+    getSuggestions.mockReset();
+    getSuggestions.mockResolvedValue(['חלב']);
+    let tree;
+    await act(async () => {
+      tree = ReactTestRenderer.create(
+        <AddItemInput onAdd={jest.fn()} listId={7} editable={false} />,
+      );
+    });
+    const input = byId(tree, 'add_item_input')[0];
+    expect(input.props.editable).toBe(false);
+    await act(async () => input.props.onChangeText('חל'));
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+    expect(getSuggestions).not.toHaveBeenCalled();
+    expect(chipIds(tree)).toEqual([]);
+    await act(async () => tree.unmount());
+    jest.useRealTimers();
+  });
+
+  test('the plus button hands over to the parent instead of the empty-name alert', async () => {
+    const { Alert } = require('react-native');
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const onAdd = jest.fn();
+    let tree;
+    await act(async () => {
+      tree = ReactTestRenderer.create(
+        <AddItemInput onAdd={onAdd} listId={7} editable={false} />,
+      );
+    });
+    await act(async () => byId(tree, 'add_item_button')[0].props.onPress());
+    expect(onAdd).toHaveBeenCalledTimes(1);
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+    await act(async () => tree.unmount());
+  });
+});
