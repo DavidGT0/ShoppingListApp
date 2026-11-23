@@ -297,6 +297,35 @@ test('manual mode gates the pull-to-refresh to a fresh pull at the top', async (
   expect(global.__scrollProps.onScroll).toBeUndefined();
 });
 
+// הספינר נשאר זמן מינימלי גם כשהשרת עונה מהר (כאן 80ms במקום 700)
+test('a pull keeps the spinner visible for the minimum time', async () => {
+  const { setMinRefreshMs } = require('../src/services/minDuration');
+  setMinRefreshMs(80);
+  try {
+    await mount(ITEMS);
+    const control = () => global.__scrollProps.refreshControl;
+    let pending;
+    await act(async () => {
+      pending = control().props.onRefresh();
+    });
+    // השרת כבר ענה, אבל הספינר עדיין מוצג (והפקד לא נסגר בזמן הריענון)
+    expect(control().props.refreshing).toBe(true);
+    expect(control().props.enabled).toBe(true);
+    await act(async () => {
+      await pending;
+    });
+    expect(control().props.refreshing).toBe(false);
+  } finally {
+    setMinRefreshMs(0);
+  }
+});
+
+test('the scroll container keeps its touch and layout hooks for the gate', async () => {
+  await mount(ITEMS);
+  expect(typeof global.__scrollProps.onTouchStart).toBe('function');
+  expect(typeof global.__scrollProps.onContentSizeChange).toBe('function');
+});
+
 test('category mode gates the pull-to-refresh too', async () => {
   await AsyncStorage.setItem('@sort_mode_7', 'category');
   const tree = await mount(ITEMS);

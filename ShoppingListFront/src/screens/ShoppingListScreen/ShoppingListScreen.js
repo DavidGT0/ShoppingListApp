@@ -57,6 +57,7 @@ import {
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import useGatedRefresh from '../../hooks/useGatedRefresh';
+import { withMinDuration } from '../../services/minDuration';
 import { makeStyles } from './ShoppingListScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -434,7 +435,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     enabled: refreshEnabled,
     scrollHandlers: refreshScrollHandlers,
     reset: resetRefreshGate,
-  } = useGatedRefresh();
+  } = useGatedRefresh(refreshing);
   // החלפת מצב מציגה רשימה אחרת, שמתחילה בראש
   useEffect(() => {
     resetRefreshGate();
@@ -443,7 +444,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshItems();
+      // הספינר נשאר גלוי זמן מינימלי, גם כשהשרת עונה מהר
+      await withMinDuration(refreshItems);
     } finally {
       setRefreshing(false);
     }
@@ -1022,46 +1024,52 @@ const ShoppingListScreen = ({ route, navigation }) => {
         // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה של gesture-handler (כמו במצב
         // מחלקות), כך שהמשיכה לריענון שייכת למיכל ולא נבלעת במחוות הגרירה.
         // הכותרת, הרשימה והחלק של מה שנקנה נגללים יחד כעמוד אחד
-        <NestableScrollContainer
-          testID="manual_list"
-          contentContainerStyle={styles.listContent}
-          {...refreshScrollHandlers}
-          refreshControl={
-            <RefreshControl
-              enabled={refreshEnabled}
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.primary]}
-              progressBackgroundColor={colors.raised}
-            />
-          }
+        // העטיפה מודדת את גובה החלון (מיכל הגרירה דורס onLayout) לטובת שער הריענון
+        <View
+          style={styles.listArea}
+          onLayout={refreshScrollHandlers.onLayout}
         >
-          {listHeader}
-          <NestableDraggableFlatList
-            data={unpurchasedItems}
-            keyExtractor={item => item.id.toString()}
-            onDragBegin={handleDragBegin}
-            onDragEnd={handleDragEnd}
-            dragHitSlop={DRAG_HIT_SLOP}
-            renderItem={({ item, drag, isActive }) => (
-              <ShoppingListItem
-                item={item}
-                onTogglePurchased={() => handleTogglePurchased(item)}
-                onEdit={() => openEditModal(item)}
-                onDelete={() => handleDeleteItem(item.id)}
-                onUpdateAmount={newAmount =>
-                  handleUpdateAmount(item, newAmount)
-                }
-                onDrag={isOffline ? undefined : drag}
-                isActive={isActive}
-                showAddedBy={memberCount > 1}
-                currentUsername={currentUsername}
-                disabled={isOffline}
+          <NestableScrollContainer
+            testID="manual_list"
+            contentContainerStyle={styles.listContent}
+            {...refreshScrollHandlers}
+            refreshControl={
+              <RefreshControl
+                enabled={refreshEnabled}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.primary]}
+                progressBackgroundColor={colors.raised}
               />
-            )}
-          />
-          {purchasedFooter}
-        </NestableScrollContainer>
+            }
+          >
+            {listHeader}
+            <NestableDraggableFlatList
+              data={unpurchasedItems}
+              keyExtractor={item => item.id.toString()}
+              onDragBegin={handleDragBegin}
+              onDragEnd={handleDragEnd}
+              dragHitSlop={DRAG_HIT_SLOP}
+              renderItem={({ item, drag, isActive }) => (
+                <ShoppingListItem
+                  item={item}
+                  onTogglePurchased={() => handleTogglePurchased(item)}
+                  onEdit={() => openEditModal(item)}
+                  onDelete={() => handleDeleteItem(item.id)}
+                  onUpdateAmount={newAmount =>
+                    handleUpdateAmount(item, newAmount)
+                  }
+                  onDrag={isOffline ? undefined : drag}
+                  isActive={isActive}
+                  showAddedBy={memberCount > 1}
+                  currentUsername={currentUsername}
+                  disabled={isOffline}
+                />
+              )}
+            />
+            {purchasedFooter}
+          </NestableScrollContainer>
+        </View>
       )}
 
       <UndoBar

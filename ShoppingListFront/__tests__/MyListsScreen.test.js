@@ -93,6 +93,34 @@ describe('MyListsScreen', () => {
     expect(list().props.refreshControl.props.enabled).toBe(true);
   });
 
+  test('a failed pull still alerts and stops the spinner after the minimum time', async () => {
+    const { setMinRefreshMs } = require('../src/services/minDuration');
+    const { FlatList } = require('react-native');
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    setMinRefreshMs(40);
+    try {
+      await renderScreen();
+      getShoppingLists.mockRejectedValueOnce(new Error('boom'));
+      const list = () => tree.root.findByType(FlatList);
+      let pending;
+      await act(async () => {
+        pending = list().props.refreshControl.props.onRefresh();
+      });
+      expect(list().props.refreshControl.props.refreshing).toBe(true);
+      await act(async () => {
+        await pending;
+      });
+      expect(alertSpy).toHaveBeenCalledWith(
+        'שגיאה',
+        'לא הצלחנו לטעון את הרשימות שלך.',
+      );
+      expect(list().props.refreshControl.props.refreshing).toBe(false);
+    } finally {
+      setMinRefreshMs(0);
+      alertSpy.mockRestore();
+    }
+  });
+
   test('every card has a menu button, and shared lists also show a badge', async () => {
     const { byTestId } = await renderScreen();
 

@@ -34,6 +34,7 @@ import {
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import useGatedRefresh from '../../hooks/useGatedRefresh';
+import { withMinDuration } from '../../services/minDuration';
 import { makeStyles } from './MyListsScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -59,7 +60,7 @@ const MyListsScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה)
   const { enabled: refreshEnabled, scrollHandlers: refreshScrollHandlers } =
-    useGatedRefresh();
+    useGatedRefresh(refreshing);
   // יש כבר רשימות על המסך - מטמון לא דורס אותן, הוא רק מעביר למצב לא מקוון
   const hasLists = useRef(false);
   // רענון חי כבר הביא נתוני שרת - תשובה מאוחרת של הטעינה הראשונה כבר ישנה
@@ -137,7 +138,8 @@ const MyListsScreen = ({ navigation }) => {
   const handlePullToRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshLists();
+      // הספינר נשאר גלוי זמן מינימלי; שגיאה נזרקת אחרי ההמתנה ומטופלת כאן כרגיל
+      await withMinDuration(refreshLists);
     } catch (error) {
       if (error.sessionExpired || error.staleToken) return; // ההתראה כבר הוצגה / טוקן שהוחלף
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את הרשימות שלך.');

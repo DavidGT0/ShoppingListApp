@@ -28,3 +28,7 @@ jest.mock('react-native-linear-gradient', () => {
     LinearGradient: MockLinearGradient,
   };
 });
+
+// משך מינימלי של ספינר הריענון: 0 בבדיקות (בלי המתנות אמיתיות ועדכונים מאוחרים).
+// בדיקה שרוצה משך מינימלי קובעת אותו בעצמה עם setMinRefreshMs ומחזירה ל-0
+require('./src/services/minDuration').setMinRefreshMs(0);

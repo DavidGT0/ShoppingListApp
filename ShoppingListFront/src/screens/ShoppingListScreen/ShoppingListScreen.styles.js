@@ -174,6 +174,10 @@ export const makeStyles = colors => StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 380,
   },
+  // אזור הרשימה במצב ידני (עוטף את מיכל הגלילה כדי למדוד את גובהו)
+  listArea: {
+    flex: 1,
+  },
   // המסלול צמוד יותר לקצוות (כמו בעיצוב), כדי להשאיר לשמות המוצרים רוחב
   routeContent: {
     paddingHorizontal: 14,
