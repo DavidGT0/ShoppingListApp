@@ -74,6 +74,25 @@ describe('MyListsScreen', () => {
     ]);
   });
 
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (useGatedRefresh)
+  test('the list wires the gated pull-to-refresh', async () => {
+    await renderScreen();
+    const { FlatList } = require('react-native');
+    const list = () => tree.root.findByType(FlatList);
+    expect(list().props.refreshControl.props.enabled).toBe(true);
+    expect(typeof list().props.onMomentumScrollBegin).toBe('function');
+    await act(async () =>
+      list().props.onScrollBeginDrag({
+        nativeEvent: { contentOffset: { y: 250 } },
+      }),
+    );
+    expect(list().props.refreshControl.props.enabled).toBe(false);
+    await act(async () =>
+      list().props.onScrollEndDrag({ nativeEvent: { contentOffset: { y: 0 } } }),
+    );
+    expect(list().props.refreshControl.props.enabled).toBe(true);
+  });
+
   test('every card has a menu button, and shared lists also show a badge', async () => {
     const { byTestId } = await renderScreen();
 

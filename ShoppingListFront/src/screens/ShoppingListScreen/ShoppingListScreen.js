@@ -56,6 +56,7 @@ import {
   INITIAL_LOAD_GRACE_MS,
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
+import useGatedRefresh from '../../hooks/useGatedRefresh';
 import { makeStyles } from './ShoppingListScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -427,6 +428,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
   };
 
   useLiveRefresh(refreshItems, LIVE_REFRESH_MS, { paused: isDragging });
+
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה)
+  const {
+    enabled: refreshEnabled,
+    scrollHandlers: refreshScrollHandlers,
+    reset: resetRefreshGate,
+  } = useGatedRefresh();
+  // החלפת מצב מציגה רשימה אחרת, שמתחילה בראש
+  useEffect(() => {
+    resetRefreshGate();
+  }, [sortMode, resetRefreshGate]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -988,8 +1000,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
         <ScrollView
           testID="category_list"
           contentContainerStyle={[styles.listContent, styles.routeContent]}
+          {...refreshScrollHandlers}
           refreshControl={
             <RefreshControl
+              enabled={refreshEnabled}
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={[colors.primary]}
@@ -1011,8 +1025,10 @@ const ShoppingListScreen = ({ route, navigation }) => {
         <NestableScrollContainer
           testID="manual_list"
           contentContainerStyle={styles.listContent}
+          {...refreshScrollHandlers}
           refreshControl={
             <RefreshControl
+              enabled={refreshEnabled}
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={[colors.primary]}

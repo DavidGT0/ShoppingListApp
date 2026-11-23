@@ -184,7 +184,7 @@ const row = (r, { variant } = {}) => (
 
 describe('focus card gradient', () => {
   test.each(['light', 'dark'])(
-    '%s: blue-to-teal, held blue from the title corner, no stand-in bar',
+    '%s: blue-to-teal top to bottom, all blue until measured, no stand-in bar',
     async mode => {
       const palette = mode === 'dark' ? dark : light;
       const station = plan(ITEMS).stations.find(s => s.key === 'dairy');
@@ -196,10 +196,10 @@ describe('focus card gradient', () => {
         const g = gradients(tree)[0];
         const [blue, teal] = palette.focusGradient;
         expect(g.props.colors).toEqual([blue, blue, teal]);
-        expect(g.props.locations).toEqual([0, 0.65, 1]);
-        // הכותרת בפינה הימנית העליונה (row-reverse) - שם מתחיל הכחול
-        expect(g.props.start).toEqual({ x: 1, y: 0 });
-        expect(g.props.end).toEqual({ x: 0, y: 1 });
+        // מעבר אנכי: לפני המדידה כולו כחול
+        expect(g.props.start).toEqual({ x: 0.5, y: 0 });
+        expect(g.props.end).toEqual({ x: 0.5, y: 1 });
+        expect(g.props.locations).toEqual([0, 1, 1]);
         expect(tree.root.findAll(n => n.props.testID === 'focus_accent')).toHaveLength(0);
       } finally {
         await unmount(tree);
@@ -243,6 +243,41 @@ describe('focus card gradient', () => {
       }
     },
   );
+
+  // בלי תפר: כל גובה שורת הכותרת (לכל הרוחב) כחול טהור, והטורקיז מתחיל רק מתחתיה,
+  // כך שהמשטח הכחול של הכותרת יושב על כחול זהה ואין לו קצה נראה
+  test('after layout the card stays pure blue across the full title row height', async () => {
+    const station = plan(ITEMS).stations.find(s => s.key === 'dairy');
+    const tree = await render(<FocusCard department={station} renderItem={row} />);
+    try {
+      const g = () => gradients(tree)[0];
+      const titleRow = tree.root.findAll(
+        n => n.props.testID === 'focus_card_title_row' && typeof n.type === 'string',
+      )[0];
+      await act(async () =>
+        g().props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 290, height: 200 } } }),
+      );
+      await act(async () =>
+        titleRow.props.onLayout({
+          nativeEvent: { layout: { x: 10, y: 12, width: 270, height: 60 } },
+        }),
+      );
+      const [, hold, end] = g().props.locations;
+      expect(end).toBe(1);
+      // תחתית השורה ב-72 מתוך 200, ועוד מרווח קטן
+      expect(hold * 200).toBeGreaterThanOrEqual(72);
+      expect(hold).toBeLessThan(0.5);
+      // שורת כותרת גבוהה מהכרטיס (מדידה חלקית) - נשאר כחול, לא חורג מ-1
+      await act(async () =>
+        titleRow.props.onLayout({
+          nativeEvent: { layout: { x: 10, y: 12, width: 270, height: 400 } },
+        }),
+      );
+      expect(g().props.locations).toEqual([0, 1, 1]);
+    } finally {
+      await unmount(tree);
+    }
+  });
 
   test('the title block is painted with the blue end of the gradient', async () => {
     const station = plan(ITEMS).stations.find(s => s.key === 'dairy');

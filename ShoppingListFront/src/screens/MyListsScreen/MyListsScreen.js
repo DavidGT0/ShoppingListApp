@@ -33,6 +33,7 @@ import {
   INITIAL_LOAD_GRACE_MS,
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
+import useGatedRefresh from '../../hooks/useGatedRefresh';
 import { makeStyles } from './MyListsScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -56,6 +57,9 @@ const MyListsScreen = ({ navigation }) => {
   // מצבים לניהול חלון ההצטרפות עם קוד הזמנה
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה)
+  const { enabled: refreshEnabled, scrollHandlers: refreshScrollHandlers } =
+    useGatedRefresh();
   // יש כבר רשימות על המסך - מטמון לא דורס אותן, הוא רק מעביר למצב לא מקוון
   const hasLists = useRef(false);
   // רענון חי כבר הביא נתוני שרת - תשובה מאוחרת של הטעינה הראשונה כבר ישנה
@@ -383,8 +387,10 @@ const MyListsScreen = ({ navigation }) => {
 
       <FlatList
         data={lists}
+        {...refreshScrollHandlers}
         refreshControl={
           <RefreshControl
+            enabled={refreshEnabled}
             refreshing={refreshing}
             onRefresh={handlePullToRefresh}
             colors={[colors.primary]}

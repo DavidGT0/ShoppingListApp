@@ -1,17 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { makeStyles } from './FocusCard.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 
 // מעבר מכחול לטורקיז (כמו בעיצוב). לבן על הטורקיז הוא 2.1:1 בלבד, ולכן:
-// - המעבר מתחיל בפינה הימנית העליונה, שם יושבת הכותרת (row-reverse), ונשאר כחול
-//   עד 65% מהדרך; הטורקיז מופיע רק לכיוון הפינה השמאלית התחתונה
-// - הכותרת נצבעת בעצמה בקצה הכחול, כך שאין טקסט לבן ישירות על המעבר
+// - המעבר אנכי, ונשאר כחול טהור לכל גובה שורת הכותרת ולכל הרוחב (נמדד ב-onLayout);
+//   הטורקיז מתחיל רק מתחתיה. לפני המדידה הכרטיס כולו כחול
+// - הכותרת נצבעת גם היא בכחול: היא יושבת על כחול זהה, ולכן אין לה קצה נראה
+//   (מעבר אלכסוני השאיר את הצד של התג טורקיז-למחצה, ונראה תפר)
 // - השורות על primaryDark, והתג בטורקיז עם טקסט כהה
-const GRADIENT_START = { x: 1, y: 0 };
-const GRADIENT_END = { x: 0, y: 1 };
-const GRADIENT_LOCATIONS = [0, 0.65, 1];
+const GRADIENT_START = { x: 0.5, y: 0 };
+const GRADIENT_END = { x: 0.5, y: 1 };
+// מרווח קטן מתחת לשורת הכותרת לפני שהטורקיז מתחיל
+const TITLE_MARGIN = 6;
 
 // כרטיס "עכשיו במחלקה": המחלקה הראשונה בסדר שעוד יש בה מה לקנות, עם שורות גדולות.
 // בלי מחלקה (הכל נקנה) מוצג הכרטיס "הכל בעגלה 🎉".
@@ -21,6 +23,22 @@ const FocusCard = ({ department, renderItem }) => {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
   const [blue, teal] = colors.focusGradient;
+  // גובה הכרטיס ותחתית שורת הכותרת (מתוך onLayout). עדכון רק כשהערך משתנה
+  const [size, setSize] = useState({ card: 0, title: 0 });
+  const onCardLayout = e => {
+    const card = e.nativeEvent.layout.height;
+    setSize(prev => (prev.card === card ? prev : { ...prev, card }));
+  };
+  const onTitleLayout = e => {
+    const { y, height } = e.nativeEvent.layout;
+    const title = y + height;
+    setSize(prev => (prev.title === title ? prev : { ...prev, title }));
+  };
+  // עד איפה המעבר כחול טהור: תחתית הכותרת ועוד מרווח, ולא יותר מ-1
+  const hold =
+    size.card > 0 && size.title > 0
+      ? Math.min(1, Math.ceil(((size.title + TITLE_MARGIN) / size.card) * 1000) / 1000)
+      : 1;
 
   if (!department) {
     return (
@@ -41,12 +59,17 @@ const FocusCard = ({ department, renderItem }) => {
     <LinearGradient
       testID="focus_card"
       colors={[blue, blue, teal]}
-      locations={GRADIENT_LOCATIONS}
+      locations={[0, hold, 1]}
       start={GRADIENT_START}
       end={GRADIENT_END}
+      onLayout={onCardLayout}
       style={styles.card}
     >
-      <View style={styles.titleRow}>
+      <View
+        testID="focus_card_title_row"
+        onLayout={onTitleLayout}
+        style={styles.titleRow}
+      >
         {/* רק הכותרת מקובצת לקריאה, כדי שהשורות יישארו נגישות אחת אחת */}
         <View
           testID="focus_card_title"

@@ -283,6 +283,31 @@ test('manual mode puts a gesture-handler RefreshControl on the nestable scroll c
   expect(getShoppingList).toHaveBeenCalledTimes(1);
 });
 
+const scrolledTo = y => ({ nativeEvent: { contentOffset: { x: 0, y } } });
+
+test('manual mode gates the pull-to-refresh to a fresh pull at the top', async () => {
+  await mount(ITEMS);
+  const enabled = () => global.__scrollProps.refreshControl.props.enabled;
+  expect(enabled()).toBe(true);
+  await act(async () => global.__scrollProps.onScrollBeginDrag(scrolledTo(400)));
+  expect(enabled()).toBe(false);
+  await act(async () => global.__scrollProps.onScrollEndDrag(scrolledTo(0)));
+  expect(enabled()).toBe(true);
+  // הגלילה של מיכל הגרירה לא נדרסת: אין onScroll משלנו
+  expect(global.__scrollProps.onScroll).toBeUndefined();
+});
+
+test('category mode gates the pull-to-refresh too', async () => {
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  const list = () => byId(tree, 'category_list');
+  expect(list().props.refreshControl.props.enabled).toBe(true);
+  await act(async () => list().props.onMomentumScrollBegin(scrolledTo(300)));
+  expect(list().props.refreshControl.props.enabled).toBe(false);
+  await act(async () => list().props.onMomentumScrollEnd(scrolledTo(0)));
+  expect(list().props.refreshControl.props.enabled).toBe(true);
+});
+
 test('manual mode scrolls the header, the list and the bought section as one page', async () => {
   const tree = await mount(ITEMS);
   const scroll = byId(tree, 'nestable_scroll');
