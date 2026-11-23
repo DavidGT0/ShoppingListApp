@@ -65,7 +65,7 @@ const sortByPosition = data =>
 
 const ShoppingListScreen = ({ route, navigation }) => {
   const styles = useStyles(makeStyles);
-  const { colors } = useTheme();
+  const { colors, isDark, setMode } = useTheme();
   const insets = useSafeAreaInsets();
   const { listId, listName, isOwner = true } = route.params || {};
   const [items, setItems] = useState([]);
@@ -840,31 +840,47 @@ const ShoppingListScreen = ({ route, navigation }) => {
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerEyebrow}>ניהול מוצרים ברשימה</Text>
-          <TouchableOpacity
-            onPress={() => {
-              if (blockIfOffline()) return;
-              setMembersVisible(true);
-            }}
-            style={styles.membersButton}
-            activeOpacity={0.8}
-            testID="members_button"
-            accessibilityLabel="משתתפים ברשימה"
-            accessibilityValue={
-              memberCount !== null
-                ? { text: `${memberCount} משתתפים` }
-                : undefined
-            }
-            accessibilityRole="button"
-          >
-            <Icon
-              name="account-group"
-              size={22}
-              color={colors.text.inverse}
-            />
-            {memberCount !== null && (
-              <Text style={styles.membersButtonText}>{memberCount}</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => setMode(isDark ? 'light' : 'dark')}
+              style={styles.themeToggle}
+              activeOpacity={0.8}
+              testID="theme_toggle"
+              accessibilityLabel={isDark ? 'מצב בהיר' : 'מצב כהה'}
+              accessibilityRole="button"
+            >
+              <Icon
+                name={isDark ? 'white-balance-sunny' : 'weather-night'}
+                size={22}
+                color={colors.text.inverse}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (blockIfOffline()) return;
+                setMembersVisible(true);
+              }}
+              style={styles.membersButton}
+              activeOpacity={0.8}
+              testID="members_button"
+              accessibilityLabel="משתתפים ברשימה"
+              accessibilityValue={
+                memberCount !== null
+                  ? { text: `${memberCount} משתתפים` }
+                  : undefined
+              }
+              accessibilityRole="button"
+            >
+              <Icon
+                name="account-group"
+                size={22}
+                color={colors.text.inverse}
+              />
+              {memberCount !== null && (
+                <Text style={styles.membersButtonText}>{memberCount}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.mainTitle} numberOfLines={1}>

@@ -42,6 +42,19 @@ export const makeStyles = colors => StyleSheet.create({
     textAlign: 'center',
     marginTop: -4, // תיקון אופטי קטן: לתווי טקסט של חצים יש לרוב רווח תחתון מובנה, זה ממקם אותו בול באמצע
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themeToggle: {
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   membersButton: {
     flexDirection: 'row',
     alignItems: 'center',

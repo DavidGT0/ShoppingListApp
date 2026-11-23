@@ -42,6 +42,31 @@ export const makeStyles = colors => StyleSheet.create({
     color: colors.text.primary,
     marginBottom: 16,
   },
+  themeSegments: {
+    flexDirection: 'row-reverse',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  themeSegment: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  themeSegmentActive: {
+    backgroundColor: colors.primary,
+  },
+  themeSegmentText: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  themeSegmentTextActive: {
+    color: colors.text.inverse,
+  },
   userInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',

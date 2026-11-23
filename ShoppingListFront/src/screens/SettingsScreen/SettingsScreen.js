@@ -22,7 +22,7 @@ import { MIN_PASSWORD_LENGTH } from '../../services/validation';
 
 const SettingsScreen = ({ onLogout }) => {
   const styles = useStyles(makeStyles);
-  const { colors } = useTheme();
+  const { colors, mode, setMode } = useTheme();
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
 
@@ -176,6 +176,43 @@ const SettingsScreen = ({ onLogout }) => {
         testID="settings_header"
       >
         <Text style={styles.title}>הגדרות</Text>
+      </View>
+
+      <View style={styles.userSection}>
+        <Text style={styles.sectionTitle}>ערכת צבעים</Text>
+        <View style={styles.themeSegments}>
+          {[
+            { value: 'light', label: 'בהיר' },
+            { value: 'dark', label: 'כהה' },
+            { value: 'system', label: 'לפי הטלפון' },
+          ].map(({ value, label }) => {
+            const selected = mode === value;
+            return (
+              <TouchableOpacity
+                key={value}
+                testID={`theme_${value}`}
+                accessibilityLabel={label}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                style={[
+                  styles.themeSegment,
+                  selected && styles.themeSegmentActive,
+                ]}
+                onPress={() => setMode(value)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.themeSegmentText,
+                    selected && styles.themeSegmentTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       {user && (
