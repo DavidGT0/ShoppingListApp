@@ -53,3 +53,37 @@ def test_network_error_returns_false_instead_of_crashing(monkeypatch):
 
     monkeypatch.setattr(email_sender.urllib.request, "urlopen", boom)
     assert email_sender.send_email("a@example.com", "s", "h") is False
+
+
+def test_request_identifies_itself_with_a_user_agent(monkeypatch):
+    """בלי User-Agent, ה-API של Resend (מאחורי Cloudflare) מחזיר 403 לבקשות של Python-urllib"""
+    monkeypatch.setenv("RESEND_API_KEY", "re_test_key")
+    captured = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["ua"] = request.get_header("User-agent")
+        return _FakeResponse()
+
+    monkeypatch.setattr(email_sender.urllib.request, "urlopen", fake_urlopen)
+    assert email_sender.send_email("a@example.com", "s", "h") is True
+    assert captured["ua"] and "Python-urllib" not in captured["ua"]
+
+
+def test_http_error_logs_status_and_reason_without_the_address(monkeypatch, caplog):
+    import io
+    import logging
+    import urllib.error
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_test_key")
+
+    def forbidden(request, timeout=None):
+        raise urllib.error.HTTPError(
+            request.full_url, 403, "Forbidden", {}, io.BytesIO(b'{"message": "domain is not verified"}')
+        )
+
+    monkeypatch.setattr(email_sender.urllib.request, "urlopen", forbidden)
+    with caplog.at_level(logging.WARNING):
+        assert email_sender.send_email("secret.person@example.com", "s", "h") is False
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "403" in messages and "domain is not verified" in messages
+    assert "secret.person@example.com" not in caplog.text
