@@ -126,3 +126,23 @@ def test_duplicate_remaps_custom_categories(client, register):
     assert client.get(f"/lists/{list_id}/categories", headers=alice).json() == [cat]
     src = {i["name"]: i["category"] for i in _items(client, alice, list_id)}
     assert src["Dog food"] == custom_value
+
+
+def test_duplicate_copies_unit_note_and_keeps_added_by(client, register):
+    alice = register("alice")
+    bob = register("bob")
+    list_id = _make_list(client, alice)
+    client.post("/lists/share", json={"list_id": list_id, "username": "bob"}, headers=alice)
+    client.post(
+        "/items",
+        json={"name": "Milk", "list_id": list_id, "unit": "ליטר", "note": "בלי לקטוז"},
+        headers=alice,
+    )
+
+    new_id = client.post(f"/lists/{list_id}/duplicate", headers=bob).json()["id"]
+
+    copy = _items(client, bob, new_id)
+    assert len(copy) == 1
+    assert copy[0]["unit"] == "ליטר"
+    assert copy[0]["note"] == "בלי לקטוז"
+    assert copy[0]["added_by"] == "alice"

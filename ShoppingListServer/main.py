@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, StringConstraints, field_validator
-from typing import Annotated, Optional, List
+from typing import Annotated, Literal, Optional, List
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -114,11 +114,37 @@ class ShoppingListResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# יחידת מידה (אופציונלית): קבוצה סגורה
+Unit = Literal["יח׳", "ק״ג", "גרם", "ליטר", "חבילה"]
+NOTE_MAX_LENGTH = 100
+
+
+def _clean_note(value):
+    """הערה: בלי רווחים מסביב, ריקה הופכת ל-null, עד 100 תווים"""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("note must be a string")
+    value = value.strip()
+    if not value:
+        return None
+    if len(value) > NOTE_MAX_LENGTH:
+        raise ValueError("note too long")
+    return value
+
+
 class ItemCreate(BaseModel):
     name: Name
     amount: Amount = 1
     list_id: int
     category: Optional[str] = None
+    unit: Optional[Unit] = None
+    note: Optional[str] = None
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def clean_note(cls, value):
+        return _clean_note(value)
 
 class ItemUpdate(BaseModel):
     name: Optional[Name] = None
@@ -126,6 +152,13 @@ class ItemUpdate(BaseModel):
     purchased: Optional[bool] = None
     position: Optional[int] = None
     category: Optional[str] = None
+    unit: Optional[Unit] = None
+    note: Optional[str] = None
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def clean_note(cls, value):
+        return _clean_note(value)
 
 class CategoryCreate(BaseModel):
     name: CategoryName
@@ -302,6 +335,10 @@ def delete_user_account(db: Session, user: models.User):
     for shopping_list in list(user.owned_lists):
         db.delete(shopping_list)  # המוצרים נמחקים בזכות cascade, והשיתופים של הרשימה נמחקים אוטומטית
     user.shared_lists.clear()  # הסרת הגישה לרשימות של אחרים
+    # מוצרים שהמשתמש הוסיף ברשימות של אחרים נשארים, בלי שם המוסיף (גם ב-SQLite, שלא אוכף מפתחות זרים)
+    db.query(models.ShoppingItem).filter(models.ShoppingItem.added_by_id == user.id).update(
+        {models.ShoppingItem.added_by_id: None}, synchronize_session=False)
+    db.expire(user)
     db.delete(user)
     db.commit()
 
@@ -490,6 +527,9 @@ def duplicate_list(list_id: int, current_user: models.User = Depends(get_current
             purchased=False,
             list_id=new_list.id,
             category=id_map.get(item.category, item.category if item.category in BUILTIN_CATEGORIES else None),
+            unit=item.unit,
+            note=item.note,
+            added_by_id=item.added_by_id,
         ))
     db.commit()
     db.refresh(new_list)
@@ -558,7 +598,23 @@ def get_items(list_id: int, current_user: models.User = Depends(get_current_user
         raise HTTPException(status_code=403, detail="Not authorized to access this list")
     
     items = db.query(models.ShoppingItem).filter(models.ShoppingItem.list_id == list_id).order_by(models.ShoppingItem.position).all()
-    return items
+    return [_item_out(i) for i in items]
+
+
+def _item_out(item: models.ShoppingItem) -> dict:
+    """תגובת מוצר: added_by הוא שם המשתמש בלבד (אף פעם לא אימייל או אובייקט משתמש)"""
+    return {
+        "id": item.id,
+        "name": item.name,
+        "amount": item.amount,
+        "purchased": item.purchased,
+        "position": item.position,
+        "list_id": item.list_id,
+        "category": item.category,
+        "unit": item.unit,
+        "note": item.note,
+        "added_by": item.added_by.username if item.added_by is not None else None,
+    }
 
 BUILTIN_CATEGORIES = {
     "produce", "dairy", "bakery", "meat", "pantry", "frozen",
@@ -658,6 +714,11 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
     if revived is not None:
         revived.purchased = False
         revived.position = top_position
+        revived.added_by_id = current_user.id
+        if "unit" in item.model_fields_set:
+            revived.unit = item.unit
+        if "note" in item.model_fields_set:
+            revived.note = item.note
         if explicit_category is not None:
             revived.category = explicit_category
         new_item = revived
@@ -673,7 +734,10 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
             amount=item.amount,
             list_id=item.list_id,
             position=top_position,
-            category=category
+            category=category,
+            unit=item.unit,
+            note=item.note,
+            added_by_id=current_user.id,
         )
         db.add(new_item)
 
@@ -681,7 +745,7 @@ def add_item(item: ItemCreate, current_user: models.User = Depends(get_current_u
     _record_history(db, current_user.id, item.name, explicit_category, set_category=explicit_category is not None)
     db.commit()
     db.refresh(new_item)
-    return new_item
+    return _item_out(new_item)
 
 @app.put("/items/{item_id}")
 def update_item(item_id: int, item_update: ItemUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -703,6 +767,10 @@ def update_item(item_id: int, item_update: ItemUpdate, current_user: models.User
         item.purchased = item_update.purchased
     if item_update.position is not None:
         item.position = item_update.position
+    if "unit" in item_update.model_fields_set:
+        item.unit = item_update.unit
+    if "note" in item_update.model_fields_set:
+        item.note = item_update.note
     if "category" in item_update.model_fields_set:
         if item_update.category is not None:
             _validate_category(db, item.list_id, item_update.category)
@@ -711,7 +779,7 @@ def update_item(item_id: int, item_update: ItemUpdate, current_user: models.User
     
     db.commit()
     db.refresh(item)
-    return item
+    return _item_out(item)
 
 @app.delete("/items/{item_id}")
 def delete_item(item_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
