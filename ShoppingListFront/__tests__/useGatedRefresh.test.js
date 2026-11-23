@@ -28,7 +28,15 @@ const mount = (refreshing = false) => {
   const content = height => act(() => h().onContentSizeChange(0, height));
   const setRefreshing = value =>
     act(() => tree.update(<Probe refreshing={value} />));
-  return { probe, fire, touch, layout, content, setRefreshing };
+  // עדכוני גלילה באמצע גרירה: onScroll (ScrollView/FlatList) או onOffset (המיכל המקונן)
+  const scroll = y =>
+    act(() => {
+      probe.value.scrollTracking.onScroll({
+        nativeEvent: { contentOffset: { x: 0, y } },
+      });
+    });
+  const offset = y => act(() => probe.value.onOffset(y));
+  return { probe, fire, touch, layout, content, setRefreshing, scroll, offset };
 };
 
 describe('useGatedRefresh', () => {
@@ -178,6 +186,64 @@ describe('useGatedRefresh', () => {
     const { probe } = mount();
     act(() => probe.value.scrollHandlers.onScrollEndDrag({}));
     expect(probe.value.enabled).toBe(true);
+  });
+
+  // מקרה חדש: גרירה אחת שמתחילה בראש, מגלגלת את התוכן הלאה, חוזרת לראש וממשיכה
+  // למשוך - לא מרעננת. הפקד נסגר ברגע שהתוכן עוזב את הראש, עד שהאצבע עוזבת
+  test.each([
+    ['onScroll', 'scroll'],
+    ['the nested container offset', 'offset'],
+  ])(
+    'a drag that leaves the top and comes back cannot refresh until the finger lifts (%s)',
+    (_label, path) => {
+      const g = mount();
+      const move = g[path];
+      g.touch();
+      g.fire('onScrollBeginDrag', 0);
+      expect(g.probe.value.enabled).toBe(true);
+      move(1);
+      expect(g.probe.value.enabled).toBe(true);
+      move(60);
+      expect(g.probe.value.enabled).toBe(false);
+      move(20);
+      move(0);
+      // חזר לראש באותה גרירה וממשיך למשוך - עדיין סגור
+      expect(g.probe.value.enabled).toBe(false);
+      g.fire('onScrollEndDrag', 0);
+      // האצבע עזבה: מגע חדש בראש מרענן
+      expect(g.probe.value.enabled).toBe(true);
+      g.touch();
+      g.fire('onScrollBeginDrag', 0);
+      expect(g.probe.value.enabled).toBe(true);
+    },
+  );
+
+  test('scroll tracking asks for frequent scroll events', () => {
+    const { probe } = mount();
+    expect(probe.value.scrollTracking.scrollEventThrottle).toBe(16);
+    expect(typeof probe.value.scrollTracking.onScroll).toBe('function');
+    expect(typeof probe.value.onOffset).toBe('function');
+  });
+
+  test('a fling that scrolls back to the top: the next touch at the top can pull', () => {
+    const { probe, fire, scroll, touch } = mount();
+    fire('onScrollBeginDrag', 500);
+    fire('onScrollEndDrag', 480);
+    fire('onMomentumScrollBegin', 480);
+    scroll(200);
+    expect(probe.value.enabled).toBe(false);
+    scroll(0);
+    // בלי אצבע אין משיכה; מגע חדש בראש מותר
+    touch();
+    expect(probe.value.enabled).toBe(true);
+  });
+
+  test('scroll updates outside a drag do not re-render when nothing changes', () => {
+    const { probe, scroll } = mount();
+    const before = probe.renders;
+    scroll(0);
+    scroll(0.5);
+    expect(probe.renders).toBe(before);
   });
 
   test('reset reopens the gate for a new list', () => {

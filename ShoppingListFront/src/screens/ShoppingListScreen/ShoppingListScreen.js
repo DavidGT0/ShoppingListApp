@@ -57,6 +57,7 @@ import {
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import useGatedRefresh from '../../hooks/useGatedRefresh';
+import NestableOffsetObserver from '../../hooks/NestableOffsetObserver';
 import { withMinDuration } from '../../services/minDuration';
 import { makeStyles } from './ShoppingListScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
@@ -434,6 +435,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const {
     enabled: refreshEnabled,
     scrollHandlers: refreshScrollHandlers,
+    scrollTracking: refreshScrollTracking,
+    onOffset: onRefreshOffset,
     reset: resetRefreshGate,
   } = useGatedRefresh(refreshing);
   // החלפת מצב מציגה רשימה אחרת, שמתחילה בראש
@@ -1003,6 +1006,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
           testID="category_list"
           contentContainerStyle={[styles.listContent, styles.routeContent]}
           {...refreshScrollHandlers}
+          {...refreshScrollTracking}
           refreshControl={
             <RefreshControl
               enabled={refreshEnabled}
@@ -1043,6 +1047,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
               />
             }
           >
+            {/* הגלילה של המיכל (הוא דורס onScroll) מגיעה לשער הריענון מכאן */}
+            <NestableOffsetObserver onOffset={onRefreshOffset} />
             {listHeader}
             <NestableDraggableFlatList
               data={unpurchasedItems}

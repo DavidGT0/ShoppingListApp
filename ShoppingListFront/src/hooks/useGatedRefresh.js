@@ -11,17 +11,20 @@ const offsetOf = event => {
 const initialState = () => ({
   offset: 0,
   dragging: false,
-  dragFromTop: true,
+  dragAtTop: true,
   momentum: false,
   viewport: 0,
   content: 0,
 });
 
 // משיכה לריענון רק במשיכה חדשה מראש הרשימה.
-// מחזיר enabled (ל-RefreshControl, אנדרואיד), scrollHandlers לרשימה הנגללת, ו-reset.
+// מחזיר enabled (ל-RefreshControl, אנדרואיד), scrollHandlers לרשימה הנגללת,
+// scrollTracking (onScroll לרשימות רגילות), onOffset (למיכל המקונן) ו-reset.
 //
-// פתוח כש: הגלילה במנוחה בראש הרשימה (y <= 1), ואין גרירה שהתחילה באמצע הרשימה.
+// פתוח כש: הגלילה במנוחה בראש הרשימה (y <= 1), ואין גרירה שלא נשארה כל הזמן בראש.
 // - גרירה מאמצע שמגיעה לראש כשהאצבע עוד על המסך - סגור עד שהאצבע עוזבת
+// - גרירה שמתחילה בראש, מגלגלת את התוכן הלאה וחוזרת לראש - סגור מהרגע שהתוכן
+//   עזב את הראש ועד שהאצבע עוזבת (אין אז משיכה בתהליך, כי התוכן זז)
 // - הטלה מאמצע: המיקום הידוע הוא באמצע עד שהתנופה נעצרת, ובלי אצבע אי אפשר לרענן
 // - מגע חדש בראש - פתוח, ומשיכה מרעננת
 //
@@ -30,7 +33,8 @@ const initialState = () => ({
 // - כל זמן הריענון (refreshing) הפקד פתוח
 // - סגירה קורית רק בתחילת גרירה (מאמצע הרשימה) או כשהאצבע כבר עזבה
 //
-// המיקום נקרא רק מאירועי הגרירה והתנופה (בלי onScroll, שמיכל הגרירה המקונן דורס).
+// המיקום מגיע מאירועי הגרירה והתנופה, ובאמצע גרירה גם מ-onScroll (ScrollView/FlatList)
+// או מ-onOffset (המיכל המקונן דורס onScroll; NestableOffsetObserver קורא את הגלילה שלו).
 // מיקום שהתיישן מתוקן: מגע שקוטע תנופה (שאירוע הסיום שלה לא יגיע) מחזיר לראש,
 // ותוכן שהתקצר מתחת לגובה החלון מצמצם את המיקום
 const useGatedRefresh = (refreshing = false) => {
@@ -38,10 +42,10 @@ const useGatedRefresh = (refreshing = false) => {
   const [atRestOpen, setAtRestOpen] = useState(true);
   const openRef = useRef(true);
 
-  const scrollHandlers = useMemo(() => {
+  const core = useMemo(() => {
     const update = () => {
       const s = state.current;
-      const next = s.offset <= TOP && !(s.dragging && !s.dragFromTop);
+      const next = s.offset <= TOP && !(s.dragging && !s.dragAtTop);
       // עדכון מצב רק כשהערך משתנה
       if (next !== openRef.current) {
         openRef.current = next;
@@ -54,7 +58,15 @@ const useGatedRefresh = (refreshing = false) => {
         s.offset = Math.min(s.offset, Math.max(0, s.content - s.viewport));
       }
     };
-    return {
+    // מיקום באמצע גרירה: תוכן שעזב את הראש סוגר את הגרירה הזו עד שהאצבע עוזבת
+    const onOffset = y => {
+      if (typeof y !== 'number') return;
+      const s = state.current;
+      s.offset = y;
+      if (s.dragging && y > TOP) s.dragAtTop = false;
+      update();
+    };
+    const scrollHandlers = {
       // מגע חדש עוצר תנופה. אם הייתה תנופה בדרך, אירוע הסיום שלה עלול לא להגיע
       // והמיקום הידוע ישן - חוזרים לראש (גרירה שתתחיל תדווח את המיקום האמיתי)
       onTouchStart: () => {
@@ -64,7 +76,7 @@ const useGatedRefresh = (refreshing = false) => {
           s.offset = 0;
         }
         s.dragging = false;
-        s.dragFromTop = true;
+        s.dragAtTop = true;
         update();
       },
       onScrollBeginDrag: event => {
@@ -72,14 +84,14 @@ const useGatedRefresh = (refreshing = false) => {
         s.offset = offsetOf(event);
         s.momentum = false;
         s.dragging = true;
-        s.dragFromTop = s.offset <= TOP;
+        s.dragAtTop = s.offset <= TOP;
         update();
       },
       onScrollEndDrag: event => {
         const s = state.current;
         s.offset = offsetOf(event);
         s.dragging = false;
-        s.dragFromTop = true;
+        s.dragAtTop = true;
         update();
       },
       onMomentumScrollBegin: event => {
@@ -108,6 +120,14 @@ const useGatedRefresh = (refreshing = false) => {
         update();
       },
     };
+    return {
+      scrollHandlers,
+      onOffset,
+      scrollTracking: {
+        onScroll: event => onOffset(offsetOf(event)),
+        scrollEventThrottle: 16,
+      },
+    };
   }, []);
 
   // רשימה חדשה הוצגה (למשל החלפת מצב מיון): מתחילים שוב מראש הרשימה
@@ -119,7 +139,13 @@ const useGatedRefresh = (refreshing = false) => {
     }
   }, []);
 
-  return { enabled: refreshing || atRestOpen, scrollHandlers, reset };
+  return {
+    enabled: refreshing || atRestOpen,
+    scrollHandlers: core.scrollHandlers,
+    scrollTracking: core.scrollTracking,
+    onOffset: core.onOffset,
+    reset,
+  };
 };
 
 export default useGatedRefresh;

@@ -93,6 +93,20 @@ describe('MyListsScreen', () => {
     expect(list().props.refreshControl.props.enabled).toBe(true);
   });
 
+  test('a drag that leaves the top closes the gate until the finger lifts', async () => {
+    await renderScreen();
+    const { FlatList } = require('react-native');
+    const list = () => tree.root.findByType(FlatList);
+    const at = y => ({ nativeEvent: { contentOffset: { y } } });
+    expect(list().props.scrollEventThrottle).toBe(16);
+    await act(async () => list().props.onScrollBeginDrag(at(0)));
+    await act(async () => list().props.onScroll(at(70)));
+    await act(async () => list().props.onScroll(at(0)));
+    expect(list().props.refreshControl.props.enabled).toBe(false);
+    await act(async () => list().props.onScrollEndDrag(at(0)));
+    expect(list().props.refreshControl.props.enabled).toBe(true);
+  });
+
   test('a failed pull still alerts and stops the spinner after the minimum time', async () => {
     const { setMinRefreshMs } = require('../src/services/minDuration');
     const { FlatList } = require('react-native');

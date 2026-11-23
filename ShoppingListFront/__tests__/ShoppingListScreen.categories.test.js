@@ -326,6 +326,34 @@ test('the scroll container keeps its touch and layout hooks for the gate', async
   expect(typeof global.__scrollProps.onContentSizeChange).toBe('function');
 });
 
+// גרירה אחת שעוזבת את הראש וחוזרת - לא מרעננת עד שהאצבע עוזבת
+test('category mode: a drag that leaves the top closes the gate until the finger lifts', async () => {
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  const list = () => byId(tree, 'category_list');
+  expect(list().props.scrollEventThrottle).toBe(16);
+  await act(async () => list().props.onScrollBeginDrag(scrolledTo(0)));
+  await act(async () => list().props.onScroll(scrolledTo(80)));
+  await act(async () => list().props.onScroll(scrolledTo(0)));
+  expect(list().props.refreshControl.props.enabled).toBe(false);
+  await act(async () => list().props.onScrollEndDrag(scrolledTo(0)));
+  expect(list().props.refreshControl.props.enabled).toBe(true);
+});
+
+test('manual mode: the nested container offset observer feeds the gate', async () => {
+  const tree = await mount(ITEMS);
+  const NestableOffsetObserver =
+    require('../src/hooks/NestableOffsetObserver').default;
+  const observer = tree.root.findByType(NestableOffsetObserver);
+  const enabled = () => global.__scrollProps.refreshControl.props.enabled;
+  await act(async () => global.__scrollProps.onScrollBeginDrag(scrolledTo(0)));
+  await act(async () => observer.props.onOffset(90));
+  await act(async () => observer.props.onOffset(0));
+  expect(enabled()).toBe(false);
+  await act(async () => global.__scrollProps.onScrollEndDrag(scrolledTo(0)));
+  expect(enabled()).toBe(true);
+});
+
 test('category mode gates the pull-to-refresh too', async () => {
   await AsyncStorage.setItem('@sort_mode_7', 'category');
   const tree = await mount(ITEMS);
