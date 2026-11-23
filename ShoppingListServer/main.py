@@ -1060,6 +1060,8 @@ def _clean_icon(value):
 @app.put("/lists/{list_id}/categories/layout")
 def update_category_layout(list_id: int, data: CategoryLayoutUpdate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """שמירת סדר, שמות ואייקונים של המחלקות (כל משתתף). הסדר = סדר המערך; מפתחות שכבר לא קיימים מתעלמים מהם"""
+    # נעילת שורת הרשימה: שמירות במקביל מתנהלות בטור במקום להתנגש באילוץ הייחודיות (SQLite מתעלם)
+    db.query(models.ShoppingList).filter(models.ShoppingList.id == list_id).with_for_update().first()
     shopping_list = get_accessible_list_or_error(db, list_id, current_user)
     existing_custom = {f"custom:{c.id}" for c in shopping_list.custom_categories}
     entries = []
@@ -1083,11 +1085,16 @@ def update_category_layout(list_id: int, data: CategoryLayoutUpdate, current_use
     keys = [e[0] for e in entries]
     if "other" in keys and keys[-1] != "other":
         raise HTTPException(status_code=400, detail='"אחר" חייבת להיות המחלקה האחרונה')
-    shopping_list.category_settings.clear()
-    db.flush()
-    for position, (key, name, icon) in enumerate(entries):
-        shopping_list.category_settings.append(models.ListCategorySetting(key=key, name=name, icon=icon, position=position))
-    db.commit()
+    try:
+        # ה-flush חייב לבוא לפני ההוספה: מוחק את השורות הישנות לפני שנכנסות החדשות (אילוץ ייחודיות)
+        shopping_list.category_settings.clear()
+        db.flush()
+        for position, (key, name, icon) in enumerate(entries):
+            shopping_list.category_settings.append(models.ListCategorySetting(key=key, name=name, icon=icon, position=position))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="המחלקות עודכנו במקביל, נסה שוב")
     db.refresh(shopping_list)
     return _categories_payload(shopping_list)
 

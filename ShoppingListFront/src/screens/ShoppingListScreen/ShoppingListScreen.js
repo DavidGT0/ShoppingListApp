@@ -774,7 +774,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const purchasedItems = visibleItems.filter(item => item.purchased);
   const categoryMode = sortMode === 'category';
 
-  // קבוצות לפי מחלקה, בסדר המעברים (מובנות, מותאמות, אחר)
+  // קבוצות לפי מחלקה, לפי הסדר ששמור בפריסת הרשימה (cat.order), "אחר" תמיד אחרונה
   const groups = [];
   if (categoryMode) {
     const byKey = new Map();

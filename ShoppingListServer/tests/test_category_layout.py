@@ -192,3 +192,45 @@ def test_duplicate_copies_layout_and_remaps_custom(client, register):
     assert new["layout"][1]["name"] == "Dogs"
     # המקור לא השתנה
     assert _keys(_get(client, alice, lid))[:3] == ["meat", old_key, "dairy"]
+
+
+def test_repeat_save_of_same_keys_and_get_layout_round_trips(client, register):
+    alice = register("alice")
+    lid = _make_list(client, alice)
+    body = [{"key": "dairy", "name": "Milk"}, {"key": "produce", "icon": "🍎"}, {"key": "other"}]
+    assert _put(client, alice, lid, body).status_code == 200
+    assert _put(client, alice, lid, body).status_code == 200
+    # תגובת ה-GET המלאה נשלחת בחזרה כגוף ה-PUT
+    layout = _get(client, alice, lid)["layout"]
+    r = _put(client, alice, lid, layout)
+    assert r.status_code == 200, r.text
+    assert _keys(r.json()) == _keys({"layout": layout})
+    assert _put(client, alice, lid, _get(client, alice, lid)["layout"]).status_code == 200
+
+
+def test_concurrent_save_conflict_returns_409(client, register, monkeypatch):
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.orm import Session
+    alice = register("alice")
+    lid = _make_list(client, alice)
+    real_commit = Session.commit
+
+    def boom(self):
+        raise IntegrityError("stmt", {}, Exception("unique"))
+
+    monkeypatch.setattr(Session, "commit", boom)
+    r = _put(client, alice, lid, [{"key": "dairy"}])
+    monkeypatch.setattr(Session, "commit", real_commit)
+    assert r.status_code == 409
+    assert r.json()["detail"] == "המחלקות עודכנו במקביל, נסה שוב"
+    assert _put(client, alice, lid, [{"key": "dairy"}]).status_code == 200
+
+
+def test_deleting_list_removes_layout_rows(client, register, db):
+    alice = register("alice")
+    lid = _make_list(client, alice)
+    _put(client, alice, lid, [{"key": "dairy", "name": "Milk"}, {"key": "meat"}])
+    assert db.query(models.ListCategorySetting).filter_by(list_id=lid).count() == 2
+    assert client.delete(f"/lists/{lid}", headers=alice).status_code == 200
+    db.expire_all()
+    assert db.query(models.ListCategorySetting).filter_by(list_id=lid).count() == 0
