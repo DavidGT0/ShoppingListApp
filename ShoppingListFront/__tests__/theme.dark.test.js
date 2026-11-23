@@ -7,6 +7,8 @@ import { ThemeProvider } from '../src/theme/ThemeContext';
 import MyListsScreen from '../src/screens/MyListsScreen/MyListsScreen';
 import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import SettingsScreen from '../src/screens/SettingsScreen/SettingsScreen';
+import OfflineBanner from '../src/components/OfflineBanner/OfflineBanner';
+import { dark } from '../src/theme/palettes';
 import LoginScreen from '../src/screens/LoginScreen/LoginScreen';
 
 jest.mock('react-native-draggable-flatlist', () => {
@@ -14,10 +16,11 @@ jest.mock('react-native-draggable-flatlist', () => {
   const { View } = require('react-native');
   return {
     __esModule: true,
-    default: ({ data, renderItem }) =>
+    default: ({ data, renderItem, ListHeaderComponent }) =>
       ReactLib.createElement(
         View,
         null,
+        ListHeaderComponent,
         data.map(item =>
           ReactLib.createElement(
             ReactLib.Fragment,
@@ -103,5 +106,24 @@ describe('dark mode screens', () => {
       expect(bgs).toContain('#0B1220');
       expect(bgs.filter(b => WHITES.includes(b))).toEqual([]);
     });
+  });
+
+  test('ShoppingList tip title uses the dark heading colour', async () => {
+    const tree = await renderDark(screens.ShoppingList);
+    const title = tree.root.findAll(
+      n => n.props.children === '💡 טיפ שימושי:' && n.props.style,
+    )[0];
+    const color = StyleSheet.flatten(title.props.style).color;
+    expect(color).toBe(dark.heading);
+    expect(color).not.toBe('#0F172A');
+  });
+
+  test('offline banner text stays dark on the warning background', async () => {
+    const tree = await renderDark(<OfflineBanner visible />);
+    const text = tree.root.findAll(
+      n => typeof n.props.children === 'string' && n.props.style,
+    )[0];
+    expect(StyleSheet.flatten(text.props.style).color).toBe(dark.onWarning);
+    expect(dark.onWarning).toBe('#212529');
   });
 });

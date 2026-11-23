@@ -30,7 +30,7 @@ export const makeStyles = colors => StyleSheet.create({
   backButton: {
     width: 44, // גודל קבוע כדי ליצור ריבוע/מלבן מדויק
     height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)', // רקע חצי שקוף כמו בתמונה (אם כבר יש לך צבע משלך, השאר אותו)
+    backgroundColor: colors.onPrimarySubtle,
     borderRadius: 12,
     justifyContent: 'center', // מרכוז אנכי של החץ בתוך הכפתור
     alignItems: 'center', // מרכוז אופקי של החץ בתוך הכפתור
@@ -50,7 +50,7 @@ export const makeStyles = colors => StyleSheet.create({
   themeToggle: {
     width: 44,
     height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: colors.onPrimarySubtle,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -61,7 +61,7 @@ export const makeStyles = colors => StyleSheet.create({
     gap: 4,
     height: 44,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: colors.onPrimarySubtle,
     borderRadius: 12,
   },
   membersButtonText: {
@@ -70,7 +70,7 @@ export const makeStyles = colors => StyleSheet.create({
     fontWeight: 'bold',
   },
   headerEyebrow: {
-    color: 'rgba(255,255,255,0.75)',
+    color: colors.onPrimaryMuted,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'right',
@@ -88,7 +88,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
+    color: colors.onPrimarySoft,
     textAlign: 'right',
     marginTop: 0,
     fontWeight: '500',
@@ -144,7 +144,7 @@ export const makeStyles = colors => StyleSheet.create({
   sortSegmentText: {
     fontSize: 14,
     marginRight: 6,
-    color: colors.primary,
+    color: colors.primaryText,
     fontWeight: '600',
   },
   sortSegmentTextActive: {
@@ -256,18 +256,18 @@ export const makeStyles = colors => StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: colors.navy,
+    color: colors.heading,
     marginBottom: 4,
     textAlign: 'right',
   },
   tipText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.text.secondary,
     lineHeight: 18,
     textAlign: 'right',
   },
   boldText: {
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text.primary,
   },
 });

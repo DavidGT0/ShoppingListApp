@@ -128,3 +128,23 @@ describe('ThemeProvider', () => {
     expect(makeStyles).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('contrast', () => {
+  const lum = hex => {
+    const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const l = c.map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  test('dark primaryText and heading meet AA on dark backgrounds', () => {
+    [dark.background, dark.surface].forEach(bg => {
+      expect(ratio(dark.primaryText, bg)).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(dark.heading, bg)).toBeGreaterThanOrEqual(4.5);
+    });
+    expect(ratio(dark.onWarning, dark.warning)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(light.primaryText, light.surface)).toBeGreaterThanOrEqual(4.5);
+  });
+});

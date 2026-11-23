@@ -61,7 +61,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   themeSegmentText: {
     fontSize: 14,
-    color: colors.primary,
+    color: colors.primaryText,
     fontWeight: '600',
   },
   themeSegmentTextActive: {
@@ -88,7 +88,7 @@ export const makeStyles = colors => StyleSheet.create({
   },
   editButtonText: {
     fontSize: 14,
-    color: colors.primary,
+    color: colors.primaryText,
     fontWeight: '600',
   },
   section: {
@@ -134,7 +134,7 @@ export const makeStyles = colors => StyleSheet.create({
     marginTop: 10,
   },
   actionButtonText: {
-    color: '#fff',
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -181,7 +181,7 @@ export const makeStyles = colors => StyleSheet.create({
     marginRight: 8,
   },
   saveButtonText: {
-    color: '#fff',
+    color: colors.text.inverse,
     fontSize: 16,
     fontWeight: '600',
   },

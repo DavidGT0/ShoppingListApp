@@ -13,6 +13,12 @@ export const light = {
   primaryDark: '#1557BF',
   secondary: '#1FC9A3',
   navy: '#0F172A',
+  heading: '#0F172A',
+  primaryText: '#1E6FE8',
+  onWarning: '#212529',
+  onPrimarySubtle: 'rgba(255, 255, 255, 0.15)',
+  onPrimaryMuted: 'rgba(255, 255, 255, 0.75)',
+  onPrimarySoft: 'rgba(255, 255, 255, 0.85)',
 
   // צבעי סטטוס
   success: '#1FC9A3',
@@ -60,6 +66,12 @@ export const dark = {
   primaryDark: '#1557BF',
   secondary: '#1FC9A3',
   navy: '#0F172A',
+  heading: '#E2E8F0',
+  primaryText: '#4C8DF0',
+  onWarning: '#212529',
+  onPrimarySubtle: 'rgba(255, 255, 255, 0.15)',
+  onPrimaryMuted: 'rgba(255, 255, 255, 0.75)',
+  onPrimarySoft: 'rgba(255, 255, 255, 0.85)',
 
   success: '#1FC9A3',
   successLight: '#81C784',

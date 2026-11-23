@@ -929,7 +929,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               <Icon
                 name={icon}
                 size={18}
-                color={selected ? colors.text.inverse : colors.primary}
+                color={selected ? colors.text.inverse : colors.primaryText}
               />
               <Text
                 style={[

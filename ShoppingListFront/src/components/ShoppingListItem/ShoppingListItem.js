@@ -238,7 +238,7 @@ const ShoppingListItem = ({
               accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(Math.max(1, item.amount - 1))}
             >
-              <Icon name="minus" size={16} color={colors.primary} />
+              <Icon name="minus" size={16} color={colors.primaryText} />
             </Pressable>
             <Text testID="item_amount" style={styles.amountText}>
               {item.unit ? `${item.amount} ${item.unit}` : String(item.amount)}
@@ -257,7 +257,7 @@ const ShoppingListItem = ({
               accessibilityState={{ disabled }}
               onPress={() => onUpdateAmount(item.amount + 1)}
             >
-              <Icon name="plus" size={16} color={colors.primary} />
+              <Icon name="plus" size={16} color={colors.primaryText} />
             </Pressable>
           </View>
 

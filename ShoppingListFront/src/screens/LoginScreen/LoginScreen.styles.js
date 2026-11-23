@@ -92,7 +92,7 @@ export const makeStyles = colors => StyleSheet.create({
     padding: 8,
   },
   switchButtonText: {
-    color: colors.primary,
+    color: colors.primaryText,
     fontSize: 15,
     fontWeight: '600',
   },

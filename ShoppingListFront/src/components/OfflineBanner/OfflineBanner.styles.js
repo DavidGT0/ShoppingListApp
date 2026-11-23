@@ -10,7 +10,7 @@ export const makeStyles = colors => StyleSheet.create({
     borderRadius: 10,
   },
   text: {
-    color: colors.text.primary,
+    color: colors.onWarning,
     fontSize: 13,
     textAlign: 'center',
   },

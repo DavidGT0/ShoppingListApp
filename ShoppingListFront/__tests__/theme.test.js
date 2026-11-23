@@ -23,13 +23,17 @@ describe('theme', () => {
     expect(colors.surfaceHighlight).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 
-  test('no hex literal outside theme/ and services/categories.js', () => {
-    const offenders = walk(SRC)
-      .filter(f => {
-        const rel = path.relative(SRC, f).split(path.sep).join('/');
-        return !rel.startsWith('theme/') && rel !== 'services/categories.js';
-      })
-      .filter(f => /#[0-9A-Fa-f]{6}\b/.test(fs.readFileSync(f, 'utf8')))
+  test('no color literals (hex or named) outside theme/ and services/categories.js', () => {
+    const files = [...walk(SRC), path.join(SRC, '..', 'App.js')].filter(f => {
+      const rel = path.relative(SRC, f).split(path.sep).join('/');
+      return !rel.startsWith('theme/') && rel !== 'services/categories.js';
+    });
+    const offenders = files
+      .filter(f =>
+        /#[0-9A-Fa-f]{3,8}\b|['"](white|black|gray|grey)['"]/i.test(
+          fs.readFileSync(f, 'utf8'),
+        ),
+      )
       .map(f => path.relative(SRC, f));
     expect(offenders).toEqual([]);
   });

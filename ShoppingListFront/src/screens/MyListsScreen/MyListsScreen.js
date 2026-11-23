@@ -408,7 +408,7 @@ const MyListsScreen = ({ navigation }) => {
               <Icon
                 name="cart-outline"
                 size={22}
-                color={colors.primary}
+                color={colors.primaryText}
                 style={styles.cardIcon}
               />
               <Text style={styles.listNameText}>{item.name}</Text>
