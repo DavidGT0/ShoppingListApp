@@ -173,7 +173,11 @@ const EditItemModal = ({
             />
 
             <Text style={styles.sectionTitle}>מחלקה</Text>
-            <ScrollView style={styles.chipsScroll} nestedScrollEnabled>
+            <ScrollView
+              style={styles.chipsScroll}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.chipsRow}>
                 {renderChip('auto', 'אוטומטי', null, null)}
                 {BUILTIN_CATEGORIES.filter(c => c.key !== 'other').map(c =>
