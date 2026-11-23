@@ -51,6 +51,12 @@ class ShoppingList(Base):
     # קוד הזמנה (אחד לכל רשימה, נמחק יחד איתה)
     invite = relationship("ListInvite", uselist=False, cascade="all, delete-orphan")
 
+    # מחלקות מותאמות אישית של הרשימה (נמחקות יחד איתה)
+    custom_categories = relationship(
+        "CustomCategory", back_populates="shopping_list",
+        cascade="all, delete-orphan", order_by="CustomCategory.id"
+    )
+
 
 class ShoppingItem(Base):
     __tablename__ = "items"
@@ -69,6 +75,20 @@ class ShoppingItem(Base):
 
     shopping_list = relationship("ShoppingList", back_populates="items")
     added_by = relationship("User", foreign_keys=[added_by_id])
+
+
+class CustomCategory(Base):
+    """מחלקה מותאמת אישית, שייכת לרשימה אחת. הערך בפריט: custom:<id>"""
+    __tablename__ = "custom_categories"
+    __table_args__ = (UniqueConstraint("list_id", "name", name="uq_custom_category_list_name"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    list_id = Column(Integer, ForeignKey('shopping_lists.id'), nullable=False, index=True)
+    name = Column(String(30), nullable=False)
+    color = Column(String(9), nullable=False)
+    created_at = Column(DateTime, nullable=False)  # UTC
+
+    shopping_list = relationship("ShoppingList", back_populates="custom_categories")
 
 
 class ItemHistory(Base):
