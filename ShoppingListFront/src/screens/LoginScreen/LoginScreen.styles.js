@@ -15,8 +15,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logoEmoji: {
-    fontSize: 80,
+  logoImage: {
+    width: 120,
+    height: 120,
     marginBottom: 16,
   },
   logoText: {

@@ -134,7 +134,7 @@ const SettingsScreen = ({ onLogout }) => {
   return (
     <ScrollView style={styles.container}>
       {/* ההגדרות הן לשונית בתפריט התחתון - אין צורך בכפתור "חזור" */}
-      <View style={styles.header}>
+      <View style={styles.header} testID="settings_header">
         <Text style={styles.title}>הגדרות</Text>
       </View>
 

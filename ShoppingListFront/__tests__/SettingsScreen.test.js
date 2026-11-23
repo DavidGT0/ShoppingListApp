@@ -72,3 +72,10 @@ test('a new password shorter than 4 characters is rejected before calling the se
   expect(alertSpy).toHaveBeenCalledWith('שגיאה', 'הסיסמה החדשה חייבת להכיל לפחות 4 תווים');
   alertSpy.mockRestore();
 });
+
+test('settings render the shared rounded header', async () => {
+  const tree = await renderSettings();
+  expect(
+    tree.root.findAll(n => n.props.testID === 'settings_header').length,
+  ).toBeGreaterThan(0);
+});

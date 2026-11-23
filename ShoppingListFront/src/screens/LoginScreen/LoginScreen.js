@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { styles } from './LoginScreen.styles';
 import { colors } from '../../theme/colors';
@@ -113,9 +114,14 @@ const LoginScreen = ({ onLoginSuccess }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.logoContainer}>
-          <Text style={styles.logoEmoji}>🛒</Text>
-          <Text style={styles.logoText}>רשימת הקניות שלי</Text>
-          <Text style={styles.subtitle}>נהל את הקניות בצורה חכמה</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+            testID="login_logo"
+          />
+          <Text style={styles.logoText}>ShopLi</Text>
+          <Text style={styles.subtitle}>רשימת הקניות המשפחתית</Text>
         </View>
 
         <View style={styles.formContainer}>

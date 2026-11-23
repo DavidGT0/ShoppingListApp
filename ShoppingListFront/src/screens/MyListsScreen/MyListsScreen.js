@@ -34,6 +34,7 @@ import {
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './MyListsScreen.styles';
 import { colors } from '../../theme/colors';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const MyListsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -398,6 +399,12 @@ const MyListsScreen = ({ navigation }) => {
               testID="list_card" // <-- מזהה לכרטיס רשימה כדי ללחוץ עליה
               accessibilityLabel="list_card"
             >
+              <Icon
+                name="cart-outline"
+                size={22}
+                color={colors.primary}
+                style={styles.cardIcon}
+              />
               <Text style={styles.listNameText}>{item.name}</Text>
             </TouchableOpacity>
 
@@ -416,7 +423,11 @@ const MyListsScreen = ({ navigation }) => {
               testID={`list_menu_${item.id}`}
               accessibilityLabel="list_menu_button"
             >
-              <Text style={styles.menuIcon}>⋮</Text>
+              <Icon
+                name="dots-vertical"
+                size={24}
+                color={colors.text.secondary}
+              />
             </TouchableOpacity>
           </View>
         )}

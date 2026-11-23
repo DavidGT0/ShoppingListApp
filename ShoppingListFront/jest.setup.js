@@ -13,3 +13,6 @@ jest.mock('react-native-reanimated', () =>
 jest.mock('react-native-safe-area-context', () =>
   require('react-native-safe-area-context/jest/mock').default,
 );
+
+// אייקוני וקטור: מוק שמציג רכיב 'Icon' עם ה-props (name וכו') כדי שאפשר לבדוק אותם
+jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');

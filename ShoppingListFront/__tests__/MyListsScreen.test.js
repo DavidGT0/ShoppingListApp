@@ -349,3 +349,20 @@ describe('MyListsScreen', () => {
     expect(listNames()).toContain('חדשה שלי');
   });
 });
+
+describe('MyListsScreen icons', () => {
+  test('cards show a cart icon and a dots-vertical menu icon, not emoji', async () => {
+    getShoppingLists.mockResolvedValue([
+      { id: 1, name: 'שלי', owner_id: 1, is_owner: true },
+    ]);
+    const { byTestId } = await renderScreen();
+    const names = tree.root
+      .findAll(n => n.type === 'Icon')
+      .map(n => n.props.name);
+    expect(names).toContain('cart-outline');
+    expect(names).toContain('dots-vertical');
+    const menu = byTestId('list_menu_1');
+    expect(menu.findAll(n => n.props.children === '⋮')).toHaveLength(0);
+    await act(async () => tree.unmount());
+  });
+});

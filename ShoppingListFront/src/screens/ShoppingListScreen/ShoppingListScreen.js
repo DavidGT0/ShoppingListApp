@@ -47,6 +47,7 @@ import {
 import useLiveRefresh from '../../hooks/useLiveRefresh';
 import { styles } from './ShoppingListScreen.styles';
 import { colors } from '../../theme/colors';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
 // כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
@@ -835,7 +836,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
             testID="members_button"
             accessibilityLabel="members_button"
           >
-            <Text style={styles.membersButtonText}>👥</Text>
+            <Icon
+              name="account-group"
+              size={22}
+              color={colors.text.inverse}
+            />
             {memberCount !== null && (
               <Text style={styles.membersButtonText}>{memberCount}</Text>
             )}
