@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 // גובה הגלילה שנחשב "בראש הרשימה"
 const TOP = 1;
@@ -37,40 +37,17 @@ const initialState = () => ({
 // או מ-onOffset (המיכל המקונן דורס onScroll; NestableOffsetObserver קורא את הגלילה שלו).
 // מיקום שהתיישן מתוקן: מגע שקוטע תנופה (שאירוע הסיום שלה לא יגיע) מחזיר לראש,
 // ותוכן שהתקצר מתחת לגובה החלון מצמצם את המיקום
-// TEMP: אבחון השער (לוג ל-logcat בתור ReactNativeJS). להסרה עם ה-revert של הקומיט הזה
-const gateLog = (...args) => console.log('[gate]', ...args);
-
 const useGatedRefresh = (refreshing = false) => {
   const state = useRef(initialState());
   const [atRestOpen, setAtRestOpen] = useState(true);
   const openRef = useRef(true);
-  // TEMP: לאבחון בלבד
-  const refreshingRef = useRef(refreshing);
-  refreshingRef.current = refreshing;
-  const counters = useRef({ scroll: 0, observer: 0 });
 
   const core = useMemo(() => {
-    // TEMP: מצב השער אחרי כל אירוע
-    const snapshot = () => {
-      const s = state.current;
-      const open = s.offset <= TOP && !(s.dragging && !s.dragAtTop);
-      return JSON.stringify({
-        offset: Math.round(s.offset * 10) / 10,
-        dragging: s.dragging,
-        dragFromTop: s.dragAtTop,
-        leftTop: s.dragging && !s.dragAtTop,
-        momentum: s.momentum,
-        refreshing: refreshingRef.current,
-        enabled: refreshingRef.current || open,
-      });
-    };
-    const update = (event, detail) => {
+    const update = () => {
       const s = state.current;
       const next = s.offset <= TOP && !(s.dragging && !s.dragAtTop);
-      if (event) gateLog(event, detail === undefined ? '' : detail, snapshot());
       // עדכון מצב רק כשהערך משתנה
       if (next !== openRef.current) {
-        gateLog('open changed ->', next, snapshot());
         openRef.current = next;
         setAtRestOpen(next);
       }
@@ -82,16 +59,12 @@ const useGatedRefresh = (refreshing = false) => {
       }
     };
     // מיקום באמצע גרירה: תוכן שעזב את הראש סוגר את הגרירה הזו עד שהאצבע עוזבת
-    const onOffset = (y, source = 'observer') => {
+    const onOffset = y => {
       if (typeof y !== 'number') return;
       const s = state.current;
-      // TEMP: לוג רק כשחוצים את גבול ה-1px, או כל אירוע עשירי
-      const crossed = s.offset <= TOP !== y <= TOP;
-      counters.current[source] = (counters.current[source] || 0) + 1;
-      const loud = crossed || counters.current[source] % 10 === 0;
       s.offset = y;
       if (s.dragging && y > TOP) s.dragAtTop = false;
-      update(loud ? source : null, y);
+      update();
     };
     const scrollHandlers = {
       // מגע חדש עוצר תנופה. אם הייתה תנופה בדרך, אירוע הסיום שלה עלול לא להגיע
@@ -104,14 +77,7 @@ const useGatedRefresh = (refreshing = false) => {
         }
         s.dragging = false;
         s.dragAtTop = true;
-        update('touchStart');
-      },
-      // TEMP: לאבחון בלבד (בלי שינוי מצב)
-      onTouchEnd: () => {
-        update('touchEnd');
-      },
-      onTouchCancel: () => {
-        update('touchCancel');
+        update();
       },
       onScrollBeginDrag: event => {
         const s = state.current;
@@ -119,26 +85,26 @@ const useGatedRefresh = (refreshing = false) => {
         s.momentum = false;
         s.dragging = true;
         s.dragAtTop = s.offset <= TOP;
-        update('beginDrag', offsetOf(event));
+        update();
       },
       onScrollEndDrag: event => {
         const s = state.current;
         s.offset = offsetOf(event);
         s.dragging = false;
         s.dragAtTop = true;
-        update('endDrag', offsetOf(event));
+        update();
       },
       onMomentumScrollBegin: event => {
         const s = state.current;
         s.offset = offsetOf(event);
         s.momentum = true;
-        update('momentumBegin', offsetOf(event));
+        update();
       },
       onMomentumScrollEnd: event => {
         const s = state.current;
         s.offset = offsetOf(event);
         s.momentum = false;
-        update('momentumEnd', offsetOf(event));
+        update();
       },
       onLayout: event => {
         const height = event?.nativeEvent?.layout?.height;
@@ -158,18 +124,11 @@ const useGatedRefresh = (refreshing = false) => {
       scrollHandlers,
       onOffset,
       scrollTracking: {
-        onScroll: event => onOffset(offsetOf(event), 'scroll'),
+        onScroll: event => onOffset(offsetOf(event)),
         scrollEventThrottle: 16,
       },
-      describe: snapshot,
     };
   }, []);
-
-  // TEMP: כל שינוי בערך הסופי של enabled (כולל refreshing)
-  const finalEnabled = refreshing || atRestOpen;
-  useEffect(() => {
-    gateLog('enabled ->', finalEnabled, core.describe());
-  }, [finalEnabled, core]);
 
   // רשימה חדשה הוצגה (למשל החלפת מצב מיון): מתחילים שוב מראש הרשימה
   const reset = useCallback(() => {
@@ -186,8 +145,6 @@ const useGatedRefresh = (refreshing = false) => {
     scrollTracking: core.scrollTracking,
     onOffset: core.onOffset,
     reset,
-    // TEMP: מצב השער ללוג של onRefresh
-    describeGate: core.describe,
   };
 };
 

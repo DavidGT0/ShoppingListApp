@@ -67,7 +67,6 @@ const MyListsScreen = ({ navigation }) => {
     enabled: refreshEnabled,
     scrollHandlers: refreshScrollHandlers,
     scrollTracking: refreshScrollTracking,
-    describeGate,
   } = useGatedRefresh(refreshing);
   // יש כבר רשימות על המסך - מטמון לא דורס אותן, הוא רק מעביר למצב לא מקוון
   const hasLists = useRef(false);
@@ -144,8 +143,6 @@ const MyListsScreen = ({ navigation }) => {
   useLiveRefresh(refreshLists, 15000);
 
   const handlePullToRefresh = async () => {
-    // TEMP: אבחון השער
-    console.log('[gate]', 'onRefresh', 'MyLists', describeGate());
     setRefreshing(true);
     try {
       // הספינר נשאר גלוי זמן מינימלי; שגיאה נזרקת אחרי ההמתנה ומטופלת כאן כרגיל

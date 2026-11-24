@@ -442,7 +442,6 @@ const ShoppingListScreen = ({ route, navigation }) => {
     scrollTracking: refreshScrollTracking,
     onOffset: onRefreshOffset,
     reset: resetRefreshGate,
-    describeGate,
   } = useGatedRefresh(refreshing);
   // החלפת מצב מציגה רשימה אחרת, שמתחילה בראש
   useEffect(() => {
@@ -450,13 +449,6 @@ const ShoppingListScreen = ({ route, navigation }) => {
   }, [sortMode, resetRefreshGate]);
 
   const handleRefresh = async () => {
-    // TEMP: אבחון השער
-    console.log(
-      '[gate]',
-      'onRefresh',
-      `ShoppingList(${sortMode === 'category' ? 'category' : 'manual'})`,
-      describeGate(),
-    );
     setRefreshing(true);
     try {
       // הספינר נשאר גלוי זמן מינימלי, גם כשהשרת עונה מהר

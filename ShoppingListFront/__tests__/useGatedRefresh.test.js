@@ -50,8 +50,6 @@ describe('useGatedRefresh', () => {
       'onMomentumScrollEnd',
       'onScrollBeginDrag',
       'onScrollEndDrag',
-      'onTouchCancel',
-      'onTouchEnd',
       'onTouchStart',
     ]);
   });
