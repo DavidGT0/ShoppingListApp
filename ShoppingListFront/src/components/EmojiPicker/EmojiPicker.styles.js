@@ -66,6 +66,12 @@ export const makeStyles = colors =>
       alignItems: 'center',
       paddingHorizontal: 12,
     },
+    // ברירת המחדל נבחרה: מסגרת בצבע הראשי, כמו אמוג'י נבחר
+    actionButtonActive: {
+      borderWidth: 2,
+      borderColor: colors.primary,
+      backgroundColor: colors.surfaceHighlight,
+    },
     actionText: {
       color: colors.primaryText,
       fontSize: 15,

@@ -1,5 +1,5 @@
-// מצב מסך עריכת המחלקות: כל המפתחות של הפריסה (גם מחלקות שלא מוצגות), השורות
-// עם השינויים (שם/אייקון, null = ברירת המחדל), והסדר של השורות המוצגות
+// מצב מסך עריכת המחלקות: השורות עם השינויים (שם/אייקון, null = ברירת המחדל)
+// והסדר של כל המחלקות (בלי "אחר", שתמיד אחרונה)
 import { BUILTIN_CATEGORIES, customKey } from '../../services/categories';
 
 export const OTHER_KEY = 'other';
@@ -22,8 +22,14 @@ export const newCustomRow = customRow;
 export const displayName = row => row.name || row.defaultName;
 export const displayIcon = row => row.icon || row.defaultIcon;
 
-// מהתשובה של GET: {custom, layout}. usedKeys = המחלקות שיש בהן מוצרים ברשימה
-export const buildEditorState = ({ custom = [], layout = [] } = {}, usedKeys = []) => {
+const byPosition = layout =>
+  [...layout]
+    .filter(Boolean)
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+// מהתשובה של GET: {custom, layout}. כל המחלקות מוצגות (גם מובנות בלי מוצרים),
+// כדי שאפשר יהיה לתכנן את המסלול מראש
+export const buildEditorState = ({ custom = [], layout = [] } = {}) => {
   const defaults = new Map();
   BUILTIN_CATEGORIES.forEach(c =>
     defaults.set(c.key, {
@@ -41,9 +47,8 @@ export const buildEditorState = ({ custom = [], layout = [] } = {}, usedKeys = [
 
   const rows = {};
   const keys = [];
-  [...layout]
-    .filter(e => e && defaults.has(e.key))
-    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+  byPosition(layout)
+    .filter(e => defaults.has(e.key))
     .forEach(e => {
       if (rows[e.key]) return;
       rows[e.key] = {
@@ -60,44 +65,77 @@ export const buildEditorState = ({ custom = [], layout = [] } = {}, usedKeys = [
       keys.push(key);
     }
   });
-  const allKeys = [...keys.filter(k => k !== OTHER_KEY), OTHER_KEY];
-
-  const used = new Set(usedKeys);
-  const order = allKeys.filter(key => {
-    if (key === OTHER_KEY) return false;
-    const row = rows[key];
-    return row.isCustom || used.has(key) || !!row.name || !!row.icon;
-  });
-  return { allKeys, rows, order };
+  return { rows, order: keys.filter(k => k !== OTHER_KEY) };
 };
 
-// הסדר המלא לשמירה: המחלקות המוצגות חוזרות למקומות שלהן בסדר החדש, והמוסתרות
-// נשארות במקומן. "אחר" תמיד אחרונה
-export const mergeOrder = (allKeys, order) => {
-  const shown = new Set(order);
-  const result = [...allKeys];
-  let next = 0;
-  allKeys.forEach((key, index) => {
-    if (shown.has(key)) result[index] = order[next++];
+const entryOf = (key, row) => ({
+  key,
+  name: row.name || null,
+  icon: row.icon || null,
+});
+
+// גוף הבקשה של PUT: כל המפתחות בסדר החדש, עם השם והאייקון (null = ברירת המחדל).
+// extra: רשומות מוכנות שנוספות לפני "אחר" (מחלקות שמשתתף אחר הוסיף בינתיים)
+export const layoutPayload = (order, rows, extra = []) => [
+  ...order.filter(key => rows[key]).map(key => entryOf(key, rows[key])),
+  ...extra,
+  entryOf(OTHER_KEY, rows[OTHER_KEY] || {}),
+];
+
+// האם יש שינוי שלא נשמר לעומת נקודת ההשוואה (הסדר, או שם/אייקון של שורה)
+export const isDirty = (baseline, order, rows) => {
+  if (!baseline) return false;
+  if (order.length !== baseline.order.length) return true;
+  if (order.some((key, i) => key !== baseline.order[i])) return true;
+  return Object.keys(rows).some(key => {
+    const before = baseline.rows[key];
+    return (
+      !before ||
+      (before.name || null) !== (rows[key].name || null) ||
+      (before.icon || null) !== (rows[key].icon || null)
+    );
   });
-  return [...result.filter(k => k !== OTHER_KEY), OTHER_KEY];
 };
 
-// גוף הבקשה של PUT: כל המפתחות, עם השם והאייקון (null = ברירת המחדל)
-export const layoutPayload = (allKeys, order, rows) =>
-  mergeOrder(allKeys, order).map(key => ({
-    key,
-    name: rows[key].name || null,
-    icon: rows[key].icon || null,
-  }));
+// חתימת המחלקות בשרת, בלי המפתחות שאני הוספתי או מחקתי (הם כבר חלים בשרת)
+const signature = ({ custom = [], layout = [] } = {}, mine) =>
+  JSON.stringify({
+    layout: byPosition(layout)
+      .filter(e => !mine.has(e.key))
+      .map(e => [e.key, e.name || null, e.icon || null]),
+    custom: custom
+      .filter(c => !mine.has(customKey(c.id)))
+      .map(c => [c.id, c.name, c.icon || null])
+      .sort((a, b) => a[0] - b[0]),
+  });
+
+// האם משתתף אחר שינה את המחלקות מאז שהמסך נטען (שם, אייקון, סדר, הוספה או מחיקה)
+export const serverChanged = (snapshot, fresh, mine = new Set()) =>
+  signature(snapshot, mine) !== signature(fresh, mine);
+
+// מחלקות שקיימות בשרת ואין לי (משתתף אחר הוסיף), כרשומות לשמירה
+export const serverOnlyEntries = (fresh, rows) => {
+  const layout = new Map(
+    byPosition(fresh?.layout || []).map(e => [e.key, e]),
+  );
+  return (fresh?.custom || [])
+    .map(c => customKey(c.id))
+    .filter(key => !rows[key])
+    .map(key => {
+      const e = layout.get(key);
+      return { key, name: e?.name || null, icon: e?.icon || null };
+    });
+};
 
 const normalizeName = value => (value || '').trim().toLowerCase();
 
-// האם השם כבר מוצג למחלקה אחרת (לפי השם המוצג, לא השם הגולמי)
-export const nameTaken = (rows, name, exceptKey = null) => {
+// המחלקה (אחרת) שכבר מוצגת בשם הזה, לפי השם המוצג ולא השם הגולמי
+export const findClash = (rows, name, exceptKey = null) => {
   const wanted = normalizeName(name);
-  return Object.values(rows).some(
-    row => row.key !== exceptKey && normalizeName(displayName(row)) === wanted,
+  return (
+    Object.values(rows).find(
+      row => row.key !== exceptKey && normalizeName(displayName(row)) === wanted,
+    ) || null
   );
 };
 

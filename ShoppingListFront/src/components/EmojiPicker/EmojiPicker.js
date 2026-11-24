@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { makeStyles } from './EmojiPicker.styles';
 import { useStyles } from '../../theme/ThemeContext';
 
-// סט קבוע של אייקונים לאוכל ולבית, עם מילה בעברית לקורא המסך
+// סט קבוע של אייקונים לאוכל ולבית, עם מילה בעברית לקורא המסך.
+// רק אמוג'י מגרסה 5.0 ומטה: אנדרואיד לפני 10 מציג ריבוע ריק במקום גרסה 11 ומעלה
 export const EMOJI_OPTIONS = [
   ['🥦', 'ברוקולי'],
   ['🥕', 'גזר'],
@@ -25,23 +26,23 @@ export const EMOJI_OPTIONS = [
   ['🥫', 'שימורים'],
   ['🍝', 'פסטה'],
   ['🍚', 'אורז'],
-  ['🧂', 'תבלינים'],
-  ['🧊', 'קפואים'],
-  ['❄️', 'שלג'],
+  ['🍯', 'דבש'],
+  ['❄️', 'קפואים'],
+  ['🍨', 'קינוח'],
   ['🍦', 'גלידה'],
   ['🥤', 'משקה'],
-  ['🧃', 'מיץ'],
+  ['🍵', 'תה'],
   ['☕', 'קפה'],
   ['🍷', 'יין'],
   ['🍺', 'בירה'],
   ['🍫', 'שוקולד'],
   ['🍪', 'עוגייה'],
   ['🍬', 'ממתקים'],
-  ['🧽', 'ספוג'],
-  ['🧴', 'תכשיר'],
-  ['🧻', 'נייר'],
-  ['🧼', 'סבון'],
-  ['🧺', 'כביסה'],
+  ['🏠', 'בית'],
+  ['💄', 'טיפוח'],
+  ['🚽', 'שירותים'],
+  ['🛁', 'אמבטיה'],
+  ['👕', 'בגדים'],
   ['🍼', 'תינוקות'],
   ['💊', 'תרופות'],
   ['🐾', 'חיות מחמד'],
@@ -50,9 +51,11 @@ export const EMOJI_OPTIONS = [
   ['🛒', 'עגלה'],
 ];
 
-// בחירת אייקון למחלקה. onReset (לא חובה) מחזיר את אייקון ברירת המחדל
+// בחירת אייקון למחלקה. onReset (לא חובה) מחזיר את אייקון ברירת המחדל;
+// selected ריק = ברירת המחדל נבחרה, ואז מסומנת האפשרות הזו ולא אמוג'י
 const EmojiPicker = ({ visible, selected, onSelect, onReset, onClose }) => {
   const styles = useStyles(makeStyles);
+  const defaultSelected = !!onReset && !selected;
   return (
     <Modal
       visible={visible}
@@ -88,11 +91,15 @@ const EmojiPicker = ({ visible, selected, onSelect, onReset, onClose }) => {
             {onReset ? (
               <TouchableOpacity
                 testID="emoji_default"
-                style={styles.actionButton}
+                style={[
+                  styles.actionButton,
+                  defaultSelected && styles.actionButtonActive,
+                ]}
                 onPress={onReset}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel="אייקון ברירת המחדל"
+                accessibilityState={{ selected: defaultSelected }}
               >
                 <Text style={styles.actionText}>אייקון ברירת המחדל</Text>
               </TouchableOpacity>

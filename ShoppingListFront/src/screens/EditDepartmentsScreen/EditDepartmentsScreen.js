@@ -33,23 +33,29 @@ import {
   layoutPayload,
   displayName,
   displayIcon,
-  nameTaken,
+  findClash,
   nameOverride,
   moveKey,
   newCustomRow,
+  isDirty,
+  serverChanged,
+  serverOnlyEntries,
 } from './departmentsModel';
 import { makeStyles } from './EditDepartmentsScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 
 const OFFLINE_HINT = 'לא זמין ללא חיבור לאינטרנט';
-const TAKEN = ['שים לב', 'המחלקה כבר קיימת ברשימה'];
+const BUSY_HINT = 'ממתין לסיום הפעולה';
 // הזזה בצעד אחד מקורא המסך (גרירה קשה עם TalkBack)
 const MOVE_ACTIONS = [
   { name: 'moveUp', label: 'הזזה למעלה' },
   { name: 'moveDown', label: 'הזזה למטה' },
 ];
 const HANDLE_HIT_SLOP = { top: 6, bottom: 6, left: 8, right: 8 };
-const NO_KEYS = [];
+
+// הודעה שנוקבת בשם המחלקה שכבר קיימת
+const alertTaken = row =>
+  Alert.alert('שים לב', `קיימת כבר מחלקה בשם "${displayName(row)}"`);
 
 // עריכת המחלקות של רשימה: סדר (גרירה), שם ואייקון, הוספה ומחיקה של מחלקות שנוספו.
 // הסדר, השמות והאייקונים נשמרים בבקשת PUT אחת ב"סיום". הוספה ומחיקה חלות מיד (כמו היום).
@@ -58,13 +64,11 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { listId, listName, usedKeys = NO_KEYS } = route?.params || {};
+  const { listId, listName } = route?.params || {};
 
   const [loading, setLoading] = useState(true);
-  // כל המפתחות של הפריסה, גם מחלקות שלא מוצגות: כולם נשלחים בשמירה
-  const [allKeys, setAllKeys] = useState([]);
   const [rows, setRows] = useState({});
-  // סדר המחלקות המוצגות (בלי "אחר", שתמיד אחרונה)
+  // סדר כל המחלקות (בלי "אחר", שתמיד אחרונה)
   const [order, setOrder] = useState([]);
   // { key, text, icon } - שורה בעריכת שם/אייקון
   const [editing, setEditing] = useState(null);
@@ -76,6 +80,26 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   const savingRef = useRef(false);
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
+  // הוספות ומחיקות שעוד בדרך: "סיום" ממתין להן (ספינר), כדי שה-PUT יכלול אותן
+  const [inFlight, setInFlight] = useState(0);
+  const inFlightRef = useRef(0);
+  // המסך עדיין מוצג: אחרי סגירה לא מעדכנים מצב
+  const mounted = useRef(true);
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
+
+  // נקודת ההשוואה לשינויים שלא נשמרו (הוספה ומחיקה מעדכנות אותה, כי הן חלות מיד)
+  const baseline = useRef(null);
+  // המחלקות בשרת כשהמסך נטען, והמפתחות שאני הוספתי או מחקתי מאז:
+  // לפני השמירה בודקים שמשתתף אחר לא שינה אותן בינתיים
+  const snapshot = useRef(null);
+  const mine = useRef(new Set());
+  // יציאה מכוונת (אחרי שמירה, או "בטל שינויים"): בלי שאלה
+  const leaving = useRef(false);
 
   // מצב לא מקוון (כמו במסך הרשימה): ה-ref משקף את הערך לפונקציות שנתפסו קודם
   const [isOffline, setIsOffline] = useState(false);
@@ -111,6 +135,23 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
     pendingMutations.current--;
   };
 
+  const leave = () => {
+    leaving.current = true;
+    navigation.goBack();
+  };
+
+  // מחליף את כל המצב בגרסה מהשרת (טעינה ראשונה, או "טען את הגרסה העדכנית")
+  const applyServerState = data => {
+    const state = buildEditorState(data);
+    setRows(state.rows);
+    setOrder(state.order);
+    setEditing(null);
+    setAdding(null);
+    baseline.current = { order: state.order, rows: state.rows };
+    snapshot.current = data;
+    mine.current = new Set();
+  };
+
   useEffect(() => {
     let cancelled = false;
     const version = mutationVersion.current;
@@ -124,10 +165,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
         if (pendingMutations.current > 0 || version !== mutationVersion.current) {
           return;
         }
-        const state = buildEditorState(normalizeCategories(data), usedKeys);
-        setAllKeys(state.allKeys);
-        setRows(state.rows);
-        setOrder(state.order);
+        applyServerState(normalizeCategories(data));
         if (fromCache) setOffline(true);
       } catch (error) {
         if (cancelled || error.sessionExpired) return;
@@ -138,7 +176,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
           Alert.alert('שגיאה', error.message || 'לא הצלחנו לטעון את המחלקות');
         }
         // 403/404: מסך הרשימה מציג את ההודעה כשהוא מתרענן
-        navigation.goBack();
+        leave();
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -151,14 +189,30 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   }, [listId]);
 
   const offlineHint = isOffline ? OFFLINE_HINT : undefined;
+  const busy = saving || inFlight > 0;
+
+  // שינויים שלא נשמרו: סדר, שם או אייקון, שורה פתוחה לעריכה ששונתה, או טקסט בטופס ההוספה
+  const editingChanged =
+    !!editing &&
+    !!rows[editing.key] &&
+    (nameOverride(rows[editing.key], editing.text) !==
+      (rows[editing.key].name || null) ||
+      (editing.icon || null) !== (rows[editing.key].icon || null));
+  const dirty =
+    isDirty(baseline.current, order, rows) ||
+    editingChanged ||
+    !!adding?.text?.trim();
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
 
   // השורות אחרי אישור השם שבעריכה, או null אם השם כבר תפוס
   const applyEdit = current => {
     if (!editing || !current[editing.key]) return current;
     const row = current[editing.key];
     const name = nameOverride(row, editing.text);
-    if (nameTaken(current, name || row.defaultName, row.key)) {
-      Alert.alert(...TAKEN);
+    const clash = findClash(current, name || row.defaultName, row.key);
+    if (clash) {
+      alertTaken(clash);
       return null;
     }
     return { ...current, [row.key]: { ...row, name, icon: editing.icon } };
@@ -202,6 +256,18 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
     if (delta) setOrder(prev => moveKey(prev, key, delta));
   };
 
+  // הוספה ומחיקה שעוד בדרך (נספרות כדי ש"סיום" ימתין להן)
+  const beginRequest = () => {
+    inFlightRef.current++;
+    setInFlight(inFlightRef.current);
+    startMutation();
+  };
+  const finishRequest = () => {
+    inFlightRef.current--;
+    endMutation();
+    if (mounted.current) setInFlight(inFlightRef.current);
+  };
+
   const openAdd = () => {
     if (blockIfOffline()) return;
     setAdding({ text: '', icon: DEFAULT_ICON });
@@ -212,62 +278,72 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
     const name = adding.text.trim();
     if (!name) return;
     if (blockIfOffline()) return;
-    if (nameTaken(rows, name)) {
-      Alert.alert(...TAKEN);
+    const clash = findClash(rows, name);
+    if (clash) {
+      alertTaken(clash);
       return;
     }
     const icon = adding.icon || DEFAULT_ICON;
     creatingRef.current = true;
     setCreating(true);
-    startMutation();
+    beginRequest();
     try {
       const created = await createListCategory(listId, name, icon);
       const row = newCustomRow({ ...created, icon: created.icon || icon });
+      mine.current.add(row.key);
+      // המחלקה כבר נוספה בשרת: חלק מנקודת ההשוואה, לא שינוי שלא נשמר
+      baseline.current = {
+        order: [...baseline.current.order.filter(k => k !== row.key), row.key],
+        rows: { ...baseline.current.rows, [row.key]: row },
+      };
+      if (!mounted.current) return;
       setRows(prev => ({ ...prev, [row.key]: row }));
-      setAllKeys(prev => [
-        ...prev.filter(k => k !== OTHER_KEY && k !== row.key),
-        row.key,
-        OTHER_KEY,
-      ]);
       setOrder(prev => [...prev.filter(k => k !== row.key), row.key]);
       setAdding(null);
     } catch (error) {
-      if (error.sessionExpired) return;
+      if (!mounted.current || error.sessionExpired) return;
       if (failedOffline(error)) return;
       if (error.status === 403 || error.status === 404) {
-        navigation.goBack();
+        leave();
         return;
       }
       Alert.alert('שגיאה', error.message || 'לא הצלחנו ליצור את המחלקה');
     } finally {
       creatingRef.current = false;
-      setCreating(false);
-      endMutation();
+      if (mounted.current) setCreating(false);
+      finishRequest();
     }
   };
 
   const deleteDepartment = async row => {
     if (blockIfOffline()) return;
-    startMutation();
+    beginRequest();
     try {
       await deleteListCategory(listId, row.catId);
     } catch (error) {
       // 404 - כבר נמחקה (למשל על ידי משתתף אחר): נחשב הצלחה
       if (error.status !== 404) {
-        if (error.sessionExpired) return;
+        if (!mounted.current || error.sessionExpired) return;
         if (failedOffline(error)) return;
         if (error.status === 403) {
-          navigation.goBack();
+          leave();
           return;
         }
         Alert.alert('שגיאה', 'לא הצלחנו למחוק את המחלקה');
         return;
       }
     } finally {
-      endMutation();
+      finishRequest();
     }
+    mine.current.add(row.key);
+    const baseRows = { ...baseline.current.rows };
+    delete baseRows[row.key];
+    baseline.current = {
+      order: baseline.current.order.filter(k => k !== row.key),
+      rows: baseRows,
+    };
+    if (!mounted.current) return;
     setOrder(prev => prev.filter(k => k !== row.key));
-    setAllKeys(prev => prev.filter(k => k !== row.key));
     setRows(prev => {
       const next = { ...prev };
       delete next[row.key];
@@ -295,9 +371,49 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
     );
   };
 
-  // "סיום": PUT אחד עם כל המפתחות, וחזרה רק אחרי שהשמירה הצליחה
+  // שגיאה בקריאה החוזרת או בשמירה: נשארים במסך (חוץ מגישה שאבדה)
+  const failSave = (error, fallback) => {
+    savingRef.current = false;
+    if (!mounted.current) return;
+    setSaving(false);
+    if (error.sessionExpired) return;
+    if (failedOffline(error)) return;
+    if (error.status === 403 || error.status === 404) {
+      leave();
+      return;
+    }
+    // 409 (שמירה במקביל) ו-400: הודעת השרת
+    Alert.alert('שגיאה', error.message || fallback);
+  };
+
+  // PUT אחד, וחזרה רק אחרי שהשמירה הצליחה (savingRef כבר דלוק)
+  const putLayout = async payload => {
+    startMutation();
+    try {
+      await saveCategoryLayout(listId, payload);
+      // נשאר "שומר" עד שהמסך נסגר, כדי שלחיצה נוספת לא תשלח שוב
+      if (mounted.current) leave();
+    } catch (error) {
+      failSave(error, 'לא הצלחנו לשמור את המחלקות');
+    } finally {
+      endMutation();
+    }
+  };
+
+  // "שמור את שלי בכל זאת" מתוך שאלת העדכון המקביל
+  const saveMineAnyway = payload => {
+    if (savingRef.current) return;
+    if (blockIfOffline()) return;
+    savingRef.current = true;
+    setSaving(true);
+    putLayout(payload);
+  };
+
+  // "סיום": קריאה חוזרת של המחלקות, ואם אף אחד לא שינה אותן בינתיים - PUT אחד
   const handleDone = async () => {
     if (savingRef.current) return;
+    // הוספה או מחיקה בדרך: הכפתור מציג ספינר, והלחיצה לא שולחת כלום
+    if (inFlightRef.current > 0) return;
     if (blockIfOffline()) return;
     let nextRows = rows;
     if (editing) {
@@ -306,28 +422,71 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
       setRows(nextRows);
       setEditing(null);
     }
+    const nextOrder = order;
     savingRef.current = true;
     setSaving(true);
-    startMutation();
+    let fresh;
     try {
-      await saveCategoryLayout(listId, layoutPayload(allKeys, order, nextRows));
-      // נשאר "שומר" עד שהמסך נסגר, כדי שלחיצה נוספת לא תשלח שוב
-      navigation.goBack();
+      fresh = normalizeCategories(await getListCategories(listId));
     } catch (error) {
+      failSave(error, 'לא הצלחנו לשמור את המחלקות');
+      return;
+    }
+    if (!mounted.current) return;
+    if (serverChanged(snapshot.current, fresh, mine.current)) {
       savingRef.current = false;
       setSaving(false);
-      if (error.sessionExpired) return;
-      if (failedOffline(error)) return;
-      if (error.status === 403 || error.status === 404) {
-        navigation.goBack();
-        return;
-      }
-      // 409 (שמירה במקביל) ו-400: הודעת השרת, ונשארים במסך
-      Alert.alert('שגיאה', error.message || 'לא הצלחנו לשמור את המחלקות');
-    } finally {
-      endMutation();
+      Alert.alert(
+        'המחלקות עודכנו על ידי מישהו אחר',
+        'משתתף אחר שינה את המחלקות בזמן שערכת. מה לעשות עם השינויים שלך?',
+        [
+          { text: 'ביטול', style: 'cancel' },
+          {
+            text: 'טען את הגרסה העדכנית',
+            onPress: () => {
+              if (mounted.current) applyServerState(fresh);
+            },
+          },
+          {
+            text: 'שמור את שלי בכל זאת',
+            onPress: () =>
+              saveMineAnyway(
+                layoutPayload(
+                  nextOrder,
+                  nextRows,
+                  serverOnlyEntries(fresh, nextRows),
+                ),
+              ),
+          },
+        ],
+      );
+      return;
     }
+    await putLayout(layoutPayload(nextOrder, nextRows));
   };
+
+  // יציאה (חץ החזרה או כפתור החזרה של המכשיר) עם שינויים שלא נשמרו: שואלים
+  const handleDoneRef = useRef(handleDone);
+  handleDoneRef.current = handleDone;
+  useEffect(() => {
+    const unsubscribe = navigation?.addListener?.('beforeRemove', e => {
+      if (leaving.current || !dirtyRef.current) return;
+      e.preventDefault();
+      Alert.alert('לשמור את השינויים?', 'יש שינויים במחלקות שעוד לא נשמרו.', [
+        { text: 'המשך לערוך', style: 'cancel' },
+        {
+          text: 'בטל שינויים',
+          style: 'destructive',
+          onPress: () => {
+            leaving.current = true;
+            navigation.dispatch(e.data.action);
+          },
+        },
+        { text: 'שמור', onPress: () => handleDoneRef.current() },
+      ]);
+    });
+    return () => unsubscribe?.();
+  }, [navigation]);
 
   const renderRow = (row, { drag, isActive = false, pinned = false } = {}) => {
     const isEditing = editing?.key === row.key;
@@ -566,9 +725,12 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="סיום"
-            accessibilityHint={offlineHint || 'שמירת הסדר, השמות והאייקונים'}
+            accessibilityHint={
+              offlineHint ||
+              (busy ? BUSY_HINT : 'שמירת הסדר, השמות והאייקונים')
+            }
           >
-            {saving ? (
+            {busy ? (
               <ActivityIndicator size="small" color={colors.text.inverse} />
             ) : (
               <Text style={styles.doneText}>סיום</Text>
@@ -591,6 +753,9 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
 
       <OfflineBanner visible={isOffline} />
 
+      {/* בלי dragHitSlop: במסך הרשימה הוא מגביל את תחילת הגרירה לרצועת הידית כדי
+          שהמשיכה לריענון לא תיבלע. כאן אין RefreshControl, והגרירה מתחילה רק
+          בלחיצה ארוכה על הידית, כך שאין מה להגן עליו */}
       <DraggableFlatList
         testID="edit_departments_list"
         data={data}
@@ -612,11 +777,8 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
 
       <EmojiPicker
         visible={!!picker}
-        selected={
-          picker === 'add'
-            ? adding?.icon
-            : editing?.icon || rows[editing?.key]?.defaultIcon
-        }
+        // בעריכה: null = אייקון ברירת המחדל (מסומנת האפשרות עצמה, לא האמוג'י)
+        selected={picker === 'add' ? adding?.icon : editing?.icon || null}
         onSelect={selectEmoji}
         onReset={picker === 'edit' ? resetEmoji : undefined}
         onClose={() => setPicker(null)}

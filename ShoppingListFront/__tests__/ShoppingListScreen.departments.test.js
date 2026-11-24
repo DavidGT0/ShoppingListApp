@@ -156,16 +156,14 @@ test('the ✎ button shows next to the segments in לפי מחלקות mode only
   expect(host(manual.tree.root, 'edit_departments_button')).toHaveLength(0);
 });
 
-test('the ✎ button opens the editor with the list id and the departments in use', async () => {
+test('the ✎ button opens the editor with the list id', async () => {
   const { tree, navigation } = await mount();
   await act(async () => pressable(tree.root, 'edit_departments_button').props.onPress());
   expect(navigation.navigate).toHaveBeenCalledTimes(1);
   const [name, params] = navigation.navigate.mock.calls[0];
   expect(name).toBe('EditDepartments');
-  expect(params.listId).toBe(7);
-  expect(params.listName).toBe('רשימה');
-  // כולל מחלקות שכל המוצרים בהן נקנו
-  expect([...params.usedKeys].sort()).toEqual(['bakery', 'dairy', 'produce']);
+  // העורך מציג את כל המחלקות, ולכן לא צריך לדעת באילו יש מוצרים
+  expect(params).toEqual({ listId: 7, listName: 'רשימה' });
 });
 
 test('offline, the ✎ button shows the existing alert and does not navigate', async () => {

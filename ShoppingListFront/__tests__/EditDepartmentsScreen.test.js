@@ -6,6 +6,8 @@ import ReactTestRenderer from 'react-test-renderer';
 import { Alert, TouchableOpacity, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import EditDepartmentsScreen from '../src/screens/EditDepartmentsScreen/EditDepartmentsScreen';
+import { EMOJI_OPTIONS } from '../src/components/EmojiPicker/EmojiPicker';
+import { BUILTIN_CATEGORIES } from '../src/services/categories';
 import { saveCache, cacheKeys } from '../src/services/offlineCache';
 import {
   getListCategories,
@@ -60,7 +62,7 @@ const LAYOUT = [
   { key: 'dairy', name: 'מקררים', icon: null, position: 2 },
   { key: 'meat', name: null, icon: null, position: 3 },
   { key: 'pantry', name: null, icon: null, position: 4 },
-  { key: 'frozen', name: null, icon: '❄️', position: 5 },
+  { key: 'frozen', name: null, icon: '🍦', position: 5 },
   { key: 'drinks', name: null, icon: null, position: 6 },
   { key: 'snacks', name: null, icon: null, position: 7 },
   { key: 'cleaning', name: null, icon: null, position: 8 },
@@ -70,8 +72,10 @@ const LAYOUT = [
 ];
 const CUSTOM = [{ id: 5, name: 'מתנות', color: '#123456', icon: '🎁' }];
 const ALL_KEYS = LAYOUT.map(e => e.key);
-// מוצגות: מובנות עם מוצרים (bakery, produce) או עם שינוי (dairy, frozen), וכל המותאמות
-const VISIBLE = ['bakery', 'produce', 'dairy', 'frozen', 'custom:5'];
+// מוצגות כל המחלקות (גם מובנות בלי מוצרים), בסדר הפריסה. "אחר" בנפרד, אחרונה
+const VISIBLE = ALL_KEYS.filter(k => k !== 'other');
+const withoutKey = key => VISIBLE.filter(k => k !== key);
+const SERVER_ERROR = { title: 'המחלקות עודכנו על ידי מישהו אחר' };
 
 const trees = [];
 let alertSpy;
@@ -92,7 +96,28 @@ afterEach(async () => {
 });
 
 const mount = async (params = {}) => {
-  const navigation = { goBack: jest.fn(), navigate: jest.fn() };
+  // beforeRemove נשמר כדי לדמות יציאה מהמסך (חץ חזרה או כפתור החזרה של המכשיר)
+  const listeners = {};
+  const navigation = {
+    goBack: jest.fn(),
+    navigate: jest.fn(),
+    dispatch: jest.fn(),
+    addListener: jest.fn((event, cb) => {
+      listeners[event] = cb;
+      return () => {
+        if (listeners[event] === cb) delete listeners[event];
+      };
+    }),
+  };
+  // מחזיר true אם היציאה נעצרה (preventDefault)
+  navigation.leave = () => {
+    const event = {
+      preventDefault: jest.fn(),
+      data: { action: { type: 'GO_BACK' } },
+    };
+    listeners.beforeRemove?.(event);
+    return event;
+  };
   let tree;
   await act(async () => {
     tree = ReactTestRenderer.create(
@@ -101,7 +126,6 @@ const mount = async (params = {}) => {
           params: {
             listId: 7,
             listName: 'קניות',
-            usedKeys: ['produce', 'bakery', 'other'],
             ...params,
           },
         }}
@@ -192,12 +216,14 @@ describe('loading and order', () => {
     expect(textOf(host(tree, 'edit_departments_title')[0])).toBe('עריכת מחלקות');
   });
 
-  test('shows built-ins with items or overrides and every custom one, in layout order', async () => {
+  test('shows every built-in (also with no items) and every custom one, in layout order', async () => {
     const { tree } = await mount();
     expect(rowKeys(tree)).toEqual([...VISIBLE, 'other']);
+    expect(rowKeys(tree)).toHaveLength(12);
+    expect(rowText(tree, 'meat')).toContain('בשר ודגים');
     expect(rowText(tree, 'dairy')).toContain('מקררים');
     expect(rowText(tree, 'dairy')).toContain('🥛');
-    expect(rowText(tree, 'frozen')).toContain('❄️');
+    expect(rowText(tree, 'frozen')).toContain('🍦');
     expect(rowText(tree, 'frozen')).toContain('קפואים');
     expect(rowText(tree, 'custom:5')).toContain('מתנות');
     expect(rowText(tree, 'custom:5')).toContain('🎁');
@@ -222,7 +248,7 @@ describe('loading and order', () => {
 });
 
 describe('save', () => {
-  test('save sends every key from the layout, hidden built-ins included', async () => {
+  test('save sends every key from the layout', async () => {
     const { tree } = await mount();
     await press(tree, 'edit_departments_done');
     expect(saveCategoryLayout).toHaveBeenCalledTimes(1);
@@ -230,7 +256,7 @@ describe('save', () => {
     const payload = lastPayload();
     expect(keysOf(payload)).toEqual(ALL_KEYS);
     expect(entry(payload, 'dairy')).toEqual({ key: 'dairy', name: 'מקררים', icon: null });
-    expect(entry(payload, 'frozen')).toEqual({ key: 'frozen', name: null, icon: '❄️' });
+    expect(entry(payload, 'frozen')).toEqual({ key: 'frozen', name: null, icon: '🍦' });
     expect(entry(payload, 'meat')).toEqual({ key: 'meat', name: null, icon: null });
   });
 
@@ -287,32 +313,13 @@ describe('save', () => {
 });
 
 describe('reorder', () => {
-  test('dragging reorders the rows and save keeps hidden built-ins in their slots', async () => {
+  test('dragging reorders the rows and save sends the new full order', async () => {
     const { tree } = await mount();
-    await dragTo(['custom:5', 'bakery', 'produce', 'dairy', 'frozen']);
-    expect(rowKeys(tree)).toEqual([
-      'custom:5',
-      'bakery',
-      'produce',
-      'dairy',
-      'frozen',
-      'other',
-    ]);
+    const next = ['custom:5', ...withoutKey('custom:5')];
+    await dragTo(next);
+    expect(rowKeys(tree)).toEqual([...next, 'other']);
     await press(tree, 'edit_departments_done');
-    expect(keysOf(lastPayload())).toEqual([
-      'custom:5',
-      'bakery',
-      'produce',
-      'meat',
-      'pantry',
-      'dairy',
-      'drinks',
-      'snacks',
-      'cleaning',
-      'care',
-      'frozen',
-      'other',
-    ]);
+    expect(keysOf(lastPayload())).toEqual([...next, 'other']);
   });
 
   test('screen-reader actions move a department up and down', async () => {
@@ -377,9 +384,9 @@ describe('rename and icon', () => {
   test('a name already shown for another department is refused', async () => {
     const { tree } = await mount();
     await press(tree, 'department_edit_produce');
-    await type(tree, 'department_name_input', 'מקררים');
+    await type(tree, 'department_name_input', ' מקררים ');
     await press(tree, 'department_name_confirm');
-    expect(alertSpy).toHaveBeenCalledWith('שים לב', 'המחלקה כבר קיימת ברשימה');
+    expect(alertSpy).toHaveBeenCalledWith('שים לב', 'קיימת כבר מחלקה בשם "מקררים"');
     expect(has(tree, 'department_name_input')).toBe(true);
   });
 
@@ -447,7 +454,7 @@ describe('rename and icon', () => {
     await press(tree, 'department_icon_frozen');
     await press(tree, 'emoji_default');
     await press(tree, 'department_name_confirm');
-    expect(rowText(tree, 'frozen')).toContain('🧊');
+    expect(rowText(tree, 'frozen')).toContain('❄️');
     await press(tree, 'edit_departments_done');
     expect(entry(lastPayload(), 'frozen').icon).toBeNull();
   });
@@ -495,9 +502,10 @@ describe('add and delete', () => {
   test('a new name that matches a shown department name is refused before POST', async () => {
     const { tree } = await mount();
     await press(tree, 'add_department_button');
-    await type(tree, 'new_department_input', 'מקררים');
+    await type(tree, 'new_department_input', 'בשר ודגים');
     await press(tree, 'new_department_save');
-    expect(alertSpy).toHaveBeenCalledWith('שים לב', 'המחלקה כבר קיימת ברשימה');
+    // מחלקה מובנית שאין בה מוצרים מוצגת, וההודעה נוקבת בשמה
+    expect(alertSpy).toHaveBeenCalledWith('שים לב', 'קיימת כבר מחלקה בשם "בשר ודגים"');
     expect(createListCategory).not.toHaveBeenCalled();
   });
 
@@ -529,7 +537,7 @@ describe('add and delete', () => {
     expect(deleteListCategory).not.toHaveBeenCalled();
     await act(async () => buttons.find(b => b.style === 'destructive').onPress());
     expect(deleteListCategory).toHaveBeenCalledWith(7, 5);
-    expect(rowKeys(tree)).toEqual(['bakery', 'produce', 'dairy', 'frozen', 'other']);
+    expect(rowKeys(tree)).toEqual([...withoutKey('custom:5'), 'other']);
     await press(tree, 'edit_departments_done');
     expect(keysOf(lastPayload())).not.toContain('custom:5');
     expect(lastPayload()).toHaveLength(ALL_KEYS.length - 1);
@@ -654,7 +662,7 @@ describe('overlapping requests', () => {
     await type(tree, 'new_department_input', 'חיות');
     await press(tree, 'new_department_save');
     await act(async () => del.resolve());
-    expect(rowKeys(tree)).toEqual(['bakery', 'produce', 'dairy', 'frozen', 'custom:9', 'other']);
+    expect(rowKeys(tree)).toEqual([...withoutKey('custom:5'), 'custom:9', 'other']);
   });
 });
 
@@ -700,5 +708,424 @@ describe('navigation', () => {
     expect(app).toContain(
       "import EditDepartmentsScreen from './src/screens/EditDepartmentsScreen/EditDepartmentsScreen';",
     );
+  });
+});
+
+const buttonsOf = call => call[2];
+const button = (call, text) => buttonsOf(call).find(b => b.text === text);
+const lastAlert = () => alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
+const renameTo = async (tree, key, name) => {
+  await press(tree, `department_edit_${key}`);
+  await type(tree, 'department_name_input', name);
+  await press(tree, 'department_name_confirm');
+};
+const spinnerIn = (tree, id) =>
+  host(tree, id)[0].findAll(n => n.type === 'ActivityIndicator').length > 0;
+
+describe('unsaved changes on leave', () => {
+  test('leaving with no changes is not stopped', async () => {
+    const { navigation } = await mount();
+    const event = navigation.leave();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  test('with a rename pending, leaving asks whether to save', async () => {
+    const { tree, navigation } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    await press(tree, 'edit_departments_back');
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    const event = navigation.leave();
+    expect(event.preventDefault).toHaveBeenCalled();
+    const call = lastAlert();
+    expect(call[0]).toBe('לשמור את השינויים?');
+    expect(buttonsOf(call).map(b => b.text).sort()).toEqual(
+      ['בטל שינויים', 'המשך לערוך', 'שמור'].sort(),
+    );
+    expect(button(call, 'המשך לערוך').style).toBe('cancel');
+  });
+
+  test('בטל שינויים leaves without saving', async () => {
+    const { tree, navigation } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    const event = navigation.leave();
+    await act(async () => button(lastAlert(), 'בטל שינויים').onPress());
+    expect(navigation.dispatch).toHaveBeenCalledWith(event.data.action);
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+  });
+
+  test('המשך לערוך stays on the screen', async () => {
+    const { tree, navigation } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    navigation.leave();
+    await act(async () => button(lastAlert(), 'המשך לערוך').onPress?.());
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    expect(rowText(tree, 'produce')).toContain('ירקן');
+  });
+
+  test('שמור runs the save flow, then goes back', async () => {
+    const { tree, navigation } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    navigation.leave();
+    await act(async () => button(lastAlert(), 'שמור').onPress());
+    expect(entry(lastPayload(), 'produce').name).toBe('ירקן');
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('a reorder is a change, and dragging it back is not', async () => {
+    const { navigation } = await mount();
+    await dragTo(['produce', ...withoutKey('produce')]);
+    expect(navigation.leave().preventDefault).toHaveBeenCalled();
+    await dragTo(VISIBLE);
+    expect(navigation.leave().preventDefault).not.toHaveBeenCalled();
+  });
+
+  test('an icon change is a change', async () => {
+    const { tree, navigation } = await mount();
+    await press(tree, 'department_edit_produce');
+    await press(tree, 'department_icon_produce');
+    const apple = tree.root.findAll(
+      n =>
+        typeof n.props.onPress === 'function' &&
+        n.props.accessibilityLabel === '🍎 תפוח',
+    )[0];
+    await act(async () => apple.props.onPress());
+    await press(tree, 'department_name_confirm');
+    expect(navigation.leave().preventDefault).toHaveBeenCalled();
+  });
+
+  test('typed text in the add form is a change; an empty form is not', async () => {
+    const { tree, navigation } = await mount();
+    await press(tree, 'add_department_button');
+    expect(navigation.leave().preventDefault).not.toHaveBeenCalled();
+    await type(tree, 'new_department_input', 'חיות');
+    expect(navigation.leave().preventDefault).toHaveBeenCalled();
+  });
+
+  test('after a successful save, leaving is not stopped', async () => {
+    const { tree, navigation } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    await press(tree, 'edit_departments_done');
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    expect(navigation.leave().preventDefault).not.toHaveBeenCalled();
+  });
+
+  test('an add or a delete that was already applied is not an unsaved change', async () => {
+    createListCategory.mockResolvedValue({
+      id: 9,
+      name: 'חיות',
+      color: '#abcdef',
+      icon: '🛒',
+    });
+    deleteListCategory.mockResolvedValue(undefined);
+    const { tree, navigation } = await mount();
+    await press(tree, 'add_department_button');
+    await type(tree, 'new_department_input', 'חיות');
+    await press(tree, 'new_department_save');
+    expect(navigation.leave().preventDefault).not.toHaveBeenCalled();
+    await act(async () =>
+      pressable(tree, 'department_name_custom:5').props.onLongPress(),
+    );
+    await act(async () => button(lastAlert(), 'מחק').onPress());
+    expect(navigation.leave().preventDefault).not.toHaveBeenCalled();
+  });
+});
+
+describe('סיום while a create or delete is in flight', () => {
+  test('a pending POST: סיום shows a spinner and sends nothing until it settles', async () => {
+    const post = deferred();
+    createListCategory.mockReturnValue(post.promise);
+    const { tree } = await mount();
+    await press(tree, 'add_department_button');
+    await type(tree, 'new_department_input', 'חיות');
+    await pressNoWait(tree, 'new_department_save');
+    expect(spinnerIn(tree, 'edit_departments_done')).toBe(true);
+    const done = pressable(tree, 'edit_departments_done');
+    expect(done.props.accessibilityState?.disabled).toBeFalsy();
+    expect(done.props.accessibilityHint).toBe('ממתין לסיום הפעולה');
+    await press(tree, 'edit_departments_done');
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    expect(getListCategories).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      post.resolve({ id: 9, name: 'חיות', color: '#abcdef', icon: '🛒' }),
+    );
+    expect(spinnerIn(tree, 'edit_departments_done')).toBe(false);
+    await press(tree, 'edit_departments_done');
+    expect(keysOf(lastPayload()).slice(-2)).toEqual(['custom:9', 'other']);
+  });
+
+  test('a pending DELETE: סיום sends nothing until it settles', async () => {
+    const del = deferred();
+    deleteListCategory.mockReturnValue(del.promise);
+    const { tree } = await mount();
+    await act(async () =>
+      pressable(tree, 'department_name_custom:5').props.onLongPress(),
+    );
+    await act(async () => {
+      button(lastAlert(), 'מחק').onPress();
+    });
+    expect(spinnerIn(tree, 'edit_departments_done')).toBe(true);
+    await press(tree, 'edit_departments_done');
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    await act(async () => del.resolve());
+    await press(tree, 'edit_departments_done');
+    expect(keysOf(lastPayload())).not.toContain('custom:5');
+  });
+
+  test('a POST that settles after the screen closed changes no state and logs nothing', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const post = deferred();
+    createListCategory.mockReturnValue(post.promise);
+    const { tree } = await mount();
+    await press(tree, 'add_department_button');
+    await type(tree, 'new_department_input', 'חיות');
+    await pressNoWait(tree, 'new_department_save');
+    await act(async () => {
+      trees.splice(trees.indexOf(tree), 1);
+      tree.unmount();
+    });
+    await act(async () =>
+      post.resolve({ id: 9, name: 'חיות', color: '#abcdef', icon: '🛒' }),
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+});
+
+describe('changes by another member while editing', () => {
+  const changed = (patch = {}) => ({
+    custom: patch.custom || CUSTOM,
+    layout: patch.layout || LAYOUT,
+  });
+  const serverRenamedDairy = () =>
+    changed({
+      layout: LAYOUT.map(e => (e.key === 'dairy' ? { ...e, name: 'קירור' } : e)),
+    });
+
+  test('סיום reads the categories again just before the PUT', async () => {
+    const { tree } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    await press(tree, 'edit_departments_done');
+    expect(getListCategories).toHaveBeenCalledTimes(2);
+    expect(getListCategories.mock.invocationCallOrder[1]).toBeLessThan(
+      saveCategoryLayout.mock.invocationCallOrder[0],
+    );
+  });
+
+  test('a change on the server asks what to do and sends nothing yet', async () => {
+    const { tree, navigation } = await mount();
+    getListCategories.mockResolvedValue(serverRenamedDairy());
+    await renameTo(tree, 'produce', 'ירקן');
+    await press(tree, 'edit_departments_done');
+    const call = lastAlert();
+    expect(call[0]).toBe(SERVER_ERROR.title);
+    expect(call[1]).toContain('מה לעשות עם השינויים שלך?');
+    expect(buttonsOf(call).map(b => b.text)).toEqual([
+      'ביטול',
+      'טען את הגרסה העדכנית',
+      'שמור את שלי בכל זאת',
+    ]);
+    expect(button(call, 'ביטול').style).toBe('cancel');
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    // הכפתור חוזר לעבוד
+    expect(spinnerIn(tree, 'edit_departments_done')).toBe(false);
+  });
+
+  test('טען את הגרסה העדכנית discards my edits, reloads and stays', async () => {
+    const { tree, navigation } = await mount();
+    getListCategories.mockResolvedValue(serverRenamedDairy());
+    await renameTo(tree, 'produce', 'ירקן');
+    await press(tree, 'edit_departments_done');
+    await act(async () =>
+      button(lastAlert(), 'טען את הגרסה העדכנית').onPress(),
+    );
+    expect(rowText(tree, 'dairy')).toContain('קירור');
+    expect(rowText(tree, 'produce')).toContain('פירות וירקות');
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    // הגרסה שנטענה היא נקודת ההשוואה החדשה
+    expect(navigation.leave().preventDefault).not.toHaveBeenCalled();
+    await press(tree, 'edit_departments_done');
+    expect(entry(lastPayload(), 'dairy').name).toBe('קירור');
+    expect(entry(lastPayload(), 'produce').name).toBeNull();
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('שמור את שלי בכל זאת puts my layout, plus customs added by others before אחר', async () => {
+    const { tree, navigation } = await mount();
+    getListCategories.mockResolvedValue(
+      changed({
+        custom: [
+          ...CUSTOM,
+          { id: 8, name: 'פרחים', color: '#aabbcc', icon: '🌸' },
+        ],
+        layout: [
+          ...LAYOUT.filter(e => e.key !== 'other'),
+          { key: 'custom:8', name: 'פרחים וצמחים', icon: '🌸', position: 11 },
+          { key: 'other', name: null, icon: null, position: 12 },
+        ],
+      }),
+    );
+    await renameTo(tree, 'produce', 'ירקן');
+    await press(tree, 'edit_departments_done');
+    expect(lastAlert()[0]).toBe(SERVER_ERROR.title);
+    await act(async () =>
+      button(lastAlert(), 'שמור את שלי בכל זאת').onPress(),
+    );
+    const payload = lastPayload();
+    expect(keysOf(payload)).toEqual([...VISIBLE, 'custom:8', 'other']);
+    expect(entry(payload, 'custom:8')).toEqual({
+      key: 'custom:8',
+      name: 'פרחים וצמחים',
+      icon: '🌸',
+    });
+    expect(entry(payload, 'produce').name).toBe('ירקן');
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('ביטול stays and sends nothing', async () => {
+    const { tree, navigation } = await mount();
+    getListCategories.mockResolvedValue(serverRenamedDairy());
+    await press(tree, 'edit_departments_done');
+    await act(async () => button(lastAlert(), 'ביטול').onPress?.());
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    expect(rowText(tree, 'dairy')).toContain('מקררים');
+  });
+
+  test('a reorder by another member is detected', async () => {
+    const { tree } = await mount();
+    getListCategories.mockResolvedValue(
+      changed({
+        layout: LAYOUT.map(e => {
+          if (e.key === 'bakery') return { ...e, position: 1 };
+          if (e.key === 'produce') return { ...e, position: 0 };
+          return e;
+        }),
+      }),
+    );
+    await press(tree, 'edit_departments_done');
+    expect(lastAlert()[0]).toBe(SERVER_ERROR.title);
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+  });
+
+  test('a custom deleted by another member is detected', async () => {
+    const { tree } = await mount();
+    getListCategories.mockResolvedValue(
+      changed({ custom: [], layout: LAYOUT.filter(e => e.key !== 'custom:5') }),
+    );
+    await press(tree, 'edit_departments_done');
+    expect(lastAlert()[0]).toBe(SERVER_ERROR.title);
+  });
+
+  test('my own add and delete are not taken for a change by someone else', async () => {
+    createListCategory.mockResolvedValue({
+      id: 9,
+      name: 'חיות',
+      color: '#abcdef',
+      icon: '🐾',
+    });
+    deleteListCategory.mockResolvedValue(undefined);
+    const { tree, navigation } = await mount();
+    await act(async () =>
+      pressable(tree, 'department_name_custom:5').props.onLongPress(),
+    );
+    await act(async () => button(lastAlert(), 'מחק').onPress());
+    await press(tree, 'add_department_button');
+    await type(tree, 'new_department_input', 'חיות');
+    await press(tree, 'new_department_save');
+    alertSpy.mockClear();
+    getListCategories.mockResolvedValue({
+      custom: [{ id: 9, name: 'חיות', color: '#abcdef', icon: '🐾' }],
+      layout: [
+        ...LAYOUT.filter(e => e.key !== 'custom:5' && e.key !== 'other'),
+        { key: 'custom:9', name: null, icon: '🐾', position: 10 },
+        { key: 'other', name: null, icon: null, position: 11 },
+      ],
+    });
+    await press(tree, 'edit_departments_done');
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(saveCategoryLayout).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('a re-read that fails on the network shows the offline alert and sends nothing', async () => {
+    const { tree, navigation } = await mount();
+    getListCategories.mockRejectedValue(
+      Object.assign(new Error('אין חיבור'), { network: true }),
+    );
+    await press(tree, 'edit_departments_done');
+    expect(alertSpy).toHaveBeenCalledWith(...BLOCKED);
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+});
+
+describe('emoji picker selection', () => {
+  const option = (tree, label) =>
+    tree.root.findAll(
+      n =>
+        typeof n.props.onPress === 'function' &&
+        n.props.accessibilityLabel === label,
+    )[0];
+
+  test('after choosing the default icon, the default choice is marked, not the default emoji', async () => {
+    const { tree } = await mount();
+    await press(tree, 'department_edit_frozen');
+    await press(tree, 'department_icon_frozen');
+    expect(option(tree, '🍦 גלידה').props.accessibilityState.selected).toBe(true);
+    expect(
+      pressable(tree, 'emoji_default').props.accessibilityState.selected,
+    ).toBe(false);
+    await press(tree, 'emoji_default');
+    await press(tree, 'department_icon_frozen');
+    expect(
+      pressable(tree, 'emoji_default').props.accessibilityState.selected,
+    ).toBe(true);
+    expect(option(tree, '❄️ קפואים').props.accessibilityState.selected).toBe(
+      false,
+    );
+    expect(option(tree, '🍦 גלידה').props.accessibilityState.selected).toBe(
+      false,
+    );
+  });
+});
+
+// אנדרואיד ישן (לפני 10) מציג ריבוע ריק במקום אמוג'י מגרסה 11 ומעלה
+describe('emoji that render on older Android', () => {
+  const NEWER = [
+    [0x1f6d5, 0x1f6df],
+    [0x1f6f9, 0x1f6ff],
+    [0x1f90c, 0x1f90f],
+    [0x1f93f, 0x1f93f],
+    [0x1f94d, 0x1f94f],
+    [0x1f96c, 0x1f97f],
+    [0x1f998, 0x1f9bf],
+    [0x1f9c1, 0x1f9cf],
+    [0x1f9e7, 0x1faff],
+  ];
+  const tooNew = emoji =>
+    [...emoji].some(ch => {
+      const cp = ch.codePointAt(0);
+      return NEWER.some(([a, b]) => cp >= a && cp <= b);
+    });
+
+  test('the checker catches Emoji 11 and 12', () => {
+    expect(['🧃', '🧊', '🧂', '🧽', '🧴', '🥰'].every(tooNew)).toBe(true);
+    expect(['🥦', '🧀', '🥩', '🥫', '🛒', '❄️', '🧐'].some(tooNew)).toBe(false);
+  });
+
+  test('every picker emoji and every built-in default icon is Emoji 5.0 or older', () => {
+    const offenders = [
+      ...EMOJI_OPTIONS.map(([emoji]) => emoji),
+      ...BUILTIN_CATEGORIES.map(c => c.icon),
+    ].filter(tooNew);
+    expect(offenders).toEqual([]);
+  });
+
+  test('the frozen default icon is ❄️', () => {
+    expect(BUILTIN_CATEGORIES.find(c => c.key === 'frozen').icon).toBe('❄️');
   });
 });

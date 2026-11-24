@@ -817,12 +817,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const departmentsLabel =
     departmentCount === 1 ? 'מחלקה אחת' : `${departmentCount} מחלקות`;
 
-  // מסך עריכת המחלקות: מקבל את המחלקות שיש בהן מוצרים (גם שנקנו), כדי להציג אותן.
-  // בחזרה המסך חוזר לפוקוס והרענון החי מביא מיד את הפריסה החדשה
+  // מסך עריכת המחלקות (מציג את כל המחלקות). בחזרה המסך חוזר לפוקוס והרענון
+  // החי מביא מיד את הפריסה החדשה
   const openEditDepartments = () => {
     if (blockIfOffline()) return;
-    const usedKeys = [...new Set(visibleResolved.map(r => r.cat.key))];
-    navigation.navigate('EditDepartments', { listId, listName, usedKeys });
+    navigation.navigate('EditDepartments', { listId, listName });
   };
 
   // שורת מוצר במסלול (רגילה, או גדולה בכרטיס "עכשיו במחלקה").

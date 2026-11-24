@@ -294,7 +294,7 @@ const cases = {
   ProgressRing: ringCase(dark),
   EditDepartments: (
     <EditDepartmentsScreen
-      route={{ params: { listId: 1, listName: 'שלי', usedKeys: ['produce'] } }}
+      route={{ params: { listId: 1, listName: 'שלי' } }}
       navigation={nav}
     />
   ),
