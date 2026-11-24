@@ -17,8 +17,18 @@ jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
 jest.mock('react-native-draggable-flatlist', () => {
   const ReactLib = require('react');
   const { View } = require('react-native');
+  // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה (עם המשיכה לריענון)
+  const MockNestableScrollContainer = ({ children, ...rest }) => {
+    global.__scrollProps = rest;
+    return ReactLib.createElement(View, { testID: 'nestable_scroll' }, children);
+  };
   return {
     __esModule: true,
+    NestableScrollContainer: MockNestableScrollContainer,
+    // הרשימה המקוננת זהה למוק של הרשימה הרגילה
+    get NestableDraggableFlatList() {
+      return this.default;
+    },
     default: ({ data, renderItem }) =>
       ReactLib.createElement(
         View,
@@ -133,7 +143,7 @@ describe('header toggle', () => {
     expect(toggle.props.accessibilityRole).toBe('button');
     expect(toggle.props.accessibilityLabel).toBe('מצב כהה');
     expect(iconName(tree)).toBe('weather-night');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
     await press(tree, 'theme_toggle');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('dark');
     expect(rootBg(tree)).toContain('#0B1220');
@@ -141,7 +151,7 @@ describe('header toggle', () => {
     expect(iconName(tree)).toBe('white-balance-sunny');
     await press(tree, 'theme_toggle');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('light');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
   });
 
   test('system mode flips to the opposite of the current scheme', async () => {
@@ -150,7 +160,7 @@ describe('header toggle', () => {
     expect(iconName(tree)).toBe('white-balance-sunny');
     await press(tree, 'theme_toggle');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('light');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
   });
 
   test('works offline: no alert, theme still changes', async () => {
@@ -204,6 +214,6 @@ describe('settings segments', () => {
     expect(rootBg(tree)).toContain('#0B1220');
     await press(tree, 'theme_light');
     expect(await AsyncStorage.getItem('@theme_mode')).toBe('light');
-    expect(rootBg(tree)).toContain('#F8F9FA');
+    expect(rootBg(tree)).toContain('#F4F7FB');
   });
 });

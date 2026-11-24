@@ -51,7 +51,21 @@ jest.mock('react-native-draggable-flatlist', () => {
       props.ListFooterComponent,
     );
   };
-  return { __esModule: true, default: MockDraggableFlatList };
+  // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה (עם המשיכה לריענון)
+  const MockNestableScrollContainer = ({ children, ...rest }) => {
+    global.__scrollProps = rest;
+    return ReactLib.createElement(View, { testID: 'nestable_scroll' }, children);
+  };
+  return {
+    __esModule: true,
+    default: MockDraggableFlatList,
+    // מסמן שהמסך משתמש ברשימה המקוננת (ולא ב-DraggableFlatList הרגילה)
+    NestableDraggableFlatList: props => {
+      global.__nestedList = true;
+      return MockDraggableFlatList(props);
+    },
+    NestableScrollContainer: MockNestableScrollContainer,
+  };
 });
 
 jest.mock('../src/hooks/useLiveRefresh', () => ({
@@ -163,6 +177,8 @@ const headerKeys = tree =>
 beforeEach(async () => {
   jest.clearAllMocks();
   global.__dragRendered = 0;
+  global.__nestedList = false;
+  global.__scrollProps = undefined;
   await AsyncStorage.clear();
   getListCategories.mockResolvedValue(customs);
 });
@@ -212,6 +228,35 @@ test('the segments switch the mode, persist it, and expose selected', async () =
   expect(has(tree, 'draggable')).toBe(true);
 });
 
+// מתג גלולה: מיכל מעוגל עם ריווח, המקטע הפעיל גלולה מלאה בצבע הראשי
+test('the segments are a pill control without clipped borders', async () => {
+  const { StyleSheet } = require('react-native');
+  const { light } = require('../src/theme/palettes');
+  const tree = await mount(ITEMS);
+  const flat = n => StyleSheet.flatten(n.props.style) || {};
+  const host = id =>
+    tree.root.findAll(n => n.props.testID === id && typeof n.type === 'string')[0];
+  const container = host('sort_segments');
+  expect(flat(container).borderRadius).toBe(14);
+  expect(flat(container).padding).toBe(4);
+  expect(flat(container).overflow).toBeUndefined();
+  expect(flat(container).backgroundColor).toBe(light.raised);
+  const active = host('sort_segment_manual');
+  const inactive = host('sort_segment_category');
+  expect(flat(active).backgroundColor).toBe(light.primary);
+  expect(flat(active).borderRadius).toBe(10);
+  expect(flat(active).borderWidth || 0).toBe(0);
+  expect(flat(inactive).backgroundColor).toBeUndefined();
+  const textColor = n =>
+    flat(n.findAll(c => c.type === 'Text')[0]).color;
+  expect(textColor(active)).toBe(light.text.inverse);
+  expect(textColor(inactive)).toBe(light.text.secondary);
+  const iconColor = n => n.findAll(c => c.type === 'Icon')[0].props.color;
+  expect(iconColor(active)).toBe(light.text.inverse);
+  expect(iconColor(inactive)).toBe(light.text.secondary);
+  expect(flat(container).marginBottom).toBeGreaterThanOrEqual(8);
+});
+
 test('the segments carry the agreed icons', async () => {
   const tree = await mount(ITEMS);
   const iconOf = id =>
@@ -222,23 +267,132 @@ test('the segments carry the agreed icons', async () => {
   expect(iconOf('sort_segment_category')).toEqual(['shape-outline']);
 });
 
-test('manual mode passes a gesture-handler RefreshControl that refreshes', async () => {
+// מצב ידני: המשיכה לריענון על מיכל הגלילה המקונן (ScrollView של gesture-handler,
+// כמו במצב מחלקות), ולא על הרשימה הנגררת שבתוכו
+test('manual mode puts a gesture-handler RefreshControl on the nestable scroll container', async () => {
   await mount(ITEMS);
-  const { refreshControl, refreshing, onRefresh } = global.__dragProps;
-  expect(refreshing).toBeUndefined();
-  expect(onRefresh).toBeUndefined();
+  expect(global.__nestedList).toBe(true);
+  const { refreshControl } = global.__scrollProps;
   expect(refreshControl.type).toBe(GHRefreshControl);
+  const { light } = require('../src/theme/palettes');
+  expect(refreshControl.props.progressBackgroundColor).toBe(light.raised);
+  expect(refreshControl.props.colors).toEqual([light.primary]);
+  expect(global.__dragProps.refreshControl).toBeUndefined();
   getShoppingList.mockClear();
   await act(async () => refreshControl.props.onRefresh());
   expect(getShoppingList).toHaveBeenCalledTimes(1);
 });
 
+const scrolledTo = y => ({ nativeEvent: { contentOffset: { x: 0, y } } });
+
+test('manual mode gates the pull-to-refresh to a fresh pull at the top', async () => {
+  await mount(ITEMS);
+  const enabled = () => global.__scrollProps.refreshControl.props.enabled;
+  expect(enabled()).toBe(true);
+  await act(async () => global.__scrollProps.onScrollBeginDrag(scrolledTo(400)));
+  expect(enabled()).toBe(false);
+  await act(async () => global.__scrollProps.onScrollEndDrag(scrolledTo(0)));
+  expect(enabled()).toBe(true);
+  // הגלילה של מיכל הגרירה לא נדרסת: אין onScroll משלנו
+  expect(global.__scrollProps.onScroll).toBeUndefined();
+});
+
+// הספינר נשאר זמן מינימלי גם כשהשרת עונה מהר (כאן 80ms במקום 700)
+test('a pull keeps the spinner visible for the minimum time', async () => {
+  const { setMinRefreshMs } = require('../src/services/minDuration');
+  setMinRefreshMs(80);
+  try {
+    await mount(ITEMS);
+    const control = () => global.__scrollProps.refreshControl;
+    let pending;
+    await act(async () => {
+      pending = control().props.onRefresh();
+    });
+    // השרת כבר ענה, אבל הספינר עדיין מוצג (והפקד לא נסגר בזמן הריענון)
+    expect(control().props.refreshing).toBe(true);
+    expect(control().props.enabled).toBe(true);
+    await act(async () => {
+      await pending;
+    });
+    expect(control().props.refreshing).toBe(false);
+  } finally {
+    setMinRefreshMs(0);
+  }
+});
+
+test('the scroll container keeps its touch and layout hooks for the gate', async () => {
+  await mount(ITEMS);
+  expect(typeof global.__scrollProps.onTouchStart).toBe('function');
+  expect(typeof global.__scrollProps.onContentSizeChange).toBe('function');
+});
+
+// גרירה אחת שעוזבת את הראש וחוזרת - לא מרעננת עד שהאצבע עוזבת
+test('category mode: a drag that leaves the top closes the gate until the finger lifts', async () => {
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  const list = () => byId(tree, 'category_list');
+  expect(list().props.scrollEventThrottle).toBe(16);
+  await act(async () => list().props.onScrollBeginDrag(scrolledTo(0)));
+  await act(async () => list().props.onScroll(scrolledTo(80)));
+  await act(async () => list().props.onScroll(scrolledTo(0)));
+  expect(list().props.refreshControl.props.enabled).toBe(false);
+  // גלילה מקוננת (שדרכה המשיכה ממשיכה גם כשהפקד כבוי) נסגרת יחד עם השער
+  expect(list().props.nestedScrollEnabled).toBe(false);
+  await act(async () => list().props.onScrollEndDrag(scrolledTo(0)));
+  expect(list().props.refreshControl.props.enabled).toBe(true);
+  expect(list().props.nestedScrollEnabled).toBe(true);
+});
+
+test('manual mode: the nested container offset observer feeds the gate', async () => {
+  const tree = await mount(ITEMS);
+  const NestableOffsetObserver =
+    require('../src/hooks/NestableOffsetObserver').default;
+  const observer = tree.root.findByType(NestableOffsetObserver);
+  const enabled = () => global.__scrollProps.refreshControl.props.enabled;
+  await act(async () => global.__scrollProps.onScrollBeginDrag(scrolledTo(0)));
+  await act(async () => observer.props.onOffset(90));
+  await act(async () => observer.props.onOffset(0));
+  expect(enabled()).toBe(false);
+  expect(global.__scrollProps.nestedScrollEnabled).toBe(false);
+  await act(async () => global.__scrollProps.onScrollEndDrag(scrolledTo(0)));
+  expect(enabled()).toBe(true);
+  expect(global.__scrollProps.nestedScrollEnabled).toBe(true);
+});
+
+test('category mode gates the pull-to-refresh too', async () => {
+  await AsyncStorage.setItem('@sort_mode_7', 'category');
+  const tree = await mount(ITEMS);
+  const list = () => byId(tree, 'category_list');
+  expect(list().props.refreshControl.props.enabled).toBe(true);
+  await act(async () => list().props.onMomentumScrollBegin(scrolledTo(300)));
+  expect(list().props.refreshControl.props.enabled).toBe(false);
+  await act(async () => list().props.onMomentumScrollEnd(scrolledTo(0)));
+  expect(list().props.refreshControl.props.enabled).toBe(true);
+});
+
+test('manual mode scrolls the header, the list and the bought section as one page', async () => {
+  const tree = await mount(ITEMS);
+  const scroll = byId(tree, 'nestable_scroll');
+  expect(
+    scroll.findAll(
+      n => n.props.testID === 'draggable' && typeof n.type === 'string',
+    ),
+  ).toHaveLength(1);
+  expect(
+    scroll.findAll(n => n.props.testID === 'restore_all_button').length,
+  ).toBeGreaterThan(0);
+  expect(global.__dragProps.ListFooterComponent).toBeUndefined();
+  expect(typeof global.__dragProps.onDragBegin).toBe('function');
+  expect(typeof global.__dragProps.onDragEnd).toBe('function');
+});
+
+// הרשימה מתחילה אחרי ריווח המיכל (20dp); הידית ב-12-40dp ממנה, עם hitSlop 2-50dp
 test('manual mode limits the drag gesture to the handle strip so a pull can refresh', async () => {
   const { I18nManager } = require('react-native');
   await mount(ITEMS);
   const { dragHitSlop } = global.__dragProps;
   const side = I18nManager.isRTL ? 'right' : 'left';
-  expect(dragHitSlop).toEqual({ [side]: 0, width: 100 });
+  expect(dragHitSlop).toEqual({ [side]: 0, width: 56 });
 });
 
 test('category mode passes a gesture-handler RefreshControl that refreshes', async () => {
@@ -270,16 +424,20 @@ test('category mode shows headers in aisle order: built-ins, customs, other', as
   expect(headerKeys(tree)).toEqual([
     'produce',
     'dairy',
+    'bakery',
     'care',
     'custom:6',
     'other',
   ]);
 });
 
-test('purchased items do not create a header', async () => {
+// החלטה 2: מוצר שנקנה נספר במחלקה שלו, ומחלקה שהכל בה נקנה מתכווצת לשורה אחת
+test('a department with only bought items collapses to one line', async () => {
   await AsyncStorage.setItem('@sort_mode_7', 'category');
   const tree = await mount(ITEMS);
-  expect(has(tree, 'category_header_bakery')).toBe(false);
+  expect(has(tree, 'category_header_bakery')).toBe(true);
+  expect(has(tree, 'department_done_bakery')).toBe(true);
+  expect(has(tree, 'department_done_dairy')).toBe(false);
 });
 
 test('items get the dot color of their resolved category', async () => {
@@ -487,6 +645,7 @@ test('the current username is re-read on focus (after a rename in settings)', as
   expect(byId(tree, 'row_2').props.currentUsername).toBe('robert');
 });
 
+// שם המחלקה והמונה, כפי שקורא המסך מקריא את כותרת המחלקה
 const headerTexts = tree =>
   tree.root
     .findAll(
@@ -495,12 +654,7 @@ const headerTexts = tree =>
         n.props.testID.startsWith('category_header_') &&
         typeof n.type === 'string',
     )
-    .map(n =>
-      n
-        .findAll(c => c.type === 'Text')
-        .map(c => [].concat(c.props.children).join(''))
-        .join(''),
-    );
+    .map(n => n.props.accessibilityLabel);
 
 const LAYOUT = [
   { key: 'custom:6', name: 'חיות מחמד', icon: '🐶', position: 0 },
@@ -512,8 +666,18 @@ test('the new {custom, layout} answer drives group order and names', async () =>
   getListCategories.mockResolvedValue({ custom: customs, layout: LAYOUT });
   await AsyncStorage.setItem('@sort_mode_7', 'category');
   const tree = await mount(ITEMS);
-  expect(headerKeys(tree)).toEqual(['custom:6', 'dairy', 'produce', 'care', 'other']);
-  expect(headerTexts(tree).slice(0, 2)).toEqual(['חיות מחמד (1)', 'חלבי (1)']);
+  expect(headerKeys(tree)).toEqual([
+    'custom:6',
+    'dairy',
+    'produce',
+    'bakery',
+    'care',
+    'other',
+  ]);
+  expect(headerTexts(tree).slice(0, 2)).toEqual([
+    'חיות מחמד, נקנו 0 מתוך 1',
+    'חלבי, נקנו 0 מתוך 1',
+  ]);
   expect(tree.root.findByType(EditItemModal).props.layout).toEqual(LAYOUT);
   expect(tree.root.findByType(EditItemModal).props.categories).toEqual(customs);
 });
@@ -539,5 +703,5 @@ test('the live refresh brings a layout saved by another member', async () => {
   getListCategories.mockResolvedValue({ custom: customs, layout: LAYOUT });
   await act(async () => global.__live.refresh());
   expect(headerKeys(tree)[0]).toBe('custom:6');
-  expect(headerTexts(tree)[1]).toBe('חלבי (1)');
+  expect(headerTexts(tree)[1]).toBe('חלבי, נקנו 0 מתוך 1');
 });

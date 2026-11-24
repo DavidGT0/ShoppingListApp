@@ -35,7 +35,7 @@ const mount = async () => {
 describe('palettes', () => {
   test('light palette equals the legacy colors export', () => {
     expect(light).toEqual(colors);
-    expect(light.background).toBe('#F8F9FA');
+    expect(light.background).toBe('#F4F7FB');
     expect(light.text.primary).toBe('#212529');
   });
 

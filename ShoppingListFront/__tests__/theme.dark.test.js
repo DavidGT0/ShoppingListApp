@@ -14,8 +14,18 @@ import LoginScreen from '../src/screens/LoginScreen/LoginScreen';
 jest.mock('react-native-draggable-flatlist', () => {
   const ReactLib = require('react');
   const { View } = require('react-native');
+  // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה (עם המשיכה לריענון)
+  const MockNestableScrollContainer = ({ children, ...rest }) => {
+    global.__scrollProps = rest;
+    return ReactLib.createElement(View, { testID: 'nestable_scroll' }, children);
+  };
   return {
     __esModule: true,
+    NestableScrollContainer: MockNestableScrollContainer,
+    // הרשימה המקוננת זהה למוק של הרשימה הרגילה
+    get NestableDraggableFlatList() {
+      return this.default;
+    },
     default: ({ data, renderItem, ListHeaderComponent }) =>
       ReactLib.createElement(
         View,
@@ -108,14 +118,27 @@ describe('dark mode screens', () => {
     });
   });
 
-  test('ShoppingList tip title uses the dark heading colour', async () => {
+  // תיבת הטיפ הוסרה (אין בעיצוב, והייתה נראית כפס ריק). תווית "מוצרים לקנייה" נשארת
+  test('ShoppingList section label uses the dark secondary text colour', async () => {
+    const api = require('../src/services/api');
+    api.getShoppingList.mockResolvedValueOnce([
+      { id: 1, name: 'חלב', amount: 1, purchased: false, position: 0 },
+    ]);
     const tree = await renderDark(screens.ShoppingList);
-    const title = tree.root.findAll(
-      n => n.props.children === '💡 טיפ שימושי:' && n.props.style,
-    )[0];
-    const color = StyleSheet.flatten(title.props.style).color;
-    expect(color).toBe(dark.heading);
-    expect(color).not.toBe('#0F172A');
+    try {
+      const label = tree.root.findAll(
+        n => n.props.children === 'מוצרים לקנייה' && n.props.style,
+      )[0];
+      expect(StyleSheet.flatten(label.props.style).color).toBe(
+        dark.text.secondary,
+      );
+      expect(
+        tree.root.findAll(n => n.props.children === '💡 טיפ שימושי:'),
+      ).toHaveLength(0);
+    } finally {
+      // פירוק בתוך act כדי שאנימציית השורה לא תמשיך אחרי הבדיקה
+      await act(async () => tree.unmount());
+    }
   });
 
   test('offline banner text stays dark on the warning background', async () => {

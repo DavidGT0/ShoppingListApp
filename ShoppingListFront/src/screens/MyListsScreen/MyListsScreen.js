@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 import {
   getShoppingLists,
   createShoppingList,
@@ -32,6 +33,8 @@ import {
   INITIAL_LOAD_GRACE_MS,
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
+import useGatedRefresh from '../../hooks/useGatedRefresh';
+import { withMinDuration } from '../../services/minDuration';
 import { makeStyles } from './MyListsScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -55,6 +58,16 @@ const MyListsScreen = ({ navigation }) => {
   // מצבים לניהול חלון ההצטרפות עם קוד הזמנה
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה).
+  // RN מפעיל גלילה מקוננת לכל רשימה עם RefreshControl. SwipeRefreshLayout מקבל את
+  // הגלילה המקוננת בתחילת המגע (כשהוא פתוח) וממשיך למשוך דרכה גם אחרי ש-enabled
+  // כבה באמצע המגע. לכן הגלילה המקוננת כבויה יחד עם השער: כיבויה עוצר את
+  // הגלילה המקוננת של המגע הנוכחי (stopNestedScroll), ומשיכה באותו מגע לא מרעננת
+  const {
+    enabled: refreshEnabled,
+    scrollHandlers: refreshScrollHandlers,
+    scrollTracking: refreshScrollTracking,
+  } = useGatedRefresh(refreshing);
   // יש כבר רשימות על המסך - מטמון לא דורס אותן, הוא רק מעביר למצב לא מקוון
   const hasLists = useRef(false);
   // רענון חי כבר הביא נתוני שרת - תשובה מאוחרת של הטעינה הראשונה כבר ישנה
@@ -132,7 +145,8 @@ const MyListsScreen = ({ navigation }) => {
   const handlePullToRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshLists();
+      // הספינר נשאר גלוי זמן מינימלי; שגיאה נזרקת אחרי ההמתנה ומטופלת כאן כרגיל
+      await withMinDuration(refreshLists);
     } catch (error) {
       if (error.sessionExpired || error.staleToken) return; // ההתראה כבר הוצגה / טוקן שהוחלף
       Alert.alert('שגיאה', 'לא הצלחנו לטעון את הרשימות שלך.');
@@ -324,7 +338,13 @@ const MyListsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* כותרת עליונה מעוצבת */}
-      <View style={[styles.headerBackground, { paddingTop: insets.top + 24 }]}>
+      <LinearGradient
+        testID="header_gradient"
+        colors={colors.headerGradient}
+        useAngle
+        angle={135}
+        style={[styles.headerBackground, { paddingTop: insets.top + 24 }]}
+      >
         <Text style={styles.headerEyebrow}>ניהול קניות חכם</Text>
         <Text style={styles.mainTitle}>הרשימות שלי</Text>
         <Text style={styles.headerSubtitle}>
@@ -332,7 +352,7 @@ const MyListsScreen = ({ navigation }) => {
             ? `${lists.length} רשימות פעילות`
             : 'בואו ניצור את הרשימה הראשונה'}
         </Text>
-      </View>
+      </LinearGradient>
 
       {/* כרטיס יצירת רשימה - "מרחף" מעל הכותרת */}
       <View style={styles.createCard}>
@@ -376,8 +396,12 @@ const MyListsScreen = ({ navigation }) => {
 
       <FlatList
         data={lists}
+        {...refreshScrollHandlers}
+        {...refreshScrollTracking}
+        nestedScrollEnabled={refreshEnabled}
         refreshControl={
           <RefreshControl
+            enabled={refreshEnabled}
             refreshing={refreshing}
             onRefresh={handlePullToRefresh}
             colors={[colors.primary]}

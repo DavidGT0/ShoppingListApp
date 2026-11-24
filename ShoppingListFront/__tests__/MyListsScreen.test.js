@@ -74,6 +74,69 @@ describe('MyListsScreen', () => {
     ]);
   });
 
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (useGatedRefresh)
+  test('the list wires the gated pull-to-refresh', async () => {
+    await renderScreen();
+    const { FlatList } = require('react-native');
+    const list = () => tree.root.findByType(FlatList);
+    expect(list().props.refreshControl.props.enabled).toBe(true);
+    expect(typeof list().props.onMomentumScrollBegin).toBe('function');
+    await act(async () =>
+      list().props.onScrollBeginDrag({
+        nativeEvent: { contentOffset: { y: 250 } },
+      }),
+    );
+    expect(list().props.refreshControl.props.enabled).toBe(false);
+    await act(async () =>
+      list().props.onScrollEndDrag({ nativeEvent: { contentOffset: { y: 0 } } }),
+    );
+    expect(list().props.refreshControl.props.enabled).toBe(true);
+  });
+
+  test('a drag that leaves the top closes the gate until the finger lifts', async () => {
+    await renderScreen();
+    const { FlatList } = require('react-native');
+    const list = () => tree.root.findByType(FlatList);
+    const at = y => ({ nativeEvent: { contentOffset: { y } } });
+    expect(list().props.scrollEventThrottle).toBe(16);
+    await act(async () => list().props.onScrollBeginDrag(at(0)));
+    await act(async () => list().props.onScroll(at(70)));
+    await act(async () => list().props.onScroll(at(0)));
+    expect(list().props.refreshControl.props.enabled).toBe(false);
+    expect(list().props.nestedScrollEnabled).toBe(false);
+    await act(async () => list().props.onScrollEndDrag(at(0)));
+    expect(list().props.refreshControl.props.enabled).toBe(true);
+    expect(list().props.nestedScrollEnabled).toBe(true);
+  });
+
+  test('a failed pull still alerts and stops the spinner after the minimum time', async () => {
+    const { setMinRefreshMs } = require('../src/services/minDuration');
+    const { FlatList } = require('react-native');
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    setMinRefreshMs(40);
+    try {
+      await renderScreen();
+      getShoppingLists.mockRejectedValueOnce(new Error('boom'));
+      const list = () => tree.root.findByType(FlatList);
+      let pending;
+      await act(async () => {
+        pending = list().props.refreshControl.props.onRefresh();
+      });
+      expect(list().props.refreshControl.props.refreshing).toBe(true);
+      await act(async () => {
+        await pending;
+      });
+      expect(alertSpy).toHaveBeenCalledWith(
+        'שגיאה',
+        'לא הצלחנו לטעון את הרשימות שלך.',
+      );
+      expect(list().props.refreshControl.props.refreshing).toBe(false);
+    } finally {
+      setMinRefreshMs(0);
+      alertSpy.mockRestore();
+    }
+  });
+
   test('every card has a menu button, and shared lists also show a badge', async () => {
     const { byTestId } = await renderScreen();
 

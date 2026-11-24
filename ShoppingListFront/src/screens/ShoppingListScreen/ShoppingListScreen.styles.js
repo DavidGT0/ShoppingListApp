@@ -14,7 +14,7 @@ export const makeStyles = colors => StyleSheet.create({
 
   /* כותרת עליונה מעוצבת */
   headerBackground: {
-    backgroundColor: colors.primary,
+    // הרקע הוא מעבר הצבעים (LinearGradient) - colors.headerGradient
     paddingBottom: 44,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 32,
@@ -77,6 +77,16 @@ export const makeStyles = colors => StyleSheet.create({
     marginBottom: 4,
     letterSpacing: 0.3,
   },
+  // טבעת ההתקדמות בצד ימין ולצידה שם הרשימה והשורה שמתחתיו
+  headerMain: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 12,
+  },
+  headerTexts: {
+    flex: 1,
+  },
   mainTitle: {
     fontSize: 28,
     fontWeight: '800',
@@ -99,8 +109,8 @@ export const makeStyles = colors => StyleSheet.create({
     backgroundColor: colors.surface,
     marginHorizontal: 20,
     marginTop: -28,
-    padding: 10,
-    borderRadius: 20,
+    padding: 8,
+    borderRadius: 16,
     shadowColor: colors.shadow.dark,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
@@ -121,12 +131,18 @@ export const makeStyles = colors => StyleSheet.create({
     marginBottom: 12,
     textAlign: 'right',
   },
+  // מתג גלולה: מיכל מעוגל עם ריווח פנימי. בלי overflow: 'hidden' (שחותך את המסגרת
+  // בפינות באנדרואיד) - המקטעים מעוגלים בעצמם
   sortSegments: {
     flexDirection: 'row-reverse',
     marginHorizontal: 20,
-    marginTop: 4,
-    borderRadius: 12,
-    overflow: 'hidden',
+    marginTop: 10,
+    marginBottom: 8,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: colors.raised,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   sortSegment: {
     flex: 1,
@@ -134,43 +150,37 @@ export const makeStyles = colors => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
+    borderRadius: 10,
   },
   sortSegmentActive: {
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sortSegmentText: {
     fontSize: 14,
     marginRight: 6,
-    color: colors.primaryText,
+    color: colors.text.secondary,
     fontWeight: '600',
   },
   sortSegmentTextActive: {
     color: colors.text.inverse,
-  },
-  categoryHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  categoryHeaderDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginLeft: 8,
-  },
-  categoryHeaderText: {
-    fontSize: 14,
     fontWeight: '700',
-    color: colors.text.secondary,
-    textAlign: 'right',
   },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 380,
+  },
+  // אזור הרשימה במצב ידני (עוטף את מיכל הגלילה כדי למדוד את גובהו)
+  listArea: {
+    flex: 1,
+  },
+  // המסלול צמוד יותר לקצוות (כמו בעיצוב), כדי להשאיר לשמות המוצרים רוחב
+  routeContent: {
+    paddingHorizontal: 14,
   },
 
   /* מודאל עריכה */
@@ -242,33 +252,5 @@ export const makeStyles = colors => StyleSheet.create({
     color: colors.text.inverse,
     fontSize: 17,
     fontWeight: '700',
-  },
-  tipContainer: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderWidth: 0.2,
-    borderColor: colors.border,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  tipTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.heading,
-    marginBottom: 4,
-    textAlign: 'right',
-  },
-  tipText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 18,
-    textAlign: 'right',
-  },
-  boldText: {
-    fontWeight: 'bold',
-    color: colors.text.primary,
   },
 });

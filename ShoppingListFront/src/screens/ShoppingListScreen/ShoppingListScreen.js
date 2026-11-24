@@ -10,8 +10,12 @@ import {
 } from 'react-native';
 import { ScrollView, RefreshControl } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DraggableFlatList from 'react-native-draggable-flatlist';
+import {
+  NestableScrollContainer,
+  NestableDraggableFlatList,
+} from 'react-native-draggable-flatlist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 
 // קומפוננטות מופרדות
 import ShoppingListItem from '../../components/ShoppingListItem/ShoppingListItem';
@@ -20,6 +24,9 @@ import AddItemInput from '../../components/AddItemInput/AddItemInput';
 import EditItemModal from '../../components/EditItemModal/EditItemModal';
 import MembersModal from '../../components/MembersModal/MembersModal';
 import UndoBar from '../../components/UndoBar/UndoBar';
+import ProgressRing from '../../components/ProgressRing/ProgressRing';
+import DepartmentRoute from '../../components/DepartmentRoute/DepartmentRoute';
+import { buildRoute } from '../../components/DepartmentRoute/buildRoute';
 import OfflineBanner, {
   showOfflineBlockedAlert,
 } from '../../components/OfflineBanner/OfflineBanner';
@@ -49,15 +56,19 @@ import {
   INITIAL_LOAD_GRACE_MS,
 } from '../../services/offlineCache';
 import useLiveRefresh from '../../hooks/useLiveRefresh';
+import useGatedRefresh from '../../hooks/useGatedRefresh';
+import NestableOffsetObserver from '../../hooks/NestableOffsetObserver';
+import { withMinDuration } from '../../services/minDuration';
 import { makeStyles } from './ShoppingListScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const LIVE_REFRESH_MS = 3000;
-// מחוות הגרירה של הרשימה תופסת כל תנועה אנכית ובולעת את המשיכה לריענון.
-// מגבילים את תחילת המחווה לרצועה של ידית הגרירה (בצד ההתחלה של השורה),
-// כך שמשיכה מכל מקום אחר מגיעה לרכיב הריענון
-const DRAG_HIT_SLOP = { [I18nManager.isRTL ? 'right' : 'left']: 0, width: 100 };
+// מחוות הגרירה של הרשימה תופסת תנועה אנכית ועלולה לבלוע את המשיכה לריענון.
+// מגבילים את תחילת המחווה לרצועה של ידית הגרירה, שבקצה השמאלי של השורה.
+// הרשימה המקוננת מתחילה אחרי ריווח המיכל (20dp); ריווח השורה 12 = הידית ב-12-40dp
+// מתחילת הרשימה, ועם hitSlop ב-2-50dp. הרצועה (56dp) מכסה רק אותה
+const DRAG_HIT_SLOP = { [I18nManager.isRTL ? 'right' : 'left']: 0, width: 56 };
 // כמה זמן אפשר לבטל פעולה (מחיקה נשלחת לשרת רק אחרי זמן זה)
 export const UNDO_MS = 5000;
 
@@ -420,10 +431,28 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   useLiveRefresh(refreshItems, LIVE_REFRESH_MS, { paused: isDragging });
 
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה).
+  // RN מפעיל גלילה מקוננת לכל רשימה עם RefreshControl. SwipeRefreshLayout מקבל את
+  // הגלילה המקוננת בתחילת המגע (כשהוא פתוח) וממשיך למשוך דרכה גם אחרי ש-enabled
+  // כבה באמצע המגע. לכן הגלילה המקוננת כבויה יחד עם השער: כיבויה עוצר את
+  // הגלילה המקוננת של המגע הנוכחי (stopNestedScroll), ומשיכה באותו מגע לא מרעננת
+  const {
+    enabled: refreshEnabled,
+    scrollHandlers: refreshScrollHandlers,
+    scrollTracking: refreshScrollTracking,
+    onOffset: onRefreshOffset,
+    reset: resetRefreshGate,
+  } = useGatedRefresh(refreshing);
+  // החלפת מצב מציגה רשימה אחרת, שמתחילה בראש
+  useEffect(() => {
+    resetRefreshGate();
+  }, [sortMode, resetRefreshGate]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshItems();
+      // הספינר נשאר גלוי זמן מינימלי, גם כשהשרת עונה מהר
+      await withMinDuration(refreshItems);
     } finally {
       setRefreshing(false);
     }
@@ -774,34 +803,42 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const purchasedItems = visibleItems.filter(item => item.purchased);
   const categoryMode = sortMode === 'category';
 
-  // קבוצות לפי מחלקה, לפי הסדר ששמור בפריסת הרשימה (cat.order), "אחר" תמיד אחרונה
-  const groups = [];
-  if (categoryMode) {
-    const byKey = new Map();
-    visibleResolved
-      .filter(r => !r.item.purchased)
-      .forEach(({ item, cat }) => {
-        if (!byKey.has(cat.key)) {
-          const group = { ...cat, items: [] };
-          byKey.set(cat.key, group);
-          groups.push(group);
-        }
-        byKey.get(cat.key).items.push(item);
-      });
-    groups.sort((x, y) => x.order - y.order);
-  }
+  // המסלול לפי מחלקות: רק מחלקות עם מוצרים, בסדר הפריסה של הרשימה ("אחר" תמיד אחרונה).
+  // המונה סופר גם מה שנקנה, אבל המוצרים שנקנו מופיעים רק בחלק התחתון
+  const departmentPlan = categoryMode ? buildRoute(visibleResolved) : null;
+  const departmentCount = departmentPlan ? departmentPlan.stations.length : 0;
+
+  const subtitle =
+    unpurchasedItems.length > 0
+      ? `${unpurchasedItems.length} מוצרים לקנייה`
+      : visibleItems.length > 0
+      ? 'כל המוצרים נקנו 🎉'
+      : 'הרשימה עדיין ריקה';
+  const departmentsLabel =
+    departmentCount === 1 ? 'מחלקה אחת' : `${departmentCount} מחלקות`;
+
+  // שורת מוצר במסלול (רגילה, או גדולה בכרטיס "עכשיו במחלקה").
+  // כל הפעולות עוברות דרך המסך: חסימה במצב לא מקוון, פס ביטול ומשמר השינויים
+  const renderRouteRow = (item, { variant } = {}) => (
+    <ShoppingListItem
+      item={item}
+      variant={variant}
+      onTogglePurchased={() => handleTogglePurchased(item)}
+      onEdit={() => openEditModal(item)}
+      onDelete={() => handleDeleteItem(item.id)}
+      onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
+      isActive={false}
+      showAddedBy={memberCount > 1}
+      currentUsername={currentUsername}
+      disabled={isOffline}
+    />
+  );
 
   const listHeader = (
     <View>
-      <View style={styles.tipContainer}>
-        <Text style={styles.tipTitle}>💡 טיפ שימושי:</Text>
-        <Text style={styles.tipText}>
-          • <Text style={styles.boldText}>סימון כנקנה:</Text> החלק שמאלה.
-          {'\n'}• <Text style={styles.boldText}>מחיקת מוצר:</Text> החלק ימינה.
-        </Text>
-      </View>
-
-      {/* הכותרת המקורית של "מוצרים לקנייה" מופיעה מתחת לטיפ במידה ויש מוצרים */}
+      {/* אין תיבת טיפ (אין בעיצוב, והייתה נראית כפס ריק מתחת למתג המיון).
+          העיגול, הפח והשם מסבירים את עצמם ויש להם תוויות נגישות */}
+      {/* הכותרת "מוצרים לקנייה" מופיעה במצב ידני כשיש מוצרים */}
       {unpurchasedItems.length > 0 && !categoryMode && (
         <Text style={styles.sectionLabel}>מוצרים לקנייה</Text>
       )}
@@ -832,7 +869,12 @@ const ShoppingListScreen = ({ route, navigation }) => {
         אפשר להקטין עוד אם צריך
       */}
       {/* הורדנו את הרווח העליון, והשארנו רווח תחתון קטן רק כדי לעבור את חלון ההוספה */}
-      <View
+      {/* כותרת במעבר צבעים מכחול כהה לכחול (135 מעלות, כמו בעיצוב) */}
+      <LinearGradient
+        testID="header_gradient"
+        colors={colors.headerGradient}
+        useAngle
+        angle={135}
         style={[
           styles.headerBackground,
           { paddingTop: insets.top + 5, paddingBottom: 40 },
@@ -893,17 +935,24 @@ const ShoppingListScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        <Text style={styles.mainTitle} numberOfLines={1}>
-          {listName || 'רשימת קניות'}
-        </Text>
-        <Text style={styles.headerSubtitle}>
-          {unpurchasedItems.length > 0
-            ? `${unpurchasedItems.length} מוצרים לקנייה`
-            : visibleItems.length > 0
-            ? 'כל המוצרים נקנו 🎉'
-            : 'הרשימה עדיין ריקה'}
-        </Text>
-      </View>
+        {/* טבעת ההתקדמות לצד שם הרשימה: כמה נקנו מתוך כל המוצרים */}
+        <View style={styles.headerMain}>
+          <ProgressRing
+            done={purchasedItems.length}
+            total={visibleItems.length}
+          />
+          <View style={styles.headerTexts}>
+            <Text style={styles.mainTitle} numberOfLines={1}>
+              {listName || 'רשימת קניות'}
+            </Text>
+            <Text testID="list_subtitle" style={styles.headerSubtitle}>
+              {departmentCount > 0
+                ? `${subtitle} · ${departmentsLabel}`
+                : subtitle}
+            </Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       {/* תיבת ההוספה נשארת קבועה כדי שתמיד יהיה אפשר להוסיף מוצרים */}
       <View style={styles.addCard}>
@@ -916,7 +965,8 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       <OfflineBanner visible={isOffline} />
 
-      <View style={styles.sortSegments}>
+      {/* מתג גלולה: מיכל מעוגל, והמקטע הפעיל גלולה מלאה בצבע הראשי */}
+      <View style={styles.sortSegments} testID="sort_segments">
         {[
           { mode: 'manual', label: 'סדר ידני', icon: 'drag-horizontal-variant' },
           { mode: 'category', label: 'לפי מחלקות', icon: 'shape-outline' },
@@ -939,7 +989,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
               <Icon
                 name={icon}
                 size={18}
-                color={selected ? colors.text.inverse : colors.primaryText}
+                color={selected ? colors.text.inverse : colors.text.secondary}
               />
               <Text
                 style={[
@@ -955,12 +1005,16 @@ const ShoppingListScreen = ({ route, navigation }) => {
       </View>
 
       {categoryMode ? (
-        // במצב מחלקות אין גרירה: רשימה רגילה עם כותרת לכל מחלקה
+        // במצב מחלקות אין גרירה: מסלול של מחלקות עם כרטיס "עכשיו במחלקה"
         <ScrollView
           testID="category_list"
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, styles.routeContent]}
+          {...refreshScrollHandlers}
+          {...refreshScrollTracking}
+          nestedScrollEnabled={refreshEnabled}
           refreshControl={
             <RefreshControl
+              enabled={refreshEnabled}
               refreshing={refreshing}
               onRefresh={handleRefresh}
               colors={[colors.primary]}
@@ -969,25 +1023,47 @@ const ShoppingListScreen = ({ route, navigation }) => {
           }
         >
           {listHeader}
-          {groups.map(group => (
-            <View key={group.key}>
-              <View
-                style={styles.categoryHeader}
-                testID={`category_header_${group.key}`}
-              >
-                <View
-                  style={[
-                    styles.categoryHeaderDot,
-                    { backgroundColor: group.color },
-                  ]}
-                />
-                <Text style={styles.categoryHeaderText}>
-                  {group.name} ({group.items.length})
-                </Text>
-              </View>
-              {group.items.map(item => (
+          <DepartmentRoute
+            plan={departmentPlan}
+            renderItem={renderRouteRow}
+          />
+          {purchasedFooter}
+        </ScrollView>
+      ) : (
+        // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה של gesture-handler (כמו במצב
+        // מחלקות), כך שהמשיכה לריענון שייכת למיכל ולא נבלעת במחוות הגרירה.
+        // הכותרת, הרשימה והחלק של מה שנקנה נגללים יחד כעמוד אחד
+        // העטיפה מודדת את גובה החלון (מיכל הגרירה דורס onLayout) לטובת שער הריענון
+        <View
+          style={styles.listArea}
+          onLayout={refreshScrollHandlers.onLayout}
+        >
+          <NestableScrollContainer
+            testID="manual_list"
+            contentContainerStyle={styles.listContent}
+            {...refreshScrollHandlers}
+            nestedScrollEnabled={refreshEnabled}
+            refreshControl={
+              <RefreshControl
+                enabled={refreshEnabled}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.primary]}
+                progressBackgroundColor={colors.raised}
+              />
+            }
+          >
+            {/* הגלילה של המיכל (הוא דורס onScroll) מגיעה לשער הריענון מכאן */}
+            <NestableOffsetObserver onOffset={onRefreshOffset} />
+            {listHeader}
+            <NestableDraggableFlatList
+              data={unpurchasedItems}
+              keyExtractor={item => item.id.toString()}
+              onDragBegin={handleDragBegin}
+              onDragEnd={handleDragEnd}
+              dragHitSlop={DRAG_HIT_SLOP}
+              renderItem={({ item, drag, isActive }) => (
                 <ShoppingListItem
-                  key={item.id}
                   item={item}
                   onTogglePurchased={() => handleTogglePurchased(item)}
                   onEdit={() => openEditModal(item)}
@@ -995,49 +1071,17 @@ const ShoppingListScreen = ({ route, navigation }) => {
                   onUpdateAmount={newAmount =>
                     handleUpdateAmount(item, newAmount)
                   }
-                  isActive={false}
+                  onDrag={isOffline ? undefined : drag}
+                  isActive={isActive}
                   showAddedBy={memberCount > 1}
                   currentUsername={currentUsername}
                   disabled={isOffline}
                 />
-              ))}
-            </View>
-          ))}
-          {purchasedFooter}
-        </ScrollView>
-      ) : (
-        <DraggableFlatList
-          data={unpurchasedItems}
-          keyExtractor={item => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          onDragBegin={handleDragBegin}
-          onDragEnd={handleDragEnd}
-          dragHitSlop={DRAG_HIT_SLOP}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.primary]}
-              progressBackgroundColor={colors.raised}
+              )}
             />
-          }
-          ListHeaderComponent={listHeader}
-          renderItem={({ item, drag, isActive }) => (
-            <ShoppingListItem
-              item={item}
-              onTogglePurchased={() => handleTogglePurchased(item)}
-              onEdit={() => openEditModal(item)}
-              onDelete={() => handleDeleteItem(item.id)}
-              onUpdateAmount={newAmount => handleUpdateAmount(item, newAmount)}
-              onDrag={isOffline ? undefined : drag}
-              isActive={isActive}
-              showAddedBy={memberCount > 1}
-              currentUsername={currentUsername}
-              disabled={isOffline}
-            />
-          )}
-          ListFooterComponent={purchasedFooter}
-        />
+            {purchasedFooter}
+          </NestableScrollContainer>
+        </View>
       )}
 
       <UndoBar

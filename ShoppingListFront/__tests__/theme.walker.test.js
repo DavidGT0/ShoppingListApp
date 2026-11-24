@@ -4,7 +4,8 @@ import ReactTestRenderer from 'react-test-renderer';
 import { StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeProvider } from '../src/theme/ThemeContext';
-import { dark } from '../src/theme/palettes';
+import { View as HeaderBackground } from 'react-native';
+import { dark, light } from '../src/theme/palettes';
 import MyListsScreen from '../src/screens/MyListsScreen/MyListsScreen';
 import ShoppingListScreen from '../src/screens/ShoppingListScreen/ShoppingListScreen';
 import SettingsScreen from '../src/screens/SettingsScreen/SettingsScreen';
@@ -13,12 +14,28 @@ import UndoBar from '../src/components/UndoBar/UndoBar';
 import OfflineBanner from '../src/components/OfflineBanner/OfflineBanner';
 import JoinListModal from '../src/components/JoinListModal/JoinListModal';
 import ListActionsMenu from '../src/components/ListActionsMenu/ListActionsMenu';
+import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListItem';
+import DepartmentRoute from '../src/components/DepartmentRoute/DepartmentRoute';
+import { buildRoute } from '../src/components/DepartmentRoute/buildRoute';
+import FocusCard from '../src/components/FocusCard/FocusCard';
+import ProgressRing from '../src/components/ProgressRing/ProgressRing';
+import { resolveCategory } from '../src/services/categories';
 
 jest.mock('react-native-draggable-flatlist', () => {
   const ReactLib = require('react');
   const { View } = require('react-native');
+  // מצב ידני: רשימה נגררת מקוננת בתוך מיכל גלילה (עם המשיכה לריענון)
+  const MockNestableScrollContainer = ({ children, ...rest }) => {
+    global.__scrollProps = rest;
+    return ReactLib.createElement(View, { testID: 'nestable_scroll' }, children);
+  };
   return {
     __esModule: true,
+    NestableScrollContainer: MockNestableScrollContainer,
+    // הרשימה המקוננת זהה למוק של הרשימה הרגילה
+    get NestableDraggableFlatList() {
+      return this.default;
+    },
     default: ({ data, renderItem, ListHeaderComponent }) =>
       ReactLib.createElement(
         View,
@@ -32,13 +49,6 @@ jest.mock('react-native-draggable-flatlist', () => {
           ),
         ),
       ),
-  };
-});
-jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
-  const R = require('react');
-  return {
-    __esModule: true,
-    default: R.forwardRef(({ children }, _ref) => <>{children}</>),
   };
 });
 jest.mock('../src/hooks/useLiveRefresh', () => ({
@@ -88,26 +98,60 @@ const ALLOWED = new Set(
   ].map(([a, b]) => `${up(a)}|${up(b)}`),
 );
 
-const failures = (json, name) => {
+// רקע של צומת: צבע אטום, או מעבר צבעים (LinearGradient, prop בשם colors) - אז
+// הטקסט נבדק מול כל אחת מנקודות המעבר (המקרה הגרוע), כך שטקסט שיושב ישירות על
+// הקצה הטורקיז של כרטיס "עכשיו במחלקה" נכשל
+const failures = (json, name, base = dark.background) => {
   const out = [];
-  const visit = (n, bg) => {
+  // gradient: הרקע הגיע ממעבר צבעים. הזוגות המותרים (ALLOWED) חלים רק על רקע אטום
+  const visit = (n, bgs, gradient) => {
     if (!n || typeof n === 'string') return;
     const style = StyleSheet.flatten(n.props && n.props.style) || {};
-    const ownBg = isHex(style.backgroundColor) ? style.backgroundColor : bg;
-    if (n.type === 'Text' && isHex(style.color)) {
-      const r = ratio(style.color, ownBg);
-      if (r < 4.5 && !ALLOWED.has(`${up(style.color)}|${up(ownBg)}`)) {
-        out.push(`${name}: ${style.color} on ${ownBg} = ${r.toFixed(2)}`);
-      }
+    const stops = n.props && n.props.colors;
+    let ownBgs = bgs;
+    let ownGradient = gradient;
+    if (isHex(style.backgroundColor)) {
+      ownBgs = [style.backgroundColor];
+      ownGradient = false;
+    } else if (Array.isArray(stops) && stops.length && stops.every(isHex)) {
+      ownBgs = stops;
+      ownGradient = true;
     }
-    (n.children || []).forEach(c => visit(c, ownBg));
+    if (n.type === 'Text' && isHex(style.color)) {
+      ownBgs.forEach(bg => {
+        const r = ratio(style.color, bg);
+        const allowed =
+          !ownGradient && ALLOWED.has(`${up(style.color)}|${up(bg)}`);
+        if (r < 4.5 && !allowed) {
+          out.push(`${name}: ${style.color} on ${bg} = ${r.toFixed(2)}`);
+        }
+      });
+    }
+    (n.children || []).forEach(c => visit(c, ownBgs, ownGradient));
   };
-  [].concat(json).forEach(n => visit(n, dark.background));
+  [].concat(json).forEach(n => visit(n, [base], false));
   return out;
 };
 
-const renderDark = async element => {
-  await AsyncStorage.setItem('@theme_mode', 'dark');
+// בדיקת השומר עצמו: טקסט לבן ישירות על מעבר כחול-טורקיז נכשל
+test('the walker treats a gradient as its worst stop', () => {
+  const json = {
+    type: 'View',
+    props: { colors: [dark.primary, dark.secondary] },
+    children: [
+      { type: 'Text', props: { style: { color: dark.text.inverse } }, children: ['x'] },
+    ],
+  };
+  expect(failures(json, 'probe')).toEqual([
+    `probe: ${dark.text.inverse} on ${dark.secondary} = ${ratio(
+      dark.text.inverse,
+      dark.secondary,
+    ).toFixed(2)}`,
+  ]);
+});
+
+const renderDark = async (element, mode = 'dark') => {
+  await AsyncStorage.setItem('@theme_mode', mode);
   let tree;
   await act(async () => {
     tree = ReactTestRenderer.create(<ThemeProvider>{element}</ThemeProvider>);
@@ -117,6 +161,47 @@ const renderDark = async element => {
 };
 
 const nav = { navigate: jest.fn(), setOptions: jest.fn(), goBack: jest.fn() };
+
+// מסלול מחלקות עם מחלקה שהושלמה, כרטיס "עכשיו במחלקה" ושורות רגילות
+const routeItems = [
+  { id: 1, name: 'עגבניות', amount: 1, purchased: true },
+  { id: 2, name: 'חלב', amount: 2, unit: 'ליטר', note: '3%', purchased: false },
+  { id: 3, name: 'ביצים', amount: 1, purchased: true },
+  { id: 4, name: 'לחם', amount: 1, purchased: false, added_by: 'dana' },
+  { id: 5, name: 'שמפו', amount: 1, purchased: false },
+];
+const routeRow = (row, { variant } = {}) => (
+  <ShoppingListItem
+    item={row}
+    variant={variant}
+    onTogglePurchased={jest.fn()}
+    onEdit={jest.fn()}
+    onDelete={jest.fn()}
+    onUpdateAmount={jest.fn()}
+    showAddedBy
+    currentUsername="bob"
+  />
+);
+const routePlan = items =>
+  buildRoute(items.map(i => ({ item: i, cat: resolveCategory(i) })));
+const routeCases = {
+  DepartmentRoute: (
+    <DepartmentRoute plan={routePlan(routeItems)} renderItem={routeRow} />
+  ),
+  DepartmentRouteAllDone: (
+    <DepartmentRoute
+      plan={routePlan(routeItems.map(i => ({ ...i, purchased: true })))}
+      renderItem={routeRow}
+    />
+  ),
+  FocusCardDone: <FocusCard department={null} />,
+};
+// הטבעת יושבת על רקע הכותרת (הצבע הראשי בשתי הערכות)
+const ringCase = palette => (
+  <HeaderBackground style={{ backgroundColor: palette.primary }}>
+    <ProgressRing done={3} total={12} />
+  </HeaderBackground>
+);
 const cases = {
   MyLists: <MyListsScreen navigation={nav} />,
   ShoppingList: (
@@ -132,6 +217,8 @@ const cases = {
   JoinListModal: (
     <JoinListModal visible onClose={jest.fn()} onJoined={jest.fn()} />
   ),
+  ...routeCases,
+  ProgressRing: ringCase(dark),
   ListActionsMenu: (
     <ListActionsMenu
       visible
@@ -156,6 +243,28 @@ describe('dark mode contrast walker', () => {
         expect(failures(json, name)).toEqual([]);
       } finally {
         // פירוק בתוך act כדי שאנימציות של השורות לא ימשיכו לרוץ אחרי הבדיקה
+        await act(async () => tree.unmount());
+      }
+    });
+  });
+});
+
+// גם בערכה הבהירה: הטקסט של המסלול, הכרטיס והטבעת עומד ב-AA
+describe('light mode contrast walker: route, focus card and ring', () => {
+  const lightCases = {
+    ...routeCases,
+    ProgressRing: ringCase(light),
+    // המסכים עם כותרת המעבר על הרקע הבהיר החדש (#F4F7FB)
+    ShoppingList: cases.ShoppingList,
+    MyLists: cases.MyLists,
+    Settings: cases.Settings,
+  };
+  Object.entries(lightCases).forEach(([name, el]) => {
+    test(`${name}: every text meets 4.5:1 on its background`, async () => {
+      const tree = await renderDark(el, 'light');
+      try {
+        expect(failures(tree.toJSON(), name, light.background)).toEqual([]);
+      } finally {
         await act(async () => tree.unmount());
       }
     });
