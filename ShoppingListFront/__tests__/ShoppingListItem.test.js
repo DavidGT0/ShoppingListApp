@@ -148,6 +148,19 @@ test('offline: circle, trash and name stay pressable and not a11y-disabled', asy
   Object.values(fns).forEach(f => expect(f).toHaveBeenCalledTimes(1));
 });
 
+test('offline: circle and trash tell TalkBack they are unavailable', async () => {
+  const offline = await render({ id: 7 }, { disabled: true });
+  for (const id of ['item_check_7', 'item_delete_7']) {
+    const [n] = offline.find(id);
+    expect(n.props.accessibilityHint).toBe('לא זמין ללא חיבור לאינטרנט');
+  }
+  const online = await render({ id: 8 });
+  for (const id of ['item_check_8', 'item_delete_8']) {
+    const [n] = online.find(id);
+    expect(n.props.accessibilityHint).toBeUndefined();
+  }
+});
+
 test('there is no swipe container and no pencil any more', async () => {
   const { tree } = await render({ id: 7 });
   expect(

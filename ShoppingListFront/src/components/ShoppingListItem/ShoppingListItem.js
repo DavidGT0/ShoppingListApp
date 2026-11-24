@@ -63,6 +63,9 @@ const ShoppingListItem = ({
   // המסך מריץ blockIfOffline. רק כפתורי הכמות מושבתים בפועל.
   // סדר השורה כמו בעיצוב (row-reverse): מימין עיגול, שם, כמות, פח, ובקצה השמאלי
   // ידית הגרירה - בתוך רצועת ה-dragHitSlop של הרשימה
+  // לא מנטרלים את הכפתורים (הם מציגים את התראת "אין חיבור"), רק מודיעים לקורא המסך
+  const offlineHint = disabled ? 'לא זמין ללא חיבור לאינטרנט' : undefined;
+
   return (
     <View
       style={[
@@ -91,6 +94,7 @@ const ShoppingListItem = ({
           .filter(Boolean)
           .join(', ')}
         accessibilityState={{ checked: !!item.purchased }}
+        accessibilityHint={offlineHint}
         hitSlop={CIRCLE_HIT_SLOP}
         style={[
           styles.checkCircle,
@@ -187,6 +191,7 @@ const ShoppingListItem = ({
         onPress={() => onDelete()}
         accessibilityRole="button"
         accessibilityLabel={`מחק את ${item.name}`}
+        accessibilityHint={offlineHint}
         hitSlop={TRASH_HIT_SLOP}
         style={styles.actionButton}
         android_ripple={ripple(18)}
