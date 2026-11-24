@@ -109,10 +109,11 @@ const EditItemModal = ({
     }
   };
 
-  const confirmDelete = category => {
+  // displayName: השם שמוצג (שינוי השם בפריסה). ב-custom נשאר השם הישן
+  const confirmDelete = (category, displayName = category.name) => {
     Alert.alert(
       'מחיקת מחלקה',
-      `למחוק את המחלקה "${category.name}"? המוצרים שבה יחזרו לסיווג אוטומטי.`,
+      `למחוק את המחלקה "${displayName}"? המוצרים שבה יחזרו לסיווג אוטומטי.`,
       [
         { text: 'ביטול', style: 'cancel' },
         {
@@ -203,7 +204,9 @@ const EditItemModal = ({
                     d.name,
                     d.key,
                     d.color,
-                    custom ? { onLongPress: () => confirmDelete(custom) } : {},
+                    custom
+                      ? { onLongPress: () => confirmDelete(custom, d.name) }
+                      : {},
                     d.icon,
                   );
                 })}

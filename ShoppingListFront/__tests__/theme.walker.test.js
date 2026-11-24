@@ -19,8 +19,17 @@ import DepartmentRoute from '../src/components/DepartmentRoute/DepartmentRoute';
 import { buildRoute } from '../src/components/DepartmentRoute/buildRoute';
 import FocusCard from '../src/components/FocusCard/FocusCard';
 import ProgressRing from '../src/components/ProgressRing/ProgressRing';
+import EditDepartmentsScreen from '../src/screens/EditDepartmentsScreen/EditDepartmentsScreen';
+import EmojiPicker from '../src/components/EmojiPicker/EmojiPicker';
 import { resolveCategory } from '../src/services/categories';
 
+// ה-ScrollView של gesture-handler (מצב מחלקות) דורש Reanimated מלא: מוחלף ברכיב
+// שמציג את הילדים (הרקע מגיע מהמסך, לא ממנו)
+jest.mock('react-native-gesture-handler', () => ({
+  ...jest.requireActual('react-native-gesture-handler'),
+  ScrollView: ({ children }) =>
+    require('react').createElement(require('react-native').View, null, children),
+}));
 jest.mock('react-native-draggable-flatlist', () => {
   const ReactLib = require('react');
   const { View } = require('react-native');
@@ -36,7 +45,13 @@ jest.mock('react-native-draggable-flatlist', () => {
     get NestableDraggableFlatList() {
       return this.default;
     },
-    default: ({ data, renderItem, ListHeaderComponent }) =>
+    default: ({
+      data,
+      renderItem,
+      keyExtractor,
+      ListHeaderComponent,
+      ListFooterComponent,
+    }) =>
       ReactLib.createElement(
         View,
         null,
@@ -44,10 +59,11 @@ jest.mock('react-native-draggable-flatlist', () => {
         data.map(item =>
           ReactLib.createElement(
             ReactLib.Fragment,
-            { key: item.id },
+            { key: keyExtractor ? keyExtractor(item) : item.id },
             renderItem({ item, drag: () => {}, isActive: false }),
           ),
         ),
+        ListFooterComponent,
       ),
   };
 });
@@ -64,6 +80,15 @@ jest.mock('../src/services/api', () => ({
     { id: 2, name: 'לחם', amount: 1, purchased: true, position: 1 },
   ]),
   getListMembers: jest.fn(async () => []),
+  // מחלקה מותאמת ושינויים בפריסה, כדי שמסך עריכת המחלקות יציג את כל סוגי השורות
+  getListCategories: jest.fn(async () => ({
+    custom: [{ id: 3, name: 'חיות', color: '#7986CB', icon: '🐾' }],
+    layout: [
+      { key: 'dairy', name: 'מקררים', icon: '🧀', position: 0 },
+      { key: 'bakery', name: null, icon: null, position: 1 },
+      { key: 'custom:3', name: null, icon: '🐾', position: 2 },
+    ],
+  })),
 }));
 jest.mock('../src/services/auth', () => ({
   getCurrentUser: jest.fn(async () => ({ username: 'bob', email: 'b@example.com' })),
@@ -219,6 +244,21 @@ const cases = {
   ),
   ...routeCases,
   ProgressRing: ringCase(dark),
+  EditDepartments: (
+    <EditDepartmentsScreen
+      route={{ params: { listId: 1, listName: 'שלי', usedKeys: ['produce'] } }}
+      navigation={nav}
+    />
+  ),
+  EmojiPicker: (
+    <EmojiPicker
+      visible
+      selected="🥦"
+      onSelect={jest.fn()}
+      onReset={jest.fn()}
+      onClose={jest.fn()}
+    />
+  ),
   ListActionsMenu: (
     <ListActionsMenu
       visible
@@ -258,6 +298,8 @@ describe('light mode contrast walker: route, focus card and ring', () => {
     ShoppingList: cases.ShoppingList,
     MyLists: cases.MyLists,
     Settings: cases.Settings,
+    EditDepartments: cases.EditDepartments,
+    EmojiPicker: cases.EmojiPicker,
   };
   Object.entries(lightCases).forEach(([name, el]) => {
     test(`${name}: every text meets 4.5:1 on its background`, async () => {
@@ -266,6 +308,56 @@ describe('light mode contrast walker: route, focus card and ring', () => {
         expect(failures(tree.toJSON(), name, light.background)).toEqual([]);
       } finally {
         await act(async () => tree.unmount());
+      }
+    });
+  });
+});
+
+// מסך עריכת המחלקות במצבי העריכה: שינוי שם עם בחירת אייקון, והוספת מחלקה
+describe('edit departments contrast walker: rename, picker and add', () => {
+  const pressById = async (tree, id) => {
+    const node = tree.root.findAll(
+      n => n.props.testID === id && typeof n.props.onPress === 'function',
+    )[0];
+    await act(async () => node.props.onPress());
+  };
+  const modes = [
+    ['dark', dark.background],
+    ['light', light.background],
+  ];
+  modes.forEach(([mode, base]) => {
+    test(`${mode}: every text meets 4.5:1 while renaming, picking and adding`, async () => {
+      const tree = await renderDark(cases.EditDepartments, mode);
+      try {
+        await pressById(tree, 'department_edit_dairy');
+        expect(JSON.stringify(tree.toJSON())).toContain('department_name_input');
+        expect(failures(tree.toJSON(), `rename ${mode}`, base)).toEqual([]);
+        await pressById(tree, 'department_icon_dairy');
+        expect(JSON.stringify(tree.toJSON())).toContain('emoji_picker');
+        expect(failures(tree.toJSON(), `picker ${mode}`, base)).toEqual([]);
+        await pressById(tree, 'emoji_close');
+        await pressById(tree, 'add_department_button');
+        const json = tree.toJSON();
+        expect(JSON.stringify(json)).toContain('new_department_input');
+        expect(failures(json, `add ${mode}`, base)).toEqual([]);
+      } finally {
+        await act(async () => tree.unmount());
+      }
+    });
+  });
+
+  // כפתור ✎ ליד מתג המיון, במצב "לפי מחלקות"
+  modes.forEach(([mode, base]) => {
+    test(`${mode}: the list screen by departments, with the ✎ button`, async () => {
+      await AsyncStorage.setItem('@sort_mode_1', 'category');
+      const tree = await renderDark(cases.ShoppingList, mode);
+      try {
+        const json = tree.toJSON();
+        expect(JSON.stringify(json)).toContain('edit_departments_button');
+        expect(failures(json, `list by departments ${mode}`, base)).toEqual([]);
+      } finally {
+        await act(async () => tree.unmount());
+        await AsyncStorage.removeItem('@sort_mode_1');
       }
     });
   });
