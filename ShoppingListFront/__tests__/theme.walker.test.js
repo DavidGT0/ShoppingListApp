@@ -276,6 +276,7 @@ const cases = {
   Login: <LoginScreen onLoginSuccess={jest.fn()} />,
   UndoBar: <UndoBar visible message="המוצר נמחק" onUndo={jest.fn()} />,
   OfflineBanner: <OfflineBanner visible />,
+  SlowBanner: <OfflineBanner visible slow />,
   JoinListModal: (
     <JoinListModal visible onClose={jest.fn()} onJoined={jest.fn()} />
   ),
@@ -352,6 +353,7 @@ describe('light mode contrast walker: route, focus card and ring', () => {
     Login: cases.Login,
     UndoBar: cases.UndoBar,
     OfflineBanner: cases.OfflineBanner,
+    SlowBanner: cases.SlowBanner,
     JoinListModal: cases.JoinListModal,
     ListActionsMenu: cases.ListActionsMenu,
     MembersModal: cases.MembersModal,

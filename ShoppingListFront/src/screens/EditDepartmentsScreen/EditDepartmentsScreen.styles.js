@@ -161,12 +161,6 @@ export const makeStyles = colors =>
       color: colors.text.primary,
       textAlign: 'right',
     },
-    pinnedText: {
-      fontSize: 12,
-      color: colors.text.secondary,
-      textAlign: 'right',
-      marginTop: 2,
-    },
     nameInput: {
       flex: 1,
       minWidth: 0,

@@ -99,6 +99,8 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   // לפני השמירה בודקים שמשתתף אחר לא שינה אותן בינתיים
   const snapshot = useRef(null);
   const mine = useRef(new Set());
+  // נקודת ההשוואה נטענה מהמטמון (לא מקוון): ייתכן שהיא ישנה
+  const snapshotFromCache = useRef(false);
   // יציאה מכוונת (אחרי שמירה, או "בטל שינויים"): בלי שאלה
   const leaving = useRef(false);
 
@@ -169,6 +171,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
           return;
         }
         applyServerState(normalizeCategories(data));
+        snapshotFromCache.current = fromCache;
         if (fromCache) setOffline(true);
       } catch (error) {
         if (cancelled || error.sessionExpired) return;
@@ -472,6 +475,19 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
     if (!mounted.current) return;
     // השרת ענה: החיבור חזר
     if (isOfflineRef.current) setOffline(false);
+    // נטען מהמטמון ואין שינויים שלי: הגרסה מהשרת היא נקודת ההשוואה החדשה (המטמון
+    // פשוט היה ישן), בלי לשאול אם מישהו אחר שינה
+    if (
+      snapshotFromCache.current &&
+      !isDirty(baseline.current, nextOrder, nextRows)
+    ) {
+      snapshotFromCache.current = false;
+      const state = buildEditorState(fresh);
+      applyServerState(fresh);
+      await putLayout(layoutPayload(state.order, state.rows), action);
+      return;
+    }
+    snapshotFromCache.current = false;
     if (serverChanged(snapshot.current, fresh, mine.current)) {
       savingRef.current = false;
       setSaving(false);
@@ -643,7 +659,6 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
                   <Text style={styles.name} numberOfLines={1}>
                     {name}
                   </Text>
-                  {pinned ? <Text style={styles.pinnedText}>תמיד אחרונה</Text> : null}
                 </View>
               )}
               <TouchableOpacity
@@ -703,6 +718,8 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
             placeholderTextColor={colors.placeholder}
             maxLength={MAX_NAME}
             style={styles.nameInput}
+            // בזמן שמירה לא מקלידים: טקסט חדש היה הולך לאיבוד כשהמסך נסגר
+            editable={!saving}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={submitAdd}

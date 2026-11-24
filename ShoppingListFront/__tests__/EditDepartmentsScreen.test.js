@@ -234,7 +234,8 @@ describe('loading and order', () => {
     expect(global.__dragProps.data.map(r => r.key)).toEqual(VISIBLE);
     expect(has(tree, 'department_drag_other')).toBe(false);
     expect(rowText(tree, 'other')).toContain('אחר');
-    expect(rowText(tree, 'other')).toContain('תמיד אחרונה');
+    // בלי התווית הגלויה: "אחר" פשוט נשארת אחרונה ובלי ידית
+    expect(rowText(tree, 'other')).not.toContain('תמיד אחרונה');
   });
 
   test('every draggable row has a handle that starts the drag on long press', async () => {
@@ -1339,5 +1340,49 @@ describe('StrictMode', () => {
     await press(tree, 'new_department_save');
     expect(rowKeys(tree)).toContain('custom:9');
     expect(has(tree, 'new_department_input')).toBe(false);
+  });
+});
+
+describe('re-review N1 and N2', () => {
+  test('N1: the open add form is not editable while a save is in flight', async () => {
+    const save = deferred();
+    saveCategoryLayout.mockReturnValue(save.promise);
+    const { tree } = await mount();
+    await press(tree, 'add_department_button');
+    expect(input(tree, 'new_department_input').props.editable).not.toBe(false);
+    await pressNoWait(tree, 'edit_departments_done');
+    expect(saveCategoryLayout).toHaveBeenCalledTimes(1);
+    expect(input(tree, 'new_department_input').props.editable).toBe(false);
+    await act(async () =>
+      save.reject(Object.assign(new Error('המחלקות עודכנו במקביל, נסה שוב'), { status: 409 })),
+    );
+    expect(input(tree, 'new_department_input').props.editable).not.toBe(false);
+  });
+
+  const staleCache = async () => {
+    await saveCache(cacheKeys.categories(7), { custom: CUSTOM, layout: LAYOUT });
+    getListCategories.mockRejectedValueOnce(
+      Object.assign(new Error('אין חיבור'), { network: true }),
+    );
+  };
+  const serverNow = () => ({
+    custom: CUSTOM,
+    layout: LAYOUT.map(e => (e.key === 'dairy' ? { ...e, name: 'קירור' } : e)),
+  });
+
+  test('N2: after a cache load with no edits, a newer server version is taken as is, with no alert', async () => {
+    await staleCache();
+    const { tree, navigation } = await mount();
+    expect(has(tree, 'offline_banner')).toBe(true);
+    getListCategories.mockResolvedValue(serverNow());
+    await press(tree, 'edit_departments_done');
+    expect(alertSpy).not.toHaveBeenCalledWith(
+      SERVER_ERROR.title,
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(entry(lastPayload(), 'dairy').name).toBe('קירור');
+    expect(keysOf(lastPayload())).toEqual(ALL_KEYS);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
   });
 });

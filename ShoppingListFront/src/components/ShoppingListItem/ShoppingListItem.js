@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { makeStyles } from './ShoppingListItem.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
+import { OFFLINE_HINT } from '../OfflineBanner/OfflineBanner';
 
 // אזורי לחיצה של 44dp לפחות סביב העיגול (26dp) והפח (28dp)
 const CIRCLE_HIT_SLOP = { top: 9, bottom: 9, left: 9, right: 9 };
@@ -21,6 +22,8 @@ const ShoppingListItem = ({
   showAddedBy = false,
   currentUsername = null,
   disabled = false,
+  // ההסבר לקורא המסך כשהשורה חסומה (אין חיבור, או שהשרת מתעורר)
+  disabledHint,
   // 'focus': שורה גדולה בכרטיס "עכשיו במחלקה" (טקסט לבן על הצבע הראשי)
   // 'route': שורה רגילה במסלול המחלקות (בלי הנקודה הצבעונית)
   variant,
@@ -64,7 +67,7 @@ const ShoppingListItem = ({
   // סדר השורה כמו בעיצוב (row-reverse): מימין עיגול, שם, כמות, פח, ובקצה השמאלי
   // ידית הגרירה - בתוך רצועת ה-dragHitSlop של הרשימה
   // לא מנטרלים את הכפתורים (הם מציגים את התראת "אין חיבור"), רק מודיעים לקורא המסך
-  const offlineHint = disabled ? 'לא זמין ללא חיבור לאינטרנט' : undefined;
+  const offlineHint = disabled ? disabledHint || OFFLINE_HINT : undefined;
 
   return (
     <View

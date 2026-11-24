@@ -55,6 +55,11 @@ const renderScreen = async () => {
 };
 const byTestId = id => tree.root.findAll(n => n.props.testID === id)[0];
 const banner = () => byTestId('offline_banner');
+const slowBanner = () => byTestId('slow_banner');
+const SLOW = ['השרת עוד מתעורר', 'אפשר יהיה לערוך בעוד כמה שניות'];
+const SLOW_HINT = 'השרת מתעורר, נסה שוב בעוד רגע';
+const OFFLINE_HINT = 'לא זמין ללא חיבור לאינטרנט';
+
 const refresh = () => useLiveRefresh.mock.calls.slice(-1)[0][0];
 const listNames = () => [
   ...new Set(
@@ -143,6 +148,9 @@ describe('loading', () => {
   test('the new-list input is not editable while offline', async () => {
     await goOffline();
     expect(byTestId('new_list_input').props.editable).toBe(false);
+    // רשת שנפלה באמת: הבאנר וההסבר של "אין חיבור", לא של השרת המתעורר
+    expect(slowBanner()).toBeUndefined();
+    expect(byTestId('create_list_button').props.accessibilityHint).toBe(OFFLINE_HINT);
   });
 
   test('a 500 refresh does not flip to offline', async () => {
@@ -303,20 +311,41 @@ describe('initial load grace period', () => {
     return { resolve, reject };
   };
 
-  test('shows the cache offline after 10 seconds, then goes online when the request succeeds', async () => {
+  // שרת שמתעורר (Render) הוא לא "אין אינטרנט": באנר נפרד ורגוע יותר
+  test('after 10 seconds shows the cache with the slow-server banner, then goes online when the request succeeds', async () => {
     await saveCache(cacheKeys.lists, LISTS);
     const request = hangingLoad();
     await renderScreen();
-    expect(banner()).toBeUndefined();
+    expect(slowBanner()).toBeUndefined();
     await act(async () => jest.advanceTimersByTimeAsync(10000));
     expect(listNames()).toEqual(['שלי', 'של אמא']);
-    expect(banner()).toBeDefined();
+    expect(slowBanner()).toBeDefined();
+    expect(banner()).toBeUndefined();
     await act(async () => request.resolve([LISTS[0]]));
     expect(listNames()).toEqual(['שלי']);
+    expect(slowBanner()).toBeUndefined();
     expect(banner()).toBeUndefined();
+    expect(byTestId('new_list_input').props.editable).toBe(true);
   });
 
-  test('a late network error keeps the cache and the banner', async () => {
+  test('while the server wakes, editing is blocked with the slow alert and hint', async () => {
+    await saveCache(cacheKeys.lists, LISTS);
+    hangingLoad();
+    await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(byTestId('new_list_input').props.editable).toBe(false);
+    expect(byTestId('create_list_button').props.accessibilityHint).toBe(SLOW_HINT);
+    await act(async () => byTestId('new_list_input').props.onChangeText('חדשה'));
+    await act(async () => byTestId('create_list_button').props.onPress());
+    expect(alertSpy).toHaveBeenCalledWith(...SLOW);
+    expect(alertSpy).not.toHaveBeenCalledWith(...BLOCKED);
+    expect(createShoppingList).not.toHaveBeenCalled();
+    alertSpy.mockClear();
+    await act(async () => byTestId('list_menu_1').props.onPress());
+    expect(alertSpy).toHaveBeenCalledWith(...SLOW);
+  });
+
+  test('a late network error turns the slow banner into the offline banner', async () => {
     await saveCache(cacheKeys.lists, LISTS);
     const request = hangingLoad();
     await renderScreen();
@@ -324,7 +353,10 @@ describe('initial load grace period', () => {
     await act(async () => request.reject(networkError()));
     expect(listNames()).toEqual(['שלי', 'של אמא']);
     expect(banner()).toBeDefined();
+    expect(slowBanner()).toBeUndefined();
     expect(alertSpy).not.toHaveBeenCalled();
+    await act(async () => byTestId('create_list_button').props.onPress());
+    expectBlocked();
   });
 
   test('a late server error keeps the existing error alert', async () => {
@@ -367,12 +399,13 @@ describe('grace period never overwrites newer data', () => {
     const initial = hang();
     await renderScreen();
     await act(async () => jest.advanceTimersByTimeAsync(10000));
-    expect(banner()).toBeDefined();
+    expect(slowBanner()).toBeDefined();
     getShoppingLists.mockResolvedValue([LISTS[0], { id: 9, name: 'חדשה' }]);
     await act(async () => refresh()());
     await act(async () => initial.resolve([LISTS[0]]));
     expect(listNames()).toEqual(['שלי', 'חדשה']);
     expect(banner()).toBeUndefined();
+    expect(slowBanner()).toBeUndefined();
   });
 
   test('the grace does not go offline when server data is already on screen', async () => {

@@ -15,10 +15,21 @@ export const makeStyles = colors => StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  // השרת מתעורר: גלולה רגועה על המשטח המורם, בלי צבע האזהרה
+  bannerSlow: {
+    backgroundColor: colors.raised,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadowBase,
+    shadowOpacity: 0.08,
+  },
   text: {
     color: colors.onWarning,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  textSlow: {
+    color: colors.text.primary,
   },
 });
