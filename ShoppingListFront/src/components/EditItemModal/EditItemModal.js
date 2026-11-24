@@ -180,6 +180,7 @@ const EditItemModal = ({
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.modalContent}>
+            <View style={styles.sheetHandle} testID="sheet_handle" />
             <Text style={styles.modalTitle}>ערוך מוצר</Text>
             <TextInput
               style={styles.modalInput}

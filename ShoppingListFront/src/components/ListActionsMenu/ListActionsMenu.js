@@ -47,6 +47,7 @@ const ListActionsMenu = ({
         accessibilityLabel="סגור תפריט"
       >
         <View style={styles.sheet}>
+          <View style={styles.sheetHandle} testID="sheet_handle" />
           <Text style={styles.title} numberOfLines={1}>
             {list.name}
           </Text>
