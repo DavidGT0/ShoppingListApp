@@ -15,6 +15,7 @@ const PurchasedItemsSection = ({
   showAddedBy = false,
   currentUsername = null,
   disabled = false,
+  disabledHint,
   blockIfOffline,
 }) => {
   const styles = useStyles(makeStyles);
@@ -79,6 +80,7 @@ const PurchasedItemsSection = ({
           showAddedBy={showAddedBy}
           currentUsername={currentUsername}
           disabled={disabled}
+          disabledHint={disabledHint}
         />
       ))}
     </View>

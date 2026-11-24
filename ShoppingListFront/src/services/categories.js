@@ -7,11 +7,11 @@ export const BUILTIN_CATEGORIES = [
   { key: 'bakery', name: 'מאפים ולחם', color: '#D4A056', icon: '🥖' },
   { key: 'meat', name: 'בשר ודגים', color: '#E57373', icon: '🥩' },
   { key: 'pantry', name: 'יבשים ושימורים', color: '#A1887F', icon: '🥫' },
-  { key: 'frozen', name: 'קפואים', color: '#4DD0E1', icon: '🧊' },
+  { key: 'frozen', name: 'קפואים', color: '#4DD0E1', icon: '❄️' },
   { key: 'drinks', name: 'משקאות', color: '#7986CB', icon: '🥤' },
   { key: 'snacks', name: 'חטיפים ומתוקים', color: '#FF8A65', icon: '🍫' },
-  { key: 'cleaning', name: 'ניקיון ובית', color: '#26A69A', icon: '🧽' },
-  { key: 'care', name: 'טיפוח ותינוקות', color: '#BA68C8', icon: '🧴' },
+  { key: 'cleaning', name: 'ניקיון ובית', color: '#26A69A', icon: '🏠' },
+  { key: 'care', name: 'טיפוח ותינוקות', color: '#BA68C8', icon: '🍼' },
   { key: 'other', name: 'אחר', color: '#9E9E9E', icon: '🛒' },
 ];
 

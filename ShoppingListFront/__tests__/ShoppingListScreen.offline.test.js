@@ -156,6 +156,11 @@ const row = (tree, id) =>
   tree.root.findAllByType(ShoppingListItem).find(n => n.props.item.id === id);
 const byId = (tree, id) => tree.root.findAll(n => n.props.testID === id)[0];
 const banner = tree => byId(tree, 'offline_banner');
+const slowBanner = tree => byId(tree, 'slow_banner');
+const SLOW = ['השרת עוד מתעורר', 'אפשר יהיה לערוך בעוד כמה שניות'];
+const SLOW_HINT = 'השרת מתעורר, נסה שוב בעוד רגע';
+const OFFLINE_HINT = 'לא זמין ללא חיבור לאינטרנט';
+
 const seed = async () => {
   await saveCache(cacheKeys.items(7), [milk, eggs]);
   await saveCache(cacheKeys.categories(7), []);
@@ -286,6 +291,10 @@ describe('view-only while offline', () => {
   test('the items receive the disabled flag', async () => {
     const tree = await offlineScreen();
     expect(row(tree, 1).props.disabled).toBe(true);
+    // רשת שנפלה באמת: הבאנר וההסבר של "אין חיבור"
+    expect(slowBanner(tree)).toBeUndefined();
+    expect(row(tree, 1).props.disabledHint).toBe(OFFLINE_HINT);
+    expect(tree.root.findByType(AddItemInput).props.disabledHint).toBe(OFFLINE_HINT);
   });
 
   test('add shows the alert and sends nothing', async () => {
@@ -495,21 +504,45 @@ describe('initial load grace period', () => {
     return { resolve, reject };
   };
 
-  test('shows the cache offline after 10 seconds, then goes online when the request succeeds', async () => {
+  // שרת שמתעורר (Render) הוא לא "אין אינטרנט": באנר נפרד ורגוע יותר
+  test('after 10 seconds shows the cache with the slow-server banner, then goes online when the request succeeds', async () => {
     await seed();
     const request = hangingLoad();
     const tree = await renderScreen();
     expect(names(tree)).toEqual([]);
-    expect(banner(tree)).toBeUndefined();
+    expect(slowBanner(tree)).toBeUndefined();
     await act(async () => jest.advanceTimersByTimeAsync(10000));
     expect(names(tree)).toEqual(['חלב', 'ביצים']);
-    expect(banner(tree)).toBeDefined();
+    expect(slowBanner(tree)).toBeDefined();
+    expect(banner(tree)).toBeUndefined();
     await act(async () => request.resolve([milk]));
     expect(names(tree)).toEqual(['חלב']);
+    expect(slowBanner(tree)).toBeUndefined();
     expect(banner(tree)).toBeUndefined();
+    expect(row(tree, 1).props.disabled).toBe(false);
+    expect(tree.root.findByType(AddItemInput).props.editable).toBe(true);
   });
 
-  test('a late network error keeps the cache and the banner', async () => {
+  test('while the server wakes, edits are blocked with the slow alert and hint', async () => {
+    await seed();
+    hangingLoad();
+    const tree = await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    const input = tree.root.findByType(AddItemInput);
+    expect(input.props.editable).toBe(false);
+    expect(input.props.disabledHint).toBe(SLOW_HINT);
+    expect(row(tree, 1).props.disabled).toBe(true);
+    expect(row(tree, 1).props.disabledHint).toBe(SLOW_HINT);
+    await act(async () => input.props.onAdd('לחם'));
+    await act(async () => row(tree, 1).props.onTogglePurchased());
+    await act(async () => row(tree, 1).props.onDelete());
+    expect(alertSpy).toHaveBeenCalledTimes(3);
+    alertSpy.mock.calls.forEach(call => expect(call).toEqual(SLOW));
+    expect(addItem).not.toHaveBeenCalled();
+    expect(updateItem).not.toHaveBeenCalled();
+  });
+
+  test('a late network error turns the slow banner into the offline banner', async () => {
     await seed();
     const request = hangingLoad();
     const tree = await renderScreen();
@@ -517,7 +550,22 @@ describe('initial load grace period', () => {
     await act(async () => request.reject(networkError()));
     expect(names(tree)).toEqual(['חלב', 'ביצים']);
     expect(banner(tree)).toBeDefined();
+    expect(slowBanner(tree)).toBeUndefined();
     expect(alertSpy).not.toHaveBeenCalled();
+    await act(async () => tree.root.findByType(AddItemInput).props.onAdd('לחם'));
+    expectBlocked();
+  });
+
+  test('a live refresh that answers during the wait clears the slow banner', async () => {
+    await seed();
+    hangingLoad();
+    const tree = await renderScreen();
+    await act(async () => jest.advanceTimersByTimeAsync(10000));
+    expect(slowBanner(tree)).toBeDefined();
+    getShoppingList.mockResolvedValue([milk]);
+    await act(async () => refresh()());
+    expect(slowBanner(tree)).toBeUndefined();
+    expect(banner(tree)).toBeUndefined();
   });
 
   test('a late server error keeps the existing error alert', async () => {
@@ -570,10 +618,11 @@ describe('grace period never overwrites newer data', () => {
     const initial = hang(getShoppingList);
     const tree = await renderScreen();
     await act(async () => jest.advanceTimersByTimeAsync(10000));
-    expect(banner(tree)).toBeDefined();
+    expect(slowBanner(tree)).toBeDefined();
     getShoppingList.mockResolvedValue([milk, eggs, bread]);
     await act(async () => refresh()());
     expect(banner(tree)).toBeUndefined();
+    expect(slowBanner(tree)).toBeUndefined();
     updateItem.mockResolvedValue({ ...milk, purchased: true });
     await act(async () => row(tree, 1).props.onTogglePurchased());
     await act(async () => initial.resolve([milk]));

@@ -29,6 +29,8 @@ import DepartmentRoute from '../../components/DepartmentRoute/DepartmentRoute';
 import { buildRoute } from '../../components/DepartmentRoute/buildRoute';
 import OfflineBanner, {
   showOfflineBlockedAlert,
+  showBlockedAlertFor,
+  unavailableHint,
 } from '../../components/OfflineBanner/OfflineBanner';
 
 // שירותים ועיצובים
@@ -97,24 +99,32 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const [layout, setLayout] = useState([]);
   // 'manual' (גרירה) או 'category' (מקובץ לפי מחלקות)
   const [sortMode, setSortMode] = useState('manual');
-  // מצב לא מקוון: מוצגת הגרסה השמורה ואי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
-  const [isOffline, setIsOffline] = useState(false);
-  const isOfflineRef = useRef(false);
+  // מצב החיבור: מוצגת הגרסה השמורה ואי אפשר לערוך כשהוא לא online.
+  // 'online', 'slow' (הבקשה הראשונה איטית כי השרת מתעורר, והוצג המטמון) או 'offline'
+  // (שגיאת רשת). בשני האחרונים אי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
+  const [connection, setConnection] = useState('online');
+  const connectionRef = useRef('online');
   const setOffline = value => {
-    isOfflineRef.current = value;
-    setIsOffline(value);
+    connectionRef.current = value ? 'offline' : 'online';
+    setConnection(connectionRef.current);
   };
-  // true אם במצב לא מקוון (ואז מציג את ההודעה). חייב לרוץ לפני כל בקשת שינוי
+  const setSlow = () => {
+    connectionRef.current = 'slow';
+    setConnection('slow');
+  };
+  const isBlocked = () => connectionRef.current !== 'online';
+  const isOffline = connection !== 'online';
+  // true אם אי אפשר לערוך עכשיו (ואז מציג את ההודעה המתאימה). חייב לרוץ לפני כל בקשת שינוי
   const blockIfOffline = () => {
-    if (!isOfflineRef.current) return false;
-    showOfflineBlockedAlert();
+    if (!isBlocked()) return false;
+    showBlockedAlertFor(connectionRef.current);
     return true;
   };
   // שגיאת רשת בבקשת שינוי: עוברים למצב לא מקוון ומציגים את ההודעה במקום שגיאה כללית
   // ההודעה מוצגת רק במעבר למצב לא מקוון, כדי שכמה בקשות שנכשלו יחד לא יערמו הודעות
   const failedOffline = error => {
     if (!error?.network) return false;
-    const wasOffline = isOfflineRef.current;
+    const wasOffline = connectionRef.current === 'offline';
     setOffline(true);
     if (!wasOffline) showOfflineBlockedAlert();
     return true;
@@ -170,7 +180,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     clearTimeout(pending.timer);
     hideBar();
     try {
-      if (isOfflineRef.current) {
+      if (isBlocked()) {
         // הרשת נפלה בזמן ההמתנה - לא שולחים, והמוצר חוזר
         const offlineError = new Error('offline');
         offlineError.network = true;
@@ -360,12 +370,16 @@ const ShoppingListScreen = ({ route, navigation }) => {
             if (hasItems.current) return;
             setItems(sortByPosition(cached));
             hasItems.current = true;
-            setOffline(true);
+            // הרשת תקינה, השרת רק איטי (מתעורר): לא "אין חיבור"
+            setSlow();
           },
         },
       );
-      // המטמון כבר מוצג והבקשה נכשלה ברשת - נשארים כמו שזה
-      if (alreadyShown) return;
+      // המטמון כבר מוצג והבקשה נכשלה ברשת: עכשיו זו באמת שגיאת רשת
+      if (alreadyShown) {
+        if (connectionRef.current === 'slow') setOffline(true);
+        return;
+      }
       // המטמון הוצג מוקדם ובינתיים הגיעו נתונים חדשים יותר (רענון או שינוי שלי) - התשובה ישנה
       if (
         shownEarly &&
@@ -476,7 +490,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     // ממתינים לסיום המחיקה: אחרת השרת עלול להחיות בדיוק את המוצר שנמחק עכשיו
     await commitPendingDelete();
     // המחיקה הממתינה נכשלה ברשת: כבר הוצגה הודעה ואין שולחים כלום
-    if (isOfflineRef.current) return;
+    if (isBlocked()) return;
     hideBar();
     actionSeq.current++;
 
@@ -677,7 +691,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
     // המחיקה הממתינה מסתיימת לפני הבקשה הקבוצתית, כדי שלא יהיה מרוץ ביניהן
     await commitPendingDelete();
     // המחיקה הממתינה נכשלה ברשת: כבר הוצגה הודעה ואין שולחים כלום
-    if (isOfflineRef.current) return;
+    if (isBlocked()) return;
     actionSeq.current++;
     hideBar();
     startMutation();
@@ -817,6 +831,13 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const departmentsLabel =
     departmentCount === 1 ? 'מחלקה אחת' : `${departmentCount} מחלקות`;
 
+  // מסך עריכת המחלקות (מציג את כל המחלקות). בחזרה המסך חוזר לפוקוס והרענון
+  // החי מביא מיד את הפריסה החדשה
+  const openEditDepartments = () => {
+    if (blockIfOffline()) return;
+    navigation.navigate('EditDepartments', { listId, listName });
+  };
+
   // שורת מוצר במסלול (רגילה, או גדולה בכרטיס "עכשיו במחלקה").
   // כל הפעולות עוברות דרך המסך: חסימה במצב לא מקוון, פס ביטול ומשמר השינויים
   const renderRouteRow = (item, { variant } = {}) => (
@@ -831,6 +852,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       showAddedBy={memberCount > 1}
       currentUsername={currentUsername}
       disabled={isOffline}
+      disabledHint={unavailableHint(connection)}
     />
   );
 
@@ -857,6 +879,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
       showAddedBy={memberCount > 1}
       currentUsername={currentUsername}
       disabled={isOffline}
+      disabledHint={unavailableHint(connection)}
       blockIfOffline={blockIfOffline}
     />
   );
@@ -960,48 +983,67 @@ const ShoppingListScreen = ({ route, navigation }) => {
           onAdd={handleAddItem}
           listId={currentListId}
           editable={!isOffline}
+          disabledHint={unavailableHint(connection)}
         />
       </View>
 
-      <OfflineBanner visible={isOffline} />
+      <OfflineBanner visible={isOffline} slow={connection === 'slow'} />
 
-      {/* מתג גלולה: מיכל מעוגל, והמקטע הפעיל גלולה מלאה בצבע הראשי */}
-      <View style={styles.sortSegments} testID="sort_segments">
-        {[
-          { mode: 'manual', label: 'סדר ידני', icon: 'drag-horizontal-variant' },
-          { mode: 'category', label: 'לפי מחלקות', icon: 'shape-outline' },
-        ].map(({ mode, label, icon }) => {
-          const selected = (mode === 'category') === categoryMode;
-          return (
-            <TouchableOpacity
-              key={mode}
-              testID={`sort_segment_${mode}`}
-              accessibilityLabel={label}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              style={[
-                styles.sortSegment,
-                selected && styles.sortSegmentActive,
-              ]}
-              onPress={() => selectSortMode(mode)}
-              activeOpacity={0.8}
-            >
-              <Icon
-                name={icon}
-                size={18}
-                color={selected ? colors.text.inverse : colors.text.secondary}
-              />
-              <Text
+      {/* מתג גלולה: מיכל מעוגל, והמקטע הפעיל גלולה מלאה בצבע הראשי.
+          במצב "לפי מחלקות" לידו כפתור ✎ לעריכת המחלקות */}
+      <View style={styles.sortRow}>
+        <View style={styles.sortSegments} testID="sort_segments">
+          {[
+            { mode: 'manual', label: 'סדר ידני', icon: 'drag-horizontal-variant' },
+            { mode: 'category', label: 'לפי מחלקות', icon: 'shape-outline' },
+          ].map(({ mode, label, icon }) => {
+            const selected = (mode === 'category') === categoryMode;
+            return (
+              <TouchableOpacity
+                key={mode}
+                testID={`sort_segment_${mode}`}
+                accessibilityLabel={label}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
                 style={[
-                  styles.sortSegmentText,
-                  selected && styles.sortSegmentTextActive,
+                  styles.sortSegment,
+                  selected && styles.sortSegmentActive,
                 ]}
+                onPress={() => selectSortMode(mode)}
+                activeOpacity={0.8}
               >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                <Icon
+                  name={icon}
+                  size={18}
+                  color={selected ? colors.text.inverse : colors.text.secondary}
+                />
+                <Text
+                  style={[
+                    styles.sortSegmentText,
+                    selected && styles.sortSegmentTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {categoryMode && (
+          <TouchableOpacity
+            testID="edit_departments_button"
+            onPress={openEditDepartments}
+            style={styles.editDepartmentsButton}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="עריכת מחלקות"
+            accessibilityHint={
+              unavailableHint(connection)
+            }
+          >
+            <Icon name="pencil-outline" size={20} color={colors.primaryText} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {categoryMode ? (
@@ -1076,6 +1118,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
                   showAddedBy={memberCount > 1}
                   currentUsername={currentUsername}
                   disabled={isOffline}
+                  disabledHint={unavailableHint(connection)}
                 />
               )}
             />

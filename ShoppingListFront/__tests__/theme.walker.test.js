@@ -13,14 +13,25 @@ import LoginScreen from '../src/screens/LoginScreen/LoginScreen';
 import UndoBar from '../src/components/UndoBar/UndoBar';
 import OfflineBanner from '../src/components/OfflineBanner/OfflineBanner';
 import JoinListModal from '../src/components/JoinListModal/JoinListModal';
+import MembersModal from '../src/components/MembersModal/MembersModal';
+import EditItemModal from '../src/components/EditItemModal/EditItemModal';
 import ListActionsMenu from '../src/components/ListActionsMenu/ListActionsMenu';
 import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListItem';
 import DepartmentRoute from '../src/components/DepartmentRoute/DepartmentRoute';
 import { buildRoute } from '../src/components/DepartmentRoute/buildRoute';
 import FocusCard from '../src/components/FocusCard/FocusCard';
 import ProgressRing from '../src/components/ProgressRing/ProgressRing';
+import EditDepartmentsScreen from '../src/screens/EditDepartmentsScreen/EditDepartmentsScreen';
+import EmojiPicker from '../src/components/EmojiPicker/EmojiPicker';
 import { resolveCategory } from '../src/services/categories';
 
+// ה-ScrollView של gesture-handler (מצב מחלקות) דורש Reanimated מלא: מוחלף ברכיב
+// שמציג את הילדים (הרקע מגיע מהמסך, לא ממנו)
+jest.mock('react-native-gesture-handler', () => ({
+  ...jest.requireActual('react-native-gesture-handler'),
+  ScrollView: ({ children }) =>
+    require('react').createElement(require('react-native').View, null, children),
+}));
 jest.mock('react-native-draggable-flatlist', () => {
   const ReactLib = require('react');
   const { View } = require('react-native');
@@ -36,7 +47,13 @@ jest.mock('react-native-draggable-flatlist', () => {
     get NestableDraggableFlatList() {
       return this.default;
     },
-    default: ({ data, renderItem, ListHeaderComponent }) =>
+    default: ({
+      data,
+      renderItem,
+      keyExtractor,
+      ListHeaderComponent,
+      ListFooterComponent,
+    }) =>
       ReactLib.createElement(
         View,
         null,
@@ -44,10 +61,11 @@ jest.mock('react-native-draggable-flatlist', () => {
         data.map(item =>
           ReactLib.createElement(
             ReactLib.Fragment,
-            { key: item.id },
+            { key: keyExtractor ? keyExtractor(item) : item.id },
             renderItem({ item, drag: () => {}, isActive: false }),
           ),
         ),
+        ListFooterComponent,
       ),
   };
 });
@@ -63,7 +81,23 @@ jest.mock('../src/services/api', () => ({
     { id: 1, name: 'חלב', amount: 1, purchased: false, position: 0 },
     { id: 2, name: 'לחם', amount: 1, purchased: true, position: 1 },
   ]),
-  getListMembers: jest.fn(async () => []),
+  getListMembers: jest.fn(async () => [
+    { id: 1, username: 'owner_user', is_owner: true },
+    { id: 2, username: 'member_user', is_owner: false },
+  ]),
+  getInviteCode: jest.fn(async () => ({ invite_code: 'ABC123' })),
+  resetInviteCode: jest.fn(),
+  removeListMember: jest.fn(),
+  leaveList: jest.fn(),
+  // מחלקה מותאמת ושינויים בפריסה, כדי שמסך עריכת המחלקות יציג את כל סוגי השורות
+  getListCategories: jest.fn(async () => ({
+    custom: [{ id: 3, name: 'חיות', color: '#7986CB', icon: '🐾' }],
+    layout: [
+      { key: 'dairy', name: 'מקררים', icon: '🧀', position: 0 },
+      { key: 'bakery', name: null, icon: null, position: 1 },
+      { key: 'custom:3', name: null, icon: '🐾', position: 2 },
+    ],
+  })),
 }));
 jest.mock('../src/services/auth', () => ({
   getCurrentUser: jest.fn(async () => ({ username: 'bob', email: 'b@example.com' })),
@@ -74,8 +108,19 @@ jest.mock('../src/services/auth', () => ({
 
 const { act } = ReactTestRenderer;
 
+const rgbOf = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+const RGBA = /^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/;
+const isRgba = c => typeof c === 'string' && RGBA.test(c);
+// צבע טקסט שקוף למחצה מורכב מעל הרקע שלו לפני חישוב הניגודיות (M1)
+const composite = (fg, bg) => {
+  const m = RGBA.exec(fg);
+  const a = parseFloat(m[4]);
+  const base = rgbOf(bg);
+  const rgb = [1, 2, 3].map((k, i) => Math.round(a * m[k] + (1 - a) * base[i]));
+  return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
+};
 const lum = hex => {
-  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const c = rgbOf(hex).map(v => v / 255);
   const l = c.map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
   return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
 };
@@ -117,9 +162,10 @@ const failures = (json, name, base = dark.background) => {
       ownBgs = stops;
       ownGradient = true;
     }
-    if (n.type === 'Text' && isHex(style.color)) {
+    if (n.type === 'Text' && (isHex(style.color) || isRgba(style.color))) {
       ownBgs.forEach(bg => {
-        const r = ratio(style.color, bg);
+        const fg = isRgba(style.color) ? composite(style.color, bg) : style.color;
+        const r = ratio(fg, bg);
         const allowed =
           !ownGradient && ALLOWED.has(`${up(style.color)}|${up(bg)}`);
         if (r < 4.5 && !allowed) {
@@ -148,6 +194,22 @@ test('the walker treats a gradient as its worst stop', () => {
       dark.secondary,
     ).toFixed(2)}`,
   ]);
+});
+
+// M1: טקסט שקוף למחצה מורכב מעל הרקע - לבן ב-0.75 על הכחול נכשל
+test('the walker composites rgba text over its background', () => {
+  const json = {
+    type: 'View',
+    props: { style: { backgroundColor: light.primary } },
+    children: [
+      {
+        type: 'Text',
+        props: { style: { color: 'rgba(255, 255, 255, 0.75)' } },
+        children: ['x'],
+      },
+    ],
+  };
+  expect(failures(json, 'probe', light.background)).toHaveLength(1);
 });
 
 const renderDark = async (element, mode = 'dark') => {
@@ -214,11 +276,38 @@ const cases = {
   Login: <LoginScreen onLoginSuccess={jest.fn()} />,
   UndoBar: <UndoBar visible message="המוצר נמחק" onUndo={jest.fn()} />,
   OfflineBanner: <OfflineBanner visible />,
+  SlowBanner: <OfflineBanner visible slow />,
   JoinListModal: (
     <JoinListModal visible onClose={jest.fn()} onJoined={jest.fn()} />
   ),
+  MembersModal: (
+    <MembersModal visible listId={1} listName="שלי" isOwner onClose={jest.fn()} onLeft={jest.fn()} />
+  ),
+  EditItemModal: (
+    <EditItemModal
+      visible
+      item={{ id: 1, name: 'חלב', unit: 'ליטר', note: 'דל שומן' }}
+      onSave={jest.fn()}
+      onClose={jest.fn()}
+    />
+  ),
   ...routeCases,
   ProgressRing: ringCase(dark),
+  EditDepartments: (
+    <EditDepartmentsScreen
+      route={{ params: { listId: 1, listName: 'שלי' } }}
+      navigation={nav}
+    />
+  ),
+  EmojiPicker: (
+    <EmojiPicker
+      visible
+      selected="🥦"
+      onSelect={jest.fn()}
+      onReset={jest.fn()}
+      onClose={jest.fn()}
+    />
+  ),
   ListActionsMenu: (
     <ListActionsMenu
       visible
@@ -258,6 +347,17 @@ describe('light mode contrast walker: route, focus card and ring', () => {
     ShoppingList: cases.ShoppingList,
     MyLists: cases.MyLists,
     Settings: cases.Settings,
+    EditDepartments: cases.EditDepartments,
+    EmojiPicker: cases.EmojiPicker,
+    // המסכים והחלונות המעוצבים מחדש (גל 9): גם בערכה הבהירה
+    Login: cases.Login,
+    UndoBar: cases.UndoBar,
+    OfflineBanner: cases.OfflineBanner,
+    SlowBanner: cases.SlowBanner,
+    JoinListModal: cases.JoinListModal,
+    ListActionsMenu: cases.ListActionsMenu,
+    MembersModal: cases.MembersModal,
+    EditItemModal: cases.EditItemModal,
   };
   Object.entries(lightCases).forEach(([name, el]) => {
     test(`${name}: every text meets 4.5:1 on its background`, async () => {
@@ -266,6 +366,56 @@ describe('light mode contrast walker: route, focus card and ring', () => {
         expect(failures(tree.toJSON(), name, light.background)).toEqual([]);
       } finally {
         await act(async () => tree.unmount());
+      }
+    });
+  });
+});
+
+// מסך עריכת המחלקות במצבי העריכה: שינוי שם עם בחירת אייקון, והוספת מחלקה
+describe('edit departments contrast walker: rename, picker and add', () => {
+  const pressById = async (tree, id) => {
+    const node = tree.root.findAll(
+      n => n.props.testID === id && typeof n.props.onPress === 'function',
+    )[0];
+    await act(async () => node.props.onPress());
+  };
+  const modes = [
+    ['dark', dark.background],
+    ['light', light.background],
+  ];
+  modes.forEach(([mode, base]) => {
+    test(`${mode}: every text meets 4.5:1 while renaming, picking and adding`, async () => {
+      const tree = await renderDark(cases.EditDepartments, mode);
+      try {
+        await pressById(tree, 'department_edit_dairy');
+        expect(JSON.stringify(tree.toJSON())).toContain('department_name_input');
+        expect(failures(tree.toJSON(), `rename ${mode}`, base)).toEqual([]);
+        await pressById(tree, 'department_icon_dairy');
+        expect(JSON.stringify(tree.toJSON())).toContain('emoji_picker');
+        expect(failures(tree.toJSON(), `picker ${mode}`, base)).toEqual([]);
+        await pressById(tree, 'emoji_close');
+        await pressById(tree, 'add_department_button');
+        const json = tree.toJSON();
+        expect(JSON.stringify(json)).toContain('new_department_input');
+        expect(failures(json, `add ${mode}`, base)).toEqual([]);
+      } finally {
+        await act(async () => tree.unmount());
+      }
+    });
+  });
+
+  // כפתור ✎ ליד מתג המיון, במצב "לפי מחלקות"
+  modes.forEach(([mode, base]) => {
+    test(`${mode}: the list screen by departments, with the ✎ button`, async () => {
+      await AsyncStorage.setItem('@sort_mode_1', 'category');
+      const tree = await renderDark(cases.ShoppingList, mode);
+      try {
+        const json = tree.toJSON();
+        expect(JSON.stringify(json)).toContain('edit_departments_button');
+        expect(failures(json, `list by departments ${mode}`, base)).toEqual([]);
+      } finally {
+        await act(async () => tree.unmount());
+        await AsyncStorage.removeItem('@sort_mode_1');
       }
     });
   });

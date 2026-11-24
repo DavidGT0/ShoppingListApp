@@ -12,6 +12,7 @@ import {
   Modal,
   Image,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { makeStyles } from './LoginScreen.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
 import { login, register, requestPasswordReset } from '../../services/auth';
@@ -115,7 +116,13 @@ const LoginScreen = ({ onLoginSuccess }) => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoContainer}>
+        <LinearGradient
+          testID="login_header_gradient"
+          colors={colors.headerGradient}
+          useAngle
+          angle={135}
+          style={styles.logoContainer}
+        >
           <Image
             source={require('../../assets/logo.png')}
             style={styles.logoImage}
@@ -124,7 +131,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
           />
           <Text style={styles.logoText}>ShopLi</Text>
           <Text style={styles.subtitle}>רשימת הקניות המשפחתית</Text>
-        </View>
+        </LinearGradient>
 
         <View style={styles.formContainer}>
           <Text style={styles.title}>{isLogin ? 'התחברות' : 'הרשמה'}</Text>
@@ -244,6 +251,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.sheetHandle} testID="sheet_handle" />
             <Text style={styles.modalTitle}>איפוס סיסמה</Text>
             <Text style={styles.modalText}>
               הזן את האימייל של החשבון, ונשלח אליו קישור לבחירת סיסמה חדשה.

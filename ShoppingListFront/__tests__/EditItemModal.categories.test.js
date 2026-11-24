@@ -177,6 +177,19 @@ test('long-press on a custom chip confirms, then deletes', async () => {
   alertSpy.mockRestore();
 });
 
+// מחלקה מותאמת ששמה שונה שומרת את השם הישן ב-custom: האישור מציג את השם שבפריסה
+test('the delete confirmation names a renamed custom category by its display name', async () => {
+  const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  const { byId } = await setup({
+    layout: [{ key: 'custom:5', name: 'מתנות חג', icon: '🎁', position: 0 }],
+  });
+  await act(async () => byId('category_chip_custom:5').props.onLongPress());
+  const message = alertSpy.mock.calls[0][1];
+  expect(message).toContain('"מתנות חג"');
+  expect(message).not.toContain('"מתנות"');
+  alertSpy.mockRestore();
+});
+
 test('built-in chips have no long-press delete', async () => {
   const { byId } = await setup();
   expect(byId('category_chip_dairy').props.onLongPress).toBeUndefined();

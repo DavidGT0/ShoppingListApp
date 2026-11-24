@@ -1,4 +1,14 @@
 ﻿import { StyleSheet } from 'react-native';
+import {
+  sheetContainer,
+  sheetOverlay,
+  sheetHandle,
+  sheetTitle,
+  primaryButton,
+  secondaryButton,
+  buttonText,
+  secondaryButtonText,
+} from '../../theme/sheetStyles';
 
 export const makeStyles = colors => StyleSheet.create({
   container: {
@@ -10,9 +20,16 @@ export const makeStyles = colors => StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  // פס כותרת עם מעבר הצבעים של האפליקציה מאחורי הלוגו, פורש על כל רוחב המסך
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginHorizontal: -20,
+    marginTop: -20,
+    marginBottom: 28,
+    paddingTop: 56,
+    paddingBottom: 36,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   logoImage: {
     width: 120,
@@ -23,20 +40,20 @@ export const makeStyles = colors => StyleSheet.create({
   logoText: {
     fontSize: 32,
     fontWeight: '700',
-    color: colors.text.primary,
+    color: colors.text.inverse,
     marginBottom: 8,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: colors.text.secondary,
+    color: colors.onPrimarySoft,
     fontWeight: '500',
   },
   formContainer: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
-    shadowColor: colors.shadow.dark,
+    shadowColor: colors.shadowBase,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -61,17 +78,18 @@ export const makeStyles = colors => StyleSheet.create({
   },
   input: {
     backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border,
     color: colors.text.primary,
     fontWeight: '500',
   },
   submitButton: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 18,
     alignItems: 'center',
     marginTop: 8,
@@ -123,24 +141,18 @@ export const makeStyles = colors => StyleSheet.create({
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
+  // חלון איפוס הסיסמה: גיליון תחתון כמו שאר החלונות
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...sheetOverlay,
   },
   modalContent: {
-    backgroundColor: colors.raised,
-    width: '85%',
-    borderRadius: 16,
-    padding: 20,
-    elevation: 5,
+    ...sheetContainer(colors),
+  },
+  sheetHandle: {
+    ...sheetHandle(colors),
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    textAlign: 'center',
+    ...sheetTitle(colors),
     marginBottom: 8,
   },
   modalText: {
@@ -157,26 +169,18 @@ export const makeStyles = colors => StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    padding: 12,
-    borderRadius: 10,
     alignItems: 'center',
   },
   modalCancelButton: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...secondaryButton(colors),
   },
   modalCancelText: {
-    color: colors.text.secondary,
-    fontSize: 16,
-    fontWeight: '600',
+    ...secondaryButtonText(colors),
   },
   modalSendButton: {
-    backgroundColor: colors.primary,
+    ...primaryButton(colors),
   },
   modalSendText: {
-    color: colors.text.inverse,
-    fontSize: 16,
-    fontWeight: '700',
+    ...buttonText(colors),
   },
 });

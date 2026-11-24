@@ -26,6 +26,8 @@ import { buildListShareText } from '../../services/shareText';
 import JoinListModal from '../../components/JoinListModal/JoinListModal';
 import OfflineBanner, {
   showOfflineBlockedAlert,
+  showBlockedAlertFor,
+  unavailableHint,
 } from '../../components/OfflineBanner/OfflineBanner';
 import {
   loadWithCache,
@@ -75,24 +77,32 @@ const MyListsScreen = ({ navigation }) => {
   // מבטל את טיימר ההמתנה של הטעינה הראשונה ביציאה מהמסך
   const loadAbort = useRef(new AbortController());
 
-  // מצב לא מקוון: מוצגת הגרסה השמורה ואי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
-  const [isOffline, setIsOffline] = useState(false);
-  const isOfflineRef = useRef(false);
+  // מצב החיבור: מוצגת הגרסה השמורה ואי אפשר לערוך כשהוא לא online.
+  // 'online', 'slow' (הבקשה הראשונה איטית כי השרת מתעורר, והוצג המטמון) או 'offline'
+  // (שגיאת רשת). בשני האחרונים אי אפשר לערוך. ה-ref משקף את הערך לפונקציות שנתפסו קודם
+  const [connection, setConnection] = useState('online');
+  const connectionRef = useRef('online');
   const setOffline = value => {
-    isOfflineRef.current = value;
-    setIsOffline(value);
+    connectionRef.current = value ? 'offline' : 'online';
+    setConnection(connectionRef.current);
   };
-  // true אם במצב לא מקוון (ואז מציג את ההודעה). חייב לרוץ לפני כל בקשת שינוי
+  const setSlow = () => {
+    connectionRef.current = 'slow';
+    setConnection('slow');
+  };
+  const isBlocked = () => connectionRef.current !== 'online';
+  const isOffline = connection !== 'online';
+  // true אם אי אפשר לערוך עכשיו (ואז מציג את ההודעה המתאימה). חייב לרוץ לפני כל בקשת שינוי
   const blockIfOffline = () => {
-    if (!isOfflineRef.current) return false;
-    showOfflineBlockedAlert();
+    if (!isBlocked()) return false;
+    showBlockedAlertFor(connectionRef.current);
     return true;
   };
   // שגיאת רשת בבקשת שינוי: עוברים למצב לא מקוון ומציגים את ההודעה במקום שגיאה כללית
   // ההודעה מוצגת רק במעבר למצב לא מקוון, כדי שכמה בקשות שנכשלו יחד לא יערמו הודעות
   const failedOffline = error => {
     if (!error?.network) return false;
-    const wasOffline = isOfflineRef.current;
+    const wasOffline = connectionRef.current === 'offline';
     setOffline(true);
     if (!wasOffline) showOfflineBlockedAlert();
     return true;
@@ -184,12 +194,16 @@ const MyListsScreen = ({ navigation }) => {
             if (hasLists.current) return;
             setLists(cached || []);
             hasLists.current = true;
-            setOffline(true);
+            // הרשת תקינה, השרת רק איטי (מתעורר): לא "אין חיבור"
+            setSlow();
           },
         },
       );
-      // המטמון כבר מוצג והבקשה נכשלה ברשת - נשארים כמו שזה
-      if (alreadyShown) return;
+      // המטמון כבר מוצג והבקשה נכשלה ברשת: עכשיו זו באמת שגיאת רשת
+      if (alreadyShown) {
+        if (connectionRef.current === 'slow') setOffline(true);
+        return;
+      }
       // המטמון הוצג מוקדם ובינתיים הגיעו נתונים חדשים יותר (רענון או שינוי שלי) - התשובה ישנה
       if (
         shownEarly &&
@@ -373,13 +387,13 @@ const MyListsScreen = ({ navigation }) => {
           testID="create_list_button" // <-- מזהה לכפתור יצירת רשימה
           accessibilityLabel="יצירת רשימה"
           accessibilityRole="button"
-          accessibilityHint={isOffline ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
+          accessibilityHint={unavailableHint(connection)}
         >
           <Text style={styles.createButtonText}>+</Text>
         </TouchableOpacity>
       </View>
 
-      <OfflineBanner visible={isOffline} />
+      <OfflineBanner visible={isOffline} slow={connection === 'slow'} />
 
       <TouchableOpacity
         style={styles.joinLink}
@@ -454,7 +468,7 @@ const MyListsScreen = ({ navigation }) => {
               testID={`list_menu_${item.id}`}
               accessibilityLabel={`פעולות לרשימה ${item.name}`}
               accessibilityRole="button"
-              accessibilityHint={isOffline ? 'לא זמין ללא חיבור לאינטרנט' : undefined}
+              accessibilityHint={unavailableHint(connection)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Icon
@@ -503,6 +517,7 @@ const MyListsScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.sheetHandle} testID="sheet_handle" />
             <Text style={styles.modalTitle}>שינוי שם רשימה</Text>
             <TextInput
               style={styles.modalInput}

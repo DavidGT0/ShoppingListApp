@@ -54,6 +54,7 @@ const JoinListModal = ({ visible, onClose, onJoined }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
+          <View style={styles.sheetHandle} testID="sheet_handle" />
           <Text style={styles.modalTitle}>הצטרפות לרשימה</Text>
           <TextInput
             style={styles.modalInput}

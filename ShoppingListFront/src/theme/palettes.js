@@ -22,8 +22,9 @@ export const light = {
   primaryText: '#1557BF',
   onWarning: '#212529',
   onPrimarySubtle: 'rgba(255, 255, 255, 0.15)',
-  onPrimaryMuted: 'rgba(255, 255, 255, 0.75)',
-  onPrimarySoft: 'rgba(255, 255, 255, 0.85)',
+  // טקסט על הכותרת: לבן כמעט מלא - 0.98 מעל הקצה הכחול (#1E6FE8) הוא 4.5:1 (M1)
+  onPrimaryMuted: 'rgba(255, 255, 255, 0.98)',
+  onPrimarySoft: 'rgba(255, 255, 255, 0.99)',
 
   // צבעי סטטוס
   success: '#1FC9A3',
@@ -91,8 +92,8 @@ export const dark = {
   primaryText: '#4C8DF0',
   onWarning: '#212529',
   onPrimarySubtle: 'rgba(255, 255, 255, 0.15)',
-  onPrimaryMuted: 'rgba(255, 255, 255, 0.75)',
-  onPrimarySoft: 'rgba(255, 255, 255, 0.85)',
+  onPrimaryMuted: 'rgba(255, 255, 255, 0.98)',
+  onPrimarySoft: 'rgba(255, 255, 255, 0.99)',
 
   success: '#1FC9A3',
   successLight: '#81C784',

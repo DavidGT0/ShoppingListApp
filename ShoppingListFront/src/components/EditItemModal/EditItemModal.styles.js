@@ -1,44 +1,43 @@
 ﻿import { StyleSheet } from 'react-native';
+import {
+  sheetContainer,
+  sheetOverlay,
+  sheetHandle,
+  sheetTitle,
+  sheetInput,
+  chip,
+  chipActive,
+  chipText,
+  chipTextActive,
+  primaryButton,
+  secondaryButton,
+  buttonText,
+  secondaryButtonText,
+} from '../../theme/sheetStyles';
 
 export const makeStyles = colors => StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...sheetOverlay,
   },
   outerScroll: {
     width: '100%',
   },
+  // הגיליון נדבק לתחתית; כשהתוכן גבוה מהמסך אפשר לגלול
   outerScrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 16,
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.sheet,
-    width: '85%',
-    borderRadius: 12,
-    padding: 20,
-    elevation: 5,
+    ...sheetContainer(colors),
+  },
+  sheetHandle: {
+    ...sheetHandle(colors),
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: colors.text.primary,
-    textAlign: 'center',
+    ...sheetTitle(colors),
   },
   modalInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20,
-    color: colors.text.primary,
+    ...sheetInput(colors),
   },
   sectionTitle: {
     fontSize: 14,
@@ -57,18 +56,12 @@ export const makeStyles = colors => StyleSheet.create({
     gap: 8,
   },
   chip: {
+    ...chip(colors),
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   chipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
+    ...chipActive(colors),
   },
   chipNew: {
     borderStyle: 'dashed',
@@ -84,12 +77,10 @@ export const makeStyles = colors => StyleSheet.create({
     marginLeft: 4,
   },
   chipText: {
-    fontSize: 14,
-    color: colors.text.primary,
+    ...chipText(colors),
   },
   chipTextActive: {
-    color: colors.text.inverse,
-    fontWeight: 'bold',
+    ...chipTextActive(colors),
   },
   newCategoryRow: {
     flexDirection: 'row-reverse',
@@ -104,30 +95,22 @@ export const makeStyles = colors => StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 15,
+    gap: 12,
   },
   modalButton: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...secondaryButton(colors),
   },
   saveButton: {
-    backgroundColor: colors.primary,
+    ...primaryButton(colors),
   },
   cancelButtonText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    fontWeight: 'bold',
+    ...secondaryButtonText(colors),
   },
   saveButtonText: {
-    fontSize: 16,
-    color: colors.text.inverse,
-    fontWeight: 'bold',
+    ...buttonText(colors),
   },
 });

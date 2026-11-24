@@ -1,37 +1,42 @@
 import { StyleSheet } from 'react-native';
+import {
+  sheetContainer,
+  sheetOverlay,
+  sheetHandle,
+} from '../../theme/sheetStyles';
 
 export const makeStyles = colors => StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...sheetOverlay,
   },
   sheet: {
-    backgroundColor: colors.sheet,
-    width: '75%',
-    borderRadius: 12,
-    paddingVertical: 8,
-    elevation: 5,
+    ...sheetContainer(colors),
+    paddingHorizontal: 8,
+  },
+  sheetHandle: {
+    ...sheetHandle(colors),
   },
   title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.secondary,
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.heading,
     textAlign: 'center',
-    paddingVertical: 10,
+    paddingBottom: 10,
     paddingHorizontal: 16,
   },
   option: {
     paddingVertical: 14,
     paddingHorizontal: 20,
+    borderRadius: 14,
   },
   optionText: {
     fontSize: 17,
+    fontWeight: '500',
     color: colors.text.primary,
     textAlign: 'right',
   },
   destructiveText: {
     color: colors.dangerText,
+    fontWeight: '700',
   },
 });

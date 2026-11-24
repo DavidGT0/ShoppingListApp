@@ -3,11 +3,13 @@ import { View, TextInput, TouchableOpacity, Text, Alert } from 'react-native';
 import { getSuggestions } from '../../services/api';
 import { makeStyles } from './AddItemInput.styles';
 import { useStyles, useTheme } from '../../theme/ThemeContext';
+import { OFFLINE_HINT } from '../OfflineBanner/OfflineBanner';
 
 const DEBOUNCE_MS = 250;
 const MAX_CHIPS = 5;
 
-const AddItemInput = ({ onAdd, listId, editable = true }) => {
+// disabledHint: ההסבר לקורא המסך כשאי אפשר להוסיף (אין חיבור, או שהשרת מתעורר)
+const AddItemInput = ({ onAdd, listId, editable = true, disabledHint }) => {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
   const [name, setName] = useState('');
@@ -75,7 +77,7 @@ const AddItemInput = ({ onAdd, listId, editable = true }) => {
         testID="add_item_button" // <-- מזהה עבור כפתור ההוספה
         accessibilityLabel="הוספת מוצר"
         accessibilityRole="button"
-        accessibilityHint={editable ? undefined : 'לא זמין ללא חיבור לאינטרנט'}
+        accessibilityHint={editable ? undefined : disabledHint || OFFLINE_HINT}
       >
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
