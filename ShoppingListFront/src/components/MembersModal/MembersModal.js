@@ -161,6 +161,7 @@ const MembersModal = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
+          <View style={styles.sheetHandle} testID="sheet_handle" />
           <Text style={styles.modalTitle}>משתתפים ברשימה</Text>
           <ScrollView>
             {members.map(member => (

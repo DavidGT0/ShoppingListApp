@@ -1,4 +1,15 @@
 ﻿import { StyleSheet } from 'react-native';
+import {
+  sheetContainer,
+  sheetOverlay,
+  sheetHandle,
+  sheetTitle,
+  sheetInput,
+  primaryButton,
+  secondaryButton,
+  buttonText,
+  secondaryButtonText,
+} from '../../theme/sheetStyles';
 
 export const makeStyles = colors => StyleSheet.create({
   container: {
@@ -124,14 +135,13 @@ export const makeStyles = colors => StyleSheet.create({
     backgroundColor: colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 18,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: colors.shadow.dark,
+    // כרטיס צף: צל רך, בלי מסגרת
+    shadowColor: colors.shadowBase,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 2,
   },
   listCardContent: {
@@ -154,6 +164,7 @@ export const makeStyles = colors => StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    marginHorizontal: 6,
   },
   sharedBadgeText: {
     color: colors.text.inverse,
@@ -171,40 +182,22 @@ export const makeStyles = colors => StyleSheet.create({
     fontSize: 16,
   },
 
-  /* מודאל שינוי שם */
+  /* מודאל שינוי שם: גיליון תחתון כמו שאר החלונות */
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...sheetOverlay,
   },
   modalContent: {
-    width: '85%',
-    backgroundColor: colors.raised,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: colors.shadowBase,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    ...sheetContainer(colors),
+  },
+  sheetHandle: {
+    ...sheetHandle(colors),
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 16,
+    ...sheetTitle(colors),
     textAlign: 'right',
   },
   modalInput: {
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text.primary,
-    marginBottom: 20,
+    ...sheetInput(colors),
   },
   modalButtons: {
     flexDirection: 'row',
@@ -213,22 +206,18 @@ export const makeStyles = colors => StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: colors.border,
+    ...secondaryButton(colors),
   },
   cancelButtonText: {
-    color: colors.text.primary,
-    fontWeight: '600',
+    ...secondaryButtonText(colors),
   },
   saveButton: {
-    backgroundColor: colors.primary,
+    ...primaryButton(colors),
   },
   saveButtonText: {
-    color: colors.text.inverse,
-    fontWeight: '600',
+    ...buttonText(colors),
   },
 });

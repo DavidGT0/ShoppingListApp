@@ -1,63 +1,51 @@
 import { StyleSheet } from 'react-native';
+import {
+  sheetContainer,
+  sheetOverlay,
+  sheetHandle,
+  sheetTitle,
+  sheetInput,
+  primaryButton,
+  secondaryButton,
+  buttonText,
+  secondaryButtonText,
+} from '../../theme/sheetStyles';
 
 export const makeStyles = colors => StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...sheetOverlay,
   },
   modalContent: {
-    backgroundColor: colors.sheet,
-    width: '85%',
-    borderRadius: 12,
-    padding: 20,
-    elevation: 5,
+    ...sheetContainer(colors),
+  },
+  sheetHandle: {
+    ...sheetHandle(colors),
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: colors.text.primary,
-    textAlign: 'center',
+    ...sheetTitle(colors),
   },
   modalInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20,
-    color: colors.text.primary,
+    ...sheetInput(colors),
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 15,
+    gap: 12,
   },
   modalButton: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...secondaryButton(colors),
   },
   saveButton: {
-    backgroundColor: colors.primary,
+    ...primaryButton(colors),
   },
   cancelButtonText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    fontWeight: 'bold',
+    ...secondaryButtonText(colors),
   },
   saveButtonText: {
-    fontSize: 16,
-    color: colors.text.inverse,
-    fontWeight: 'bold',
+    ...buttonText(colors),
   },
 });

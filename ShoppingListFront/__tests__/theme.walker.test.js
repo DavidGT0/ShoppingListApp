@@ -13,6 +13,8 @@ import LoginScreen from '../src/screens/LoginScreen/LoginScreen';
 import UndoBar from '../src/components/UndoBar/UndoBar';
 import OfflineBanner from '../src/components/OfflineBanner/OfflineBanner';
 import JoinListModal from '../src/components/JoinListModal/JoinListModal';
+import MembersModal from '../src/components/MembersModal/MembersModal';
+import EditItemModal from '../src/components/EditItemModal/EditItemModal';
 import ListActionsMenu from '../src/components/ListActionsMenu/ListActionsMenu';
 import ShoppingListItem from '../src/components/ShoppingListItem/ShoppingListItem';
 import DepartmentRoute from '../src/components/DepartmentRoute/DepartmentRoute';
@@ -79,7 +81,14 @@ jest.mock('../src/services/api', () => ({
     { id: 1, name: 'חלב', amount: 1, purchased: false, position: 0 },
     { id: 2, name: 'לחם', amount: 1, purchased: true, position: 1 },
   ]),
-  getListMembers: jest.fn(async () => []),
+  getListMembers: jest.fn(async () => [
+    { id: 1, username: 'owner_user', is_owner: true },
+    { id: 2, username: 'member_user', is_owner: false },
+  ]),
+  getInviteCode: jest.fn(async () => ({ invite_code: 'ABC123' })),
+  resetInviteCode: jest.fn(),
+  removeListMember: jest.fn(),
+  leaveList: jest.fn(),
   // מחלקה מותאמת ושינויים בפריסה, כדי שמסך עריכת המחלקות יציג את כל סוגי השורות
   getListCategories: jest.fn(async () => ({
     custom: [{ id: 3, name: 'חיות', color: '#7986CB', icon: '🐾' }],
@@ -99,8 +108,19 @@ jest.mock('../src/services/auth', () => ({
 
 const { act } = ReactTestRenderer;
 
+const rgbOf = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+const RGBA = /^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/;
+const isRgba = c => typeof c === 'string' && RGBA.test(c);
+// צבע טקסט שקוף למחצה מורכב מעל הרקע שלו לפני חישוב הניגודיות (M1)
+const composite = (fg, bg) => {
+  const m = RGBA.exec(fg);
+  const a = parseFloat(m[4]);
+  const base = rgbOf(bg);
+  const rgb = [1, 2, 3].map((k, i) => Math.round(a * m[k] + (1 - a) * base[i]));
+  return '#' + rgb.map(v => v.toString(16).padStart(2, '0')).join('');
+};
 const lum = hex => {
-  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const c = rgbOf(hex).map(v => v / 255);
   const l = c.map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
   return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
 };
@@ -142,9 +162,10 @@ const failures = (json, name, base = dark.background) => {
       ownBgs = stops;
       ownGradient = true;
     }
-    if (n.type === 'Text' && isHex(style.color)) {
+    if (n.type === 'Text' && (isHex(style.color) || isRgba(style.color))) {
       ownBgs.forEach(bg => {
-        const r = ratio(style.color, bg);
+        const fg = isRgba(style.color) ? composite(style.color, bg) : style.color;
+        const r = ratio(fg, bg);
         const allowed =
           !ownGradient && ALLOWED.has(`${up(style.color)}|${up(bg)}`);
         if (r < 4.5 && !allowed) {
@@ -173,6 +194,22 @@ test('the walker treats a gradient as its worst stop', () => {
       dark.secondary,
     ).toFixed(2)}`,
   ]);
+});
+
+// M1: טקסט שקוף למחצה מורכב מעל הרקע - לבן ב-0.75 על הכחול נכשל
+test('the walker composites rgba text over its background', () => {
+  const json = {
+    type: 'View',
+    props: { style: { backgroundColor: light.primary } },
+    children: [
+      {
+        type: 'Text',
+        props: { style: { color: 'rgba(255, 255, 255, 0.75)' } },
+        children: ['x'],
+      },
+    ],
+  };
+  expect(failures(json, 'probe', light.background)).toHaveLength(1);
 });
 
 const renderDark = async (element, mode = 'dark') => {
@@ -242,6 +279,17 @@ const cases = {
   JoinListModal: (
     <JoinListModal visible onClose={jest.fn()} onJoined={jest.fn()} />
   ),
+  MembersModal: (
+    <MembersModal visible listId={1} listName="שלי" isOwner onClose={jest.fn()} onLeft={jest.fn()} />
+  ),
+  EditItemModal: (
+    <EditItemModal
+      visible
+      item={{ id: 1, name: 'חלב', unit: 'ליטר', note: 'דל שומן' }}
+      onSave={jest.fn()}
+      onClose={jest.fn()}
+    />
+  ),
   ...routeCases,
   ProgressRing: ringCase(dark),
   EditDepartments: (
@@ -300,6 +348,14 @@ describe('light mode contrast walker: route, focus card and ring', () => {
     Settings: cases.Settings,
     EditDepartments: cases.EditDepartments,
     EmojiPicker: cases.EmojiPicker,
+    // המסכים והחלונות המעוצבים מחדש (גל 9): גם בערכה הבהירה
+    Login: cases.Login,
+    UndoBar: cases.UndoBar,
+    OfflineBanner: cases.OfflineBanner,
+    JoinListModal: cases.JoinListModal,
+    ListActionsMenu: cases.ListActionsMenu,
+    MembersModal: cases.MembersModal,
+    EditItemModal: cases.EditItemModal,
   };
   Object.entries(lightCases).forEach(([name, el]) => {
     test(`${name}: every text meets 4.5:1 on its background`, async () => {

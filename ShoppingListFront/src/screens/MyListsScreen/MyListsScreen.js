@@ -503,6 +503,7 @@ const MyListsScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.sheetHandle} testID="sheet_handle" />
             <Text style={styles.modalTitle}>שינוי שם רשימה</Text>
             <TextInput
               style={styles.modalInput}

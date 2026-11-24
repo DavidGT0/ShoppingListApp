@@ -1,38 +1,44 @@
 import { StyleSheet } from 'react-native';
+import {
+  sheetContainer,
+  sheetOverlay,
+  sheetHandle,
+  sheetTitle,
+  primaryButton,
+  secondaryButton,
+  buttonText,
+  secondaryButtonText,
+} from '../../theme/sheetStyles';
 
 export const makeStyles = colors => StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...sheetOverlay,
   },
   modalContent: {
-    backgroundColor: colors.sheet,
-    width: '85%',
-    maxHeight: '80%',
-    borderRadius: 12,
-    padding: 20,
-    elevation: 5,
+    ...sheetContainer(colors),
+    maxHeight: '85%',
+  },
+  sheetHandle: {
+    ...sheetHandle(colors),
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: colors.text.primary,
-    textAlign: 'center',
+    ...sheetTitle(colors),
   },
+  // שורת משתתף: כרטיס רך בלי מסגרת, כמו כרטיסי הרשימה
   memberRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     marginBottom: 8,
+    shadowColor: colors.shadowBase,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 1,
   },
   memberName: {
     fontSize: 16,
@@ -46,10 +52,10 @@ export const makeStyles = colors => StyleSheet.create({
   },
   removeButton: {
     paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.danger,
+    borderColor: colors.dangerText,
   },
   removeButtonText: {
     fontSize: 14,
@@ -61,36 +67,27 @@ export const makeStyles = colors => StyleSheet.create({
     gap: 10,
   },
   modalButton: {
-    padding: 12,
-    borderRadius: 8,
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    ...primaryButton(colors),
   },
   secondaryButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...secondaryButton(colors),
   },
   dangerButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.danger,
+    ...secondaryButton(colors),
+    borderWidth: 1.5,
+    borderColor: colors.dangerText,
   },
   primaryButtonText: {
-    fontSize: 16,
-    color: colors.text.inverse,
-    fontWeight: 'bold',
+    ...buttonText(colors),
   },
   secondaryButtonText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    fontWeight: 'bold',
+    ...secondaryButtonText(colors),
   },
   dangerButtonText: {
-    fontSize: 16,
+    ...buttonText(colors),
     color: colors.dangerText,
-    fontWeight: 'bold',
   },
 });

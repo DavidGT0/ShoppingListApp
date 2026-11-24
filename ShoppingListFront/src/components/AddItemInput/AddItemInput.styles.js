@@ -1,4 +1,5 @@
 ﻿import { StyleSheet } from 'react-native';
+import { chip, chipText } from '../../theme/sheetStyles';
 
 export const makeStyles = colors => StyleSheet.create({
   // סרגל קומפקטי: בלי רווח ריק מתחת לשדה (להצעות יש רווח משלהן)
@@ -31,17 +32,12 @@ export const makeStyles = colors => StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
+  // אותו צ'יפ גלולה כמו בחלון העריכה (theme/sheetStyles)
   chip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    ...chip(colors),
   },
   chipText: {
-    color: colors.text.primary,
-    fontSize: 14,
+    ...chipText(colors),
   },
   addButtonText: {
     color: colors.text.inverse,
