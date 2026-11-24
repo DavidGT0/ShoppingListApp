@@ -58,7 +58,11 @@ const MyListsScreen = ({ navigation }) => {
   // מצבים לניהול חלון ההצטרפות עם קוד הזמנה
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה)
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה).
+  // RN מפעיל גלילה מקוננת לכל רשימה עם RefreshControl. SwipeRefreshLayout מקבל את
+  // הגלילה המקוננת בתחילת המגע (כשהוא פתוח) וממשיך למשוך דרכה גם אחרי ש-enabled
+  // כבה באמצע המגע. לכן הגלילה המקוננת כבויה יחד עם השער: כיבויה עוצר את
+  // הגלילה המקוננת של המגע הנוכחי (stopNestedScroll), ומשיכה באותו מגע לא מרעננת
   const {
     enabled: refreshEnabled,
     scrollHandlers: refreshScrollHandlers,
@@ -394,6 +398,7 @@ const MyListsScreen = ({ navigation }) => {
         data={lists}
         {...refreshScrollHandlers}
         {...refreshScrollTracking}
+        nestedScrollEnabled={refreshEnabled}
         refreshControl={
           <RefreshControl
             enabled={refreshEnabled}

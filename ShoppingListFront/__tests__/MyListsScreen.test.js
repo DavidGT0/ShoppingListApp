@@ -103,8 +103,10 @@ describe('MyListsScreen', () => {
     await act(async () => list().props.onScroll(at(70)));
     await act(async () => list().props.onScroll(at(0)));
     expect(list().props.refreshControl.props.enabled).toBe(false);
+    expect(list().props.nestedScrollEnabled).toBe(false);
     await act(async () => list().props.onScrollEndDrag(at(0)));
     expect(list().props.refreshControl.props.enabled).toBe(true);
+    expect(list().props.nestedScrollEnabled).toBe(true);
   });
 
   test('a failed pull still alerts and stops the spinner after the minimum time', async () => {

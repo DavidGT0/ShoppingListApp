@@ -431,7 +431,11 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
   useLiveRefresh(refreshItems, LIVE_REFRESH_MS, { paused: isDragging });
 
-  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה)
+  // משיכה לריענון רק במשיכה חדשה מראש הרשימה (לא אחרי הטלה או גרירה מאמצע הרשימה).
+  // RN מפעיל גלילה מקוננת לכל רשימה עם RefreshControl. SwipeRefreshLayout מקבל את
+  // הגלילה המקוננת בתחילת המגע (כשהוא פתוח) וממשיך למשוך דרכה גם אחרי ש-enabled
+  // כבה באמצע המגע. לכן הגלילה המקוננת כבויה יחד עם השער: כיבויה עוצר את
+  // הגלילה המקוננת של המגע הנוכחי (stopNestedScroll), ומשיכה באותו מגע לא מרעננת
   const {
     enabled: refreshEnabled,
     scrollHandlers: refreshScrollHandlers,
@@ -1007,6 +1011,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
           contentContainerStyle={[styles.listContent, styles.routeContent]}
           {...refreshScrollHandlers}
           {...refreshScrollTracking}
+          nestedScrollEnabled={refreshEnabled}
           refreshControl={
             <RefreshControl
               enabled={refreshEnabled}
@@ -1037,6 +1042,7 @@ const ShoppingListScreen = ({ route, navigation }) => {
             testID="manual_list"
             contentContainerStyle={styles.listContent}
             {...refreshScrollHandlers}
+            nestedScrollEnabled={refreshEnabled}
             refreshControl={
               <RefreshControl
                 enabled={refreshEnabled}

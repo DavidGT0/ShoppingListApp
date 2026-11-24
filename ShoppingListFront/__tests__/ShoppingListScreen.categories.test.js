@@ -336,8 +336,11 @@ test('category mode: a drag that leaves the top closes the gate until the finger
   await act(async () => list().props.onScroll(scrolledTo(80)));
   await act(async () => list().props.onScroll(scrolledTo(0)));
   expect(list().props.refreshControl.props.enabled).toBe(false);
+  // גלילה מקוננת (שדרכה המשיכה ממשיכה גם כשהפקד כבוי) נסגרת יחד עם השער
+  expect(list().props.nestedScrollEnabled).toBe(false);
   await act(async () => list().props.onScrollEndDrag(scrolledTo(0)));
   expect(list().props.refreshControl.props.enabled).toBe(true);
+  expect(list().props.nestedScrollEnabled).toBe(true);
 });
 
 test('manual mode: the nested container offset observer feeds the gate', async () => {
@@ -350,8 +353,10 @@ test('manual mode: the nested container offset observer feeds the gate', async (
   await act(async () => observer.props.onOffset(90));
   await act(async () => observer.props.onOffset(0));
   expect(enabled()).toBe(false);
+  expect(global.__scrollProps.nestedScrollEnabled).toBe(false);
   await act(async () => global.__scrollProps.onScrollEndDrag(scrolledTo(0)));
   expect(enabled()).toBe(true);
+  expect(global.__scrollProps.nestedScrollEnabled).toBe(true);
 });
 
 test('category mode gates the pull-to-refresh too', async () => {
