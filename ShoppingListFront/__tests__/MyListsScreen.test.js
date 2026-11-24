@@ -113,7 +113,9 @@ describe('MyListsScreen', () => {
     const { setMinRefreshMs } = require('../src/services/minDuration');
     const { FlatList } = require('react-native');
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    setMinRefreshMs(40);
+    // זמן מינימום ארוך מספיק כדי שהבדיקה של "עדיין מסתובב" לא תתפספס כשהמחשב עמוס
+    // (עם 40ms הבדיקה נכשלה לפעמים: הזמן עבר עוד לפני שנבדק המצב)
+    setMinRefreshMs(1000);
     try {
       await renderScreen();
       getShoppingLists.mockRejectedValueOnce(new Error('boom'));

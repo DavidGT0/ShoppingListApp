@@ -297,10 +297,10 @@ test('manual mode gates the pull-to-refresh to a fresh pull at the top', async (
   expect(global.__scrollProps.onScroll).toBeUndefined();
 });
 
-// הספינר נשאר זמן מינימלי גם כשהשרת עונה מהר (כאן 80ms במקום 700)
+// הספינר נשאר זמן מינימלי גם כשהשרת עונה מהר (כאן 1000ms, ארוך מספיק כדי שהבדיקה לא תתפספס כשהמחשב עמוס)
 test('a pull keeps the spinner visible for the minimum time', async () => {
   const { setMinRefreshMs } = require('../src/services/minDuration');
-  setMinRefreshMs(80);
+  setMinRefreshMs(1000);
   try {
     await mount(ITEMS);
     const control = () => global.__scrollProps.refreshControl;
