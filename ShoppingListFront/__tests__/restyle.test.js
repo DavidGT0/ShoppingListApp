@@ -15,6 +15,7 @@ import MembersModal from '../src/components/MembersModal/MembersModal';
 import EditItemModal from '../src/components/EditItemModal/EditItemModal';
 import ListActionsMenu from '../src/components/ListActionsMenu/ListActionsMenu';
 import AddItemInput from '../src/components/AddItemInput/AddItemInput';
+import EmojiPicker from '../src/components/EmojiPicker/EmojiPicker';
 import { getSuggestions } from '../src/services/api';
 
 jest.mock('../src/hooks/useLiveRefresh', () => ({
@@ -71,6 +72,15 @@ const sheets = {
       onDuplicate={jest.fn()}
       onShareText={jest.fn()}
       onDelete={jest.fn()}
+    />
+  ),
+  EmojiPicker: (
+    <EmojiPicker
+      visible
+      selected="🥦"
+      onSelect={jest.fn()}
+      onReset={jest.fn()}
+      onClose={jest.fn()}
     />
   ),
 };

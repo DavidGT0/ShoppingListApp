@@ -60,11 +60,12 @@ const EmojiPicker = ({ visible, selected, onSelect, onReset, onClose }) => {
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
         <View style={styles.sheet} testID="emoji_picker">
+          <View style={styles.handle} testID="sheet_handle" />
           <Text style={styles.title} accessibilityRole="header">
             בחירת אייקון
           </Text>

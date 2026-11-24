@@ -625,8 +625,8 @@ describe('offline', () => {
     expect(navigation.goBack).not.toHaveBeenCalled();
   });
 
-  test('a save that fails on the network shows the offline alert, stays, and blocks the retry', async () => {
-    saveCategoryLayout.mockRejectedValue(
+  test('a save that fails on the network shows the offline alert and stays; the next סיום tries again', async () => {
+    saveCategoryLayout.mockRejectedValueOnce(
       Object.assign(new Error('אין חיבור'), { network: true }),
     );
     const { tree, navigation } = await mount();
@@ -634,8 +634,42 @@ describe('offline', () => {
     expect(alertSpy).toHaveBeenCalledWith(...BLOCKED);
     expect(navigation.goBack).not.toHaveBeenCalled();
     expect(has(tree, 'offline_banner')).toBe(true);
+    // הרשת חזרה: הקריאה החוזרת מצליחה, המצב הלא מקוון מתבטל והשמירה נשלחת
     await press(tree, 'edit_departments_done');
+    expect(saveCategoryLayout).toHaveBeenCalledTimes(2);
+    expect(has(tree, 'offline_banner')).toBe(false);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('while the network is still down, every סיום shows the alert and keeps the offline state', async () => {
+    saveCategoryLayout.mockRejectedValueOnce(
+      Object.assign(new Error('אין חיבור'), { network: true }),
+    );
+    const { tree, navigation } = await mount();
+    await press(tree, 'edit_departments_done');
+    getListCategories.mockRejectedValue(
+      Object.assign(new Error('אין חיבור'), { network: true }),
+    );
+    alertSpy.mockClear();
+    await press(tree, 'edit_departments_done');
+    expect(alertSpy).toHaveBeenCalledWith(...BLOCKED);
+    expect(has(tree, 'offline_banner')).toBe(true);
+    alertSpy.mockClear();
+    await press(tree, 'edit_departments_done');
+    expect(alertSpy).toHaveBeenCalledWith(...BLOCKED);
     expect(saveCategoryLayout).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  test('after a cache-fallback load, סיום probes the server and saves once it answers', async () => {
+    await goOffline();
+    const { tree, navigation } = await mount();
+    expect(has(tree, 'offline_banner')).toBe(true);
+    getListCategories.mockResolvedValue({ custom: CUSTOM, layout: LAYOUT });
+    await press(tree, 'edit_departments_done');
+    expect(has(tree, 'offline_banner')).toBe(false);
+    expect(saveCategoryLayout).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
   });
 
   test('a load without network and without cache goes back with the offline alert', async () => {
@@ -688,7 +722,7 @@ describe('accessibility', () => {
     const { tree } = await mount();
     expect(pressable(tree, 'edit_departments_done').props.accessibilityLabel).toBe('סיום');
     expect(pressable(tree, 'edit_departments_back').props.accessibilityLabel).toBe(
-      'חזרה בלי לשמור',
+      'חזרה',
     );
     expect(pressable(tree, 'add_department_button').props.accessibilityLabel).toBe(
       'הוספת מחלקה חדשה',
@@ -764,13 +798,30 @@ describe('unsaved changes on leave', () => {
     expect(rowText(tree, 'produce')).toContain('ירקן');
   });
 
-  test('שמור runs the save flow, then goes back', async () => {
+  test('שמור runs the save flow, then follows the original back action', async () => {
     const { tree, navigation } = await mount();
     await renameTo(tree, 'produce', 'ירקן');
-    navigation.leave();
+    const event = navigation.leave();
     await act(async () => button(lastAlert(), 'שמור').onPress());
     expect(entry(lastPayload(), 'produce').name).toBe('ירקן');
-    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    expect(navigation.dispatch).toHaveBeenCalledWith(event.data.action);
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  test('שמור after a network failure tries again and leaves when the server answers', async () => {
+    saveCategoryLayout.mockRejectedValueOnce(
+      Object.assign(new Error('אין חיבור'), { network: true }),
+    );
+    const { tree, navigation } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    await press(tree, 'edit_departments_done');
+    expect(has(tree, 'offline_banner')).toBe(true);
+    const event = navigation.leave();
+    expect(event.preventDefault).toHaveBeenCalled();
+    await act(async () => button(lastAlert(), 'שמור').onPress());
+    expect(saveCategoryLayout).toHaveBeenCalledTimes(2);
+    expect(entry(lastPayload(), 'produce').name).toBe('ירקן');
+    expect(navigation.dispatch).toHaveBeenCalledWith(event.data.action);
   });
 
   test('a reorder is a change, and dragging it back is not', async () => {
@@ -844,6 +895,7 @@ describe('סיום while a create or delete is in flight', () => {
     const done = pressable(tree, 'edit_departments_done');
     expect(done.props.accessibilityState?.disabled).toBeFalsy();
     expect(done.props.accessibilityHint).toBe('ממתין לסיום הפעולה');
+    expect(done.props.accessibilityState).toEqual({ busy: true });
     await press(tree, 'edit_departments_done');
     expect(saveCategoryLayout).not.toHaveBeenCalled();
     expect(getListCategories).toHaveBeenCalledTimes(1);
@@ -1127,5 +1179,165 @@ describe('emoji that render on older Android', () => {
 
   test('the frozen default icon is ❄️', () => {
     expect(BUILTIN_CATEGORIES.find(c => c.key === 'frozen').icon).toBe('❄️');
+  });
+});
+
+describe('text typed in the add form when pressing סיום', () => {
+  const typeNew = async (tree, text) => {
+    await press(tree, 'add_department_button');
+    await type(tree, 'new_department_input', text);
+  };
+  const ADD_TITLE = 'המחלקה החדשה עוד לא נוספה';
+
+  test('asks before saving, and sends nothing yet', async () => {
+    const { tree, navigation } = await mount();
+    await typeNew(tree, 'חיות');
+    await press(tree, 'edit_departments_done');
+    const call = lastAlert();
+    expect(call[0]).toBe(ADD_TITLE);
+    expect(call[1]).toContain('"חיות"');
+    expect(buttonsOf(call).map(b => b.text)).toEqual([
+      'המשך לערוך',
+      'הוסף',
+      'שמור בלי להוסיף',
+    ]);
+    expect(button(call, 'המשך לערוך').style).toBe('cancel');
+    expect(createListCategory).not.toHaveBeenCalled();
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    expect(getListCategories).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  test('הוסף creates it like the add button and stays; the next סיום saves it in place', async () => {
+    createListCategory.mockResolvedValue({ id: 9, name: 'חיות', color: '#abcdef', icon: '🛒' });
+    const { tree, navigation } = await mount();
+    await typeNew(tree, 'חיות');
+    await press(tree, 'edit_departments_done');
+    await act(async () => button(lastAlert(), 'הוסף').onPress());
+    expect(createListCategory).toHaveBeenCalledWith(7, 'חיות', '🛒');
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    expect(rowKeys(tree)).toContain('custom:9');
+    await press(tree, 'edit_departments_done');
+    expect(keysOf(lastPayload()).slice(-2)).toEqual(['custom:9', 'other']);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('שמור בלי להוסיף drops the text and saves the rest', async () => {
+    const { tree, navigation } = await mount();
+    await renameTo(tree, 'produce', 'ירקן');
+    await typeNew(tree, 'חיות');
+    await press(tree, 'edit_departments_done');
+    await act(async () => button(lastAlert(), 'שמור בלי להוסיף').onPress());
+    expect(createListCategory).not.toHaveBeenCalled();
+    expect(entry(lastPayload(), 'produce').name).toBe('ירקן');
+    expect(keysOf(lastPayload())).toHaveLength(ALL_KEYS.length);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('המשך לערוך keeps the typed text', async () => {
+    const { tree } = await mount();
+    await typeNew(tree, 'חיות');
+    await press(tree, 'edit_departments_done');
+    await act(async () => button(lastAlert(), 'המשך לערוך').onPress?.());
+    expect(input(tree, 'new_department_input').props.value).toBe('חיות');
+    expect(saveCategoryLayout).not.toHaveBeenCalled();
+  });
+
+  test('an empty add form does not ask', async () => {
+    const { tree, navigation } = await mount();
+    await typeNew(tree, '   ');
+    await press(tree, 'edit_departments_done');
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(saveCategoryLayout).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('while a save is in flight', () => {
+  const startSlowSave = async () => {
+    const save = deferred();
+    saveCategoryLayout.mockReturnValue(save.promise);
+    const mounted = await mount();
+    await renameTo(mounted.tree, 'dairy', 'קירור');
+    await pressNoWait(mounted.tree, 'edit_departments_done');
+    expect(saveCategoryLayout).toHaveBeenCalledTimes(1);
+    return { ...mounted, save };
+  };
+
+  test('add, delete, rename, drag and the move actions do nothing', async () => {
+    const { tree, save } = await startSlowSave();
+    alertSpy.mockClear();
+    await press(tree, 'department_edit_produce');
+    expect(has(tree, 'department_name_input')).toBe(false);
+    await press(tree, 'add_department_button');
+    expect(has(tree, 'new_department_input')).toBe(false);
+    await act(async () => pressable(tree, 'department_name_custom:5').props.onLongPress());
+    expect(alertSpy).not.toHaveBeenCalled();
+    await act(async () => pressable(tree, 'department_drag_produce').props.onLongPress());
+    expect(global.__drag).not.toHaveBeenCalled();
+    await act(async () =>
+      pressable(tree, 'department_drag_produce').props.onAccessibilityAction({
+        nativeEvent: { actionName: 'moveUp' },
+      }),
+    );
+    expect(rowKeys(tree)).toEqual([...VISIBLE, 'other']);
+    expect(createListCategory).not.toHaveBeenCalled();
+    expect(deleteListCategory).not.toHaveBeenCalled();
+    await act(async () => save.resolve());
+  });
+
+  test('back is held without a prompt; the save then leaves on its own', async () => {
+    const { navigation, save } = await startSlowSave();
+    alertSpy.mockClear();
+    const event = navigation.leave();
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+    await act(async () => save.resolve());
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('busy סיום is marked busy for TalkBack, never disabled', async () => {
+    const { tree, save } = await startSlowSave();
+    const done = pressable(tree, 'edit_departments_done');
+    expect(done.props.accessibilityState).toEqual({ busy: true });
+    await act(async () => save.resolve());
+  });
+
+  test('when the save fails, editing works again', async () => {
+    const save = deferred();
+    saveCategoryLayout.mockReturnValue(save.promise);
+    const { tree } = await mount();
+    await pressNoWait(tree, 'edit_departments_done');
+    await act(async () =>
+      save.reject(Object.assign(new Error('המחלקות עודכנו במקביל, נסה שוב'), { status: 409 })),
+    );
+    expect(pressable(tree, 'edit_departments_done').props.accessibilityState).toEqual({
+      busy: false,
+    });
+    await press(tree, 'department_edit_produce');
+    expect(has(tree, 'department_name_input')).toBe(true);
+  });
+});
+
+// StrictMode מריץ את האפקטים פעמיים (הרכבה, פירוק, הרכבה): המסך חייב להמשיך לעבוד
+describe('StrictMode', () => {
+  test('a created department still shows after the effects re-run', async () => {
+    createListCategory.mockResolvedValue({ id: 9, name: 'חיות', color: '#abcdef', icon: '🛒' });
+    const navigation = { goBack: jest.fn(), navigate: jest.fn(), dispatch: jest.fn(), addListener: jest.fn(() => () => {}) };
+    let tree;
+    await act(async () => {
+      tree = ReactTestRenderer.create(
+        <React.StrictMode>
+          <EditDepartmentsScreen route={{ params: { listId: 7 } }} navigation={navigation} />
+        </React.StrictMode>,
+      );
+    });
+    trees.push(tree);
+    await press(tree, 'add_department_button');
+    await type(tree, 'new_department_input', 'חיות');
+    await press(tree, 'new_department_save');
+    expect(rowKeys(tree)).toContain('custom:9');
+    expect(has(tree, 'new_department_input')).toBe(false);
   });
 });

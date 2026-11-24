@@ -83,14 +83,15 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   // הוספות ומחיקות שעוד בדרך: "סיום" ממתין להן (ספינר), כדי שה-PUT יכלול אותן
   const [inFlight, setInFlight] = useState(0);
   const inFlightRef = useRef(0);
-  // המסך עדיין מוצג: אחרי סגירה לא מעדכנים מצב
-  const mounted = useRef(true);
-  useEffect(
-    () => () => {
+  // המסך עדיין מוצג: אחרי סגירה לא מעדכנים מצב. נדלק בגוף האפקט, כדי שגם הרצה
+  // חוזרת של האפקטים (StrictMode, Fast Refresh) תשאיר אותו דלוק
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
       mounted.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   // נקודת ההשוואה לשינויים שלא נשמרו (הוספה ומחיקה מעדכנות אותה, כי הן חלות מיד)
   const baseline = useRef(null);
@@ -135,9 +136,11 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
     pendingMutations.current--;
   };
 
-  const leave = () => {
+  // יציאה מכוונת. action: פעולת הניווט המקורית שנעצרה ב-beforeRemove (אם יש)
+  const leave = action => {
     leaving.current = true;
-    navigation.goBack();
+    if (action) navigation.dispatch(action);
+    else navigation.goBack();
   };
 
   // מחליף את כל המצב בגרסה מהשרת (טעינה ראשונה, או "טען את הגרסה העדכנית")
@@ -219,6 +222,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   const startEdit = key => {
+    if (savingRef.current) return;
     if (blockIfOffline()) return;
     const next = applyEdit(rows);
     if (!next) return;
@@ -228,6 +232,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   const confirmEdit = () => {
+    if (savingRef.current) return;
     const next = applyEdit(rows);
     if (!next) return;
     setRows(next);
@@ -235,6 +240,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   const openPicker = target => {
+    if (savingRef.current) return;
     if (blockIfOffline()) return;
     setPicker(target);
   };
@@ -251,6 +257,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   const moveRow = (key, actionName) => {
+    if (savingRef.current) return;
     if (blockIfOffline()) return;
     const delta = actionName === 'moveUp' ? -1 : actionName === 'moveDown' ? 1 : 0;
     if (delta) setOrder(prev => moveKey(prev, key, delta));
@@ -269,12 +276,13 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   const openAdd = () => {
+    if (savingRef.current) return;
     if (blockIfOffline()) return;
     setAdding({ text: '', icon: DEFAULT_ICON });
   };
 
   const submitAdd = async () => {
-    if (!adding || creatingRef.current) return;
+    if (!adding || creatingRef.current || savingRef.current) return;
     const name = adding.text.trim();
     if (!name) return;
     if (blockIfOffline()) return;
@@ -316,6 +324,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   const deleteDepartment = async row => {
+    if (savingRef.current) return;
     if (blockIfOffline()) return;
     beginRequest();
     try {
@@ -354,6 +363,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
 
   // לחיצה ארוכה על מחלקה שנוספה: אישור עם השם המוצג (שינוי השם בפריסה), ואז מחיקה
   const requestDelete = key => {
+    if (savingRef.current) return;
     if (blockIfOffline()) return;
     const row = rows[key];
     if (!row?.isCustom) return;
@@ -387,12 +397,12 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   // PUT אחד, וחזרה רק אחרי שהשמירה הצליחה (savingRef כבר דלוק)
-  const putLayout = async payload => {
+  const putLayout = async (payload, action) => {
     startMutation();
     try {
       await saveCategoryLayout(listId, payload);
       // נשאר "שומר" עד שהמסך נסגר, כדי שלחיצה נוספת לא תשלח שוב
-      if (mounted.current) leave();
+      if (mounted.current) leave(action);
     } catch (error) {
       failSave(error, 'לא הצלחנו לשמור את המחלקות');
     } finally {
@@ -401,20 +411,38 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   };
 
   // "שמור את שלי בכל זאת" מתוך שאלת העדכון המקביל
-  const saveMineAnyway = payload => {
+  const saveMineAnyway = (payload, action) => {
     if (savingRef.current) return;
     if (blockIfOffline()) return;
     savingRef.current = true;
     setSaving(true);
-    putLayout(payload);
+    putLayout(payload, action);
   };
 
-  // "סיום": קריאה חוזרת של המחלקות, ואם אף אחד לא שינה אותן בינתיים - PUT אחד
-  const handleDone = async () => {
+  // "סיום": קריאה חוזרת של המחלקות, ואם אף אחד לא שינה אותן בינתיים - PUT אחד.
+  // action: פעולת הניווט שנעצרה (כש"שמור" נלחץ בשאלת היציאה). skipAdd: המשתמש
+  // בחר לשמור בלי להוסיף את מה שהקליד בטופס ההוספה
+  const handleDone = async ({ action, skipAdd = false } = {}) => {
     if (savingRef.current) return;
     // הוספה או מחיקה בדרך: הכפתור מציג ספינר, והלחיצה לא שולחת כלום
     if (inFlightRef.current > 0) return;
-    if (blockIfOffline()) return;
+    // טקסט בטופס ההוספה לא נזרק בשקט: שואלים לפני השמירה
+    const typed = adding?.text?.trim();
+    if (typed && !skipAdd) {
+      Alert.alert('המחלקה החדשה עוד לא נוספה', `להוסיף את "${typed}" לפני השמירה?`, [
+        { text: 'המשך לערוך', style: 'cancel' },
+        { text: 'הוסף', onPress: () => submitAdd() },
+        {
+          text: 'שמור בלי להוסיף',
+          onPress: () => {
+            setAdding(null);
+            handleDoneRef.current({ action, skipAdd: true });
+          },
+        },
+      ]);
+      return;
+    }
+    // אין חסימה במצב לא מקוון כאן: הקריאה החוזרת (קריאה בלבד) היא גם בדיקת החיבור
     let nextRows = rows;
     if (editing) {
       nextRows = applyEdit(rows);
@@ -429,10 +457,21 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
     try {
       fresh = normalizeCategories(await getListCategories(listId));
     } catch (error) {
+      if (error?.network) {
+        // עדיין אין חיבור: ההודעה בכל ניסיון, והלחיצה הבאה תנסה שוב
+        savingRef.current = false;
+        if (!mounted.current) return;
+        setSaving(false);
+        setOffline(true);
+        showOfflineBlockedAlert();
+        return;
+      }
       failSave(error, 'לא הצלחנו לשמור את המחלקות');
       return;
     }
     if (!mounted.current) return;
+    // השרת ענה: החיבור חזר
+    if (isOfflineRef.current) setOffline(false);
     if (serverChanged(snapshot.current, fresh, mine.current)) {
       savingRef.current = false;
       setSaving(false);
@@ -456,13 +495,14 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
                   nextRows,
                   serverOnlyEntries(fresh, nextRows),
                 ),
+                action,
               ),
           },
         ],
       );
       return;
     }
-    await putLayout(layoutPayload(nextOrder, nextRows));
+    await putLayout(layoutPayload(nextOrder, nextRows), action);
   };
 
   // יציאה (חץ החזרה או כפתור החזרה של המכשיר) עם שינויים שלא נשמרו: שואלים
@@ -470,7 +510,14 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
   handleDoneRef.current = handleDone;
   useEffect(() => {
     const unsubscribe = navigation?.addListener?.('beforeRemove', e => {
-      if (leaving.current || !dirtyRef.current) return;
+      if (leaving.current) return;
+      // שמירה בדרך: היציאה מוחזקת בלי שאלה. שמירה שמצליחה יוצאת בעצמה, ושמירה
+      // שנכשלת משאירה במסך עם ההודעה
+      if (savingRef.current) {
+        e.preventDefault();
+        return;
+      }
+      if (!dirtyRef.current) return;
       e.preventDefault();
       Alert.alert('לשמור את השינויים?', 'יש שינויים במחלקות שעוד לא נשמרו.', [
         { text: 'המשך לערוך', style: 'cancel' },
@@ -482,7 +529,10 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
             navigation.dispatch(e.data.action);
           },
         },
-        { text: 'שמור', onPress: () => handleDoneRef.current() },
+        {
+          text: 'שמור',
+          onPress: () => handleDoneRef.current({ action: e.data.action }),
+        },
       ]);
     });
     return () => unsubscribe?.();
@@ -506,6 +556,7 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
             <GHTouchableOpacity
               testID={`department_drag_${row.key}`}
               onLongPress={() => {
+                if (savingRef.current) return;
                 if (blockIfOffline()) return;
                 drag();
               }}
@@ -714,17 +765,18 @@ const EditDepartmentsScreen = ({ route, navigation }) => {
             style={styles.backButton}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="חזרה בלי לשמור"
+            accessibilityLabel="חזרה"
           >
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <TouchableOpacity
             testID="edit_departments_done"
-            onPress={handleDone}
+            onPress={() => handleDone()}
             style={styles.doneButton}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="סיום"
+            accessibilityState={{ busy }}
             accessibilityHint={
               offlineHint ||
               (busy ? BUSY_HINT : 'שמירת הסדר, השמות והאייקונים')

@@ -1,29 +1,25 @@
 import { StyleSheet } from 'react-native';
+import {
+  sheetContainer,
+  sheetOverlay,
+  sheetHandle,
+  sheetTitle,
+} from '../../theme/sheetStyles';
 
 export const makeStyles = colors =>
   StyleSheet.create({
+    // גיליון תחתון כמו שאר החלונות: רקע sheet, פינות עליונות מעוגלות וידית אחיזה
     overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
+      ...sheetOverlay,
     },
     sheet: {
-      width: '88%',
-      backgroundColor: colors.raised,
-      borderRadius: 20,
-      padding: 16,
-      shadowColor: colors.shadowBase,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.25,
-      shadowRadius: 16,
-      elevation: 10,
+      ...sheetContainer(colors),
+    },
+    handle: {
+      ...sheetHandle(colors),
     },
     title: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: colors.text.primary,
-      textAlign: 'right',
+      ...sheetTitle(colors),
       marginBottom: 12,
     },
     grid: {
