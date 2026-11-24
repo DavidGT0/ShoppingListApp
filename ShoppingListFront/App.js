@@ -18,6 +18,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 // מסכים
 import MyListsScreen from './src/screens/MyListsScreen/MyListsScreen';
 import ShoppingListScreen from './src/screens/ShoppingListScreen/ShoppingListScreen';
+import EditDepartmentsScreen from './src/screens/EditDepartmentsScreen/EditDepartmentsScreen';
 import SettingsScreen from './src/screens/SettingsScreen/SettingsScreen';
 import LoginScreen from './src/screens/LoginScreen/LoginScreen';
 
@@ -38,6 +39,11 @@ function ListsStackNavigator() {
       <ListsStack.Screen
         name="ShoppingListItems"
         component={ShoppingListScreen}
+      />
+      {/* עריכת המחלקות של רשימה (נפתח מכפתור ✎ במסך הרשימה) */}
+      <ListsStack.Screen
+        name="EditDepartments"
+        component={EditDepartmentsScreen}
       />
     </ListsStack.Navigator>
   );

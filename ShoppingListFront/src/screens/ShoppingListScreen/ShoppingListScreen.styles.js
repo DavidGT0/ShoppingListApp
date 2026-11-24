@@ -131,11 +131,31 @@ export const makeStyles = colors => StyleSheet.create({
     marginBottom: 12,
     textAlign: 'right',
   },
+  // שורת המתג: המתג בצד ימין, ובמצב "לפי מחלקות" כפתור ✎ משמאלו
+  sortRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    gap: 8,
+  },
+  // כפתור עריכת המחלקות: ריבוע מעוגל בגובה המתג, באותו משטח ומסגרת
+  editDepartmentsButton: {
+    width: 48,
+    height: 48,
+    marginTop: 10,
+    marginBottom: 8,
+    borderRadius: 14,
+    backgroundColor: colors.raised,
+    borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   // מתג גלולה: מיכל מעוגל עם ריווח פנימי. בלי overflow: 'hidden' (שחותך את המסגרת
   // בפינות באנדרואיד) - המקטעים מעוגלים בעצמם
   sortSegments: {
+    flex: 1,
     flexDirection: 'row-reverse',
-    marginHorizontal: 20,
     marginTop: 10,
     marginBottom: 8,
     padding: 4,

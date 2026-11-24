@@ -817,6 +817,14 @@ const ShoppingListScreen = ({ route, navigation }) => {
   const departmentsLabel =
     departmentCount === 1 ? 'מחלקה אחת' : `${departmentCount} מחלקות`;
 
+  // מסך עריכת המחלקות: מקבל את המחלקות שיש בהן מוצרים (גם שנקנו), כדי להציג אותן.
+  // בחזרה המסך חוזר לפוקוס והרענון החי מביא מיד את הפריסה החדשה
+  const openEditDepartments = () => {
+    if (blockIfOffline()) return;
+    const usedKeys = [...new Set(visibleResolved.map(r => r.cat.key))];
+    navigation.navigate('EditDepartments', { listId, listName, usedKeys });
+  };
+
   // שורת מוצר במסלול (רגילה, או גדולה בכרטיס "עכשיו במחלקה").
   // כל הפעולות עוברות דרך המסך: חסימה במצב לא מקוון, פס ביטול ומשמר השינויים
   const renderRouteRow = (item, { variant } = {}) => (
@@ -965,43 +973,61 @@ const ShoppingListScreen = ({ route, navigation }) => {
 
       <OfflineBanner visible={isOffline} />
 
-      {/* מתג גלולה: מיכל מעוגל, והמקטע הפעיל גלולה מלאה בצבע הראשי */}
-      <View style={styles.sortSegments} testID="sort_segments">
-        {[
-          { mode: 'manual', label: 'סדר ידני', icon: 'drag-horizontal-variant' },
-          { mode: 'category', label: 'לפי מחלקות', icon: 'shape-outline' },
-        ].map(({ mode, label, icon }) => {
-          const selected = (mode === 'category') === categoryMode;
-          return (
-            <TouchableOpacity
-              key={mode}
-              testID={`sort_segment_${mode}`}
-              accessibilityLabel={label}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              style={[
-                styles.sortSegment,
-                selected && styles.sortSegmentActive,
-              ]}
-              onPress={() => selectSortMode(mode)}
-              activeOpacity={0.8}
-            >
-              <Icon
-                name={icon}
-                size={18}
-                color={selected ? colors.text.inverse : colors.text.secondary}
-              />
-              <Text
+      {/* מתג גלולה: מיכל מעוגל, והמקטע הפעיל גלולה מלאה בצבע הראשי.
+          במצב "לפי מחלקות" לידו כפתור ✎ לעריכת המחלקות */}
+      <View style={styles.sortRow}>
+        <View style={styles.sortSegments} testID="sort_segments">
+          {[
+            { mode: 'manual', label: 'סדר ידני', icon: 'drag-horizontal-variant' },
+            { mode: 'category', label: 'לפי מחלקות', icon: 'shape-outline' },
+          ].map(({ mode, label, icon }) => {
+            const selected = (mode === 'category') === categoryMode;
+            return (
+              <TouchableOpacity
+                key={mode}
+                testID={`sort_segment_${mode}`}
+                accessibilityLabel={label}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
                 style={[
-                  styles.sortSegmentText,
-                  selected && styles.sortSegmentTextActive,
+                  styles.sortSegment,
+                  selected && styles.sortSegmentActive,
                 ]}
+                onPress={() => selectSortMode(mode)}
+                activeOpacity={0.8}
               >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                <Icon
+                  name={icon}
+                  size={18}
+                  color={selected ? colors.text.inverse : colors.text.secondary}
+                />
+                <Text
+                  style={[
+                    styles.sortSegmentText,
+                    selected && styles.sortSegmentTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {categoryMode && (
+          <TouchableOpacity
+            testID="edit_departments_button"
+            onPress={openEditDepartments}
+            style={styles.editDepartmentsButton}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="עריכת מחלקות"
+            accessibilityHint={
+              isOffline ? 'לא זמין ללא חיבור לאינטרנט' : undefined
+            }
+          >
+            <Icon name="pencil-outline" size={20} color={colors.primaryText} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {categoryMode ? (
