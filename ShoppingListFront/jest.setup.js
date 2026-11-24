@@ -32,3 +32,12 @@ jest.mock('react-native-linear-gradient', () => {
 // משך מינימלי של ספינר הריענון: 0 בבדיקות (בלי המתנות אמיתיות ועדכונים מאוחרים).
 // בדיקה שרוצה משך מינימלי קובעת אותו בעצמה עם setMinRefreshMs ומחזירה ל-0
 require('./src/services/minDuration').setMinRefreshMs(0);
+
+// TEMP: לוגי האבחון של שער הריענון ('[gate]') לא מוצגים בבדיקות
+{
+  const originalLog = console.log;
+  console.log = (...args) => {
+    if (args[0] === '[gate]') return;
+    originalLog(...args);
+  };
+}
